@@ -232,6 +232,29 @@ local function SellJunk()
 end
 
 -- ============================================================================
+-- FASTER LOOTING  (auto-loot without right-click)
+--   Sets the game's built-in autoLootDefault CVar when enabled.
+--   Saves the previous value on first enable so it can be restored on disable.
+-- ============================================================================
+local function ApplyFasterLooting()
+    local enabled = cfg().fasterLooting
+    -- Snapshot the original value the first time we enable so we can restore it.
+    if enabled and cfg().fasterLootingOrig == nil then
+        cfg().fasterLootingOrig = GetCVarBool("autoLootDefault") and "1" or "0"
+    end
+    if enabled then
+        SetCVar("autoLootDefault", "1")
+    else
+        -- Restore the original value (or leave it alone if we never touched it).
+        local orig = cfg().fasterLootingOrig
+        if orig then
+            SetCVar("autoLootDefault", orig)
+            cfg().fasterLootingOrig = nil
+        end
+    end
+end
+
+-- ============================================================================
 -- AUTO REPAIR on MERCHANT_SHOW
 -- ============================================================================
 local function AutoRepair()
@@ -748,4 +771,6 @@ function QOL.Refresh(addonObj)
 
     -- MERCHANT_SHOW is needed for either sell-junk or auto-repair
     Reg("MERCHANT_SHOW", d.sellJunk or d.autoRepair)
+
+    ApplyFasterLooting()
 end

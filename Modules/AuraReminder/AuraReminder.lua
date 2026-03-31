@@ -75,12 +75,41 @@ local function GetOrMakeRow(idx)
             GameTooltip:AddLine(self.spellLabel, 1, 1, 1)
             if self.required then GameTooltip:AddLine("Required", 1, 0.3, 0.3)
             else GameTooltip:AddLine("Optional", 0.7, 0.7, 0.7) end
+            -- Party buff: show how many members are missing it
+            if self.partyMissingCount and self.partyMissingCount > 0 then
+                GameTooltip:AddLine(
+                    string.format("|cffff9900%d group member%s missing this buff|r",
+                        self.partyMissingCount,
+                        self.partyMissingCount == 1 and " is" or "s are"),
+                    1, 1, 1)
+            end
+            -- Click hint
+            if self.spellID and self.spellID > 0 then
+                GameTooltip:AddLine("|cff888888Click to cast|r", 1, 1, 1)
+            end
             GameTooltip:Show()
         end
     end)
     row:SetScript("OnLeave", function(self) 
         frame:SetAlpha(0.7)
         GameTooltip:Hide() 
+    end)
+
+    -- Click to cast the associated spell
+    row:SetScript("OnClick", function(self, button)
+        if button ~= "LeftButton" then return end
+        if self.spellID and self.spellID > 0 then
+            -- CastSpellByID is protected — use SecureActionButtonTemplate via a
+            -- hidden button so we can cast in any context.
+            if not row._castBtn then
+                local cb = CreateFrame("Button", nil, UIParent, "SecureActionButtonTemplate")
+                cb:SetAttribute("type", "spell")
+                cb:Hide()
+                row._castBtn = cb
+            end
+            row._castBtn:SetAttribute("spell", self.spellID)
+            row._castBtn:Click()
+        end
     end)
 
     -- Make dragging pass through to parent
@@ -152,6 +181,8 @@ local function ShowMissing(missing)
         row.icon:SetTexture(m.icon)
         row.spellLabel = m.label
         row.required = m.required
+        row.spellID = m.spellID or 0
+        row.partyMissingCount = m.partyMissingCount or 0
         row:Show()
         xOff = xOff + ICON_SIZE + ICON_PAD
     end

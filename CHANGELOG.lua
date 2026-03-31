@@ -8,6 +8,15 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.0.13",
+        date    = "2026-03-31",
+        changes = {
+            "|cff00d1b2New|r  Click buff reminder icons to cast the spell",
+            "|cff00d1b2New|r  Tooltip shows how many group members are missing a party buff",
+            "|cff00d1b2New|r  QOL: Faster looting (auto-loot without right-click)",
+        },
+    },
+    {
         version = "1.0.12",
         date    = "2026-03-31",
         changes = {

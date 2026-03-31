@@ -766,6 +766,17 @@ local function BuildQOL(content, db, addon)
 
     y = y - 8
 
+    -- ── LOOTING ───────────────────────────────────────────────────────────
+    local h4a = Label(content, "LOOTING", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    h4a:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    _, dh = MakeToggle(content, "Faster looting (auto-loot without right-click)",
+        function() return q.fasterLooting end,
+        function(v) q.fasterLooting = v; ns.QOL.Refresh(addon) end, y)
+    y = y - dh - 14
+
     -- ── VENDOR ────────────────────────────────────────────────────────────
     local h4 = Label(content, "VENDOR", "GameFontNormalSmall",
         T.textHeader[1], T.textHeader[2], T.textHeader[3])

@@ -229,15 +229,17 @@ local PARTY_BUFFS = {
       buffIDs = { 381732,381741,381746,381748,381749,381750,381751,381752,381753,381754,381756,381757,381758 } },
 }
 
--- Helper: returns true if any group member (including player) is missing the buff.
+-- Helper: returns the number of group members (including player) missing the buff.
 -- All party buff IDs are in the NON_SECRET whitelist so safe in all contexts.
-local function AnyMemberMissingBuff(buffIDs)
+local function CountMembersMissingBuff(buffIDs)
+    local count = 0
+
     -- Check player
     local playerHas = false
     for _, id in ipairs(buffIDs) do
         if PlayerHasAura(id) then playerHas = true; break end
     end
-    if not playerHas then return true end
+    if not playerHas then count = count + 1 end
 
     -- Check group members
     local function unitMissing(unit)
@@ -249,14 +251,14 @@ local function AnyMemberMissingBuff(buffIDs)
 
     if IsInRaid() then
         for i = 1, GetNumGroupMembers() do
-            if unitMissing("raid"..i) then return true end
+            if unitMissing("raid"..i) then count = count + 1 end
         end
     elseif IsInGroup() then
         for i = 1, GetNumSubgroupMembers() do
-            if unitMissing("party"..i) then return true end
+            if unitMissing("party"..i) then count = count + 1 end
         end
     end
-    return false
+    return count
 end
 
 -- Returns missing party buff reminders for the player's class.
@@ -270,12 +272,14 @@ local function GetMissingPartyBuffs(db)
     for _, def in ipairs(PARTY_BUFFS) do
         if def.class == playerClass then
             if cfg[def.key] ~= false and Known(def.castSpell) then
-                if AnyMemberMissingBuff(def.buffIDs) then
+                local missingCount = CountMembersMissingBuff(def.buffIDs)
+                if missingCount > 0 then
                     missing[#missing + 1] = {
-                        label    = def.label,
-                        spellID  = def.castSpell,
-                        icon     = SpellIcon(def.castSpell),
-                        required = true,
+                        label             = def.label,
+                        spellID           = def.castSpell,
+                        icon              = SpellIcon(def.castSpell),
+                        required          = true,
+                        partyMissingCount = missingCount,
                     }
                 end
             end

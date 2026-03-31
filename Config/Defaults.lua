@@ -18,6 +18,7 @@ ns.Defaults = {
             holdModifier   = "ANY",  -- which modifier: "ANY", "ALT", "SHIFT", "CTRL"
             questSkipModifier = "SHIFT", -- hold this key to skip auto-quest actions
             autoSkipCinematic = false, -- auto-skip cinematics and cutscenes
+            fasterLooting  = false,  -- enable auto-loot (no right-click needed)
             sellJunk       = false,  -- sell grey items when visiting a vendor
             autoRepair      = false,  -- repair all gear when visiting a repair vendor
             repairGuild     = false,  -- prefer guild bank funds for repairs

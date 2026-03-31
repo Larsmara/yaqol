@@ -1,5 +1,3 @@
 - Is it possible to get current season dungeons instead of hardcoding their id?
   - Partial: `BuildChallengeMapTable()` already uses `C_ChallengeMode.GetMapTable()` dynamically for keystone detection. Teleport spell IDs cannot be derived from any Blizzard API — they must remain hardcoded. Current approach is correct.
 - Incorporate the other addon i made "ClassColor Friends" into this one.
-- Placement of the options for key modifier for auto accept is missplaced. It seems to be under "Auto-advance single-option gossip/quest dialogs"
-- Fast loot: I dont know if its working. The loot window takes what it seems like 2 seconds to close

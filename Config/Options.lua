@@ -616,12 +616,7 @@ local function BuildQOL(content, db, addon)
     noteQ:SetJustifyH("LEFT")
     y = y - 26
 
-    _, dh = MakeToggle(content, "Auto-advance single-option gossip / quest dialogs",
-        function() return q.autoGossip end,
-        function(v) q.autoGossip = v; ns.QOL.Refresh(addon) end, y)
-    y = y - dh - 4
-
-    -- Quest skip modifier row
+    -- Quest skip modifier row (belongs with auto-quest, not gossip)
     local qModLabel = Label(content, "  Hold to skip auto-quest:", "GameFontNormalSmall",
         T.textDim[1], T.textDim[2], T.textDim[3])
     qModLabel:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
@@ -664,6 +659,11 @@ local function BuildQOL(content, db, addon)
         end)
     end
     y = y - 30
+
+    _, dh = MakeToggle(content, "Auto-advance single-option gossip / quest dialogs",
+        function() return q.autoGossip end,
+        function(v) q.autoGossip = v; ns.QOL.Refresh(addon) end, y)
+    y = y - dh - 14
 
     -- Auto-skip cinematics toggle
     _, dh = MakeToggle(content, "Auto-skip cinematics and cutscenes",

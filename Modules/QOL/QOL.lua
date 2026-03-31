@@ -238,18 +238,22 @@ end
 -- ============================================================================
 local function ApplyFasterLooting()
     local enabled = cfg().fasterLooting
-    -- Snapshot the original value the first time we enable so we can restore it.
+    -- Snapshot the original values the first time we enable so we can restore them.
     if enabled and cfg().fasterLootingOrig == nil then
-        cfg().fasterLootingOrig = GetCVarBool("autoLootDefault") and "1" or "0"
+        cfg().fasterLootingOrig      = GetCVarBool("autoLootDefault") and "1" or "0"
+        cfg().fasterLootingDelayOrig = GetCVar("autoLootDelay") or "0.5"
     end
     if enabled then
         SetCVar("autoLootDefault", "1")
+        SetCVar("autoLootDelay",   "0")  -- close loot window instantly
     else
-        -- Restore the original value (or leave it alone if we never touched it).
+        -- Restore the original values (or leave them alone if we never touched them).
         local orig = cfg().fasterLootingOrig
         if orig then
             SetCVar("autoLootDefault", orig)
-            cfg().fasterLootingOrig = nil
+            SetCVar("autoLootDelay",   cfg().fasterLootingDelayOrig or "0.5")
+            cfg().fasterLootingOrig      = nil
+            cfg().fasterLootingDelayOrig = nil
         end
     end
 end

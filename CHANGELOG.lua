@@ -8,6 +8,14 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.0.15",
+        date    = "2026-03-31",
+        changes = {
+            "|cff2dc9b8Fix|r  Quest skip modifier now correctly grouped under auto-quest (not gossip)",
+            "|cff2dc9b8Fix|r  Faster looting now also sets autoLootDelay=0 so the loot window closes instantly",
+        },
+    },
+    {
         version = "1.0.14",
         date    = "2026-04-01",
         changes = {

@@ -1,3 +1,3 @@
 - Is it possible to get current season dungeons instead of hardcoding their id?
-  - Partial: `BuildChallengeMapTable()` already uses `C_ChallengeMode.GetMapTable()` dynamically for keystone detection. Teleport spell IDs cannot be derived from any Blizzard API — they must remain hardcoded. Current approach is correct.
+  - Fixed: dungeon list is now fully dynamic from C_ChallengeMode.GetMapTable(). DUNGEON_SPELL_BY_NAME lookup table covers all recent seasons. Spell IDs for new Midnight S1 dungeons need in-game verification.
 - Incorporate the other addon i made "ClassColor Friends" into this one.

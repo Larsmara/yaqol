@@ -8,6 +8,15 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.0.16",
+        date    = "2026-03-31",
+        changes = {
+            "|cff00d1b2New|r  Faster looting now suppresses the loot window entirely — loot goes straight to bags",
+            "|cff2dc9b8Fix|r  Buff reminders failing to appear in instanced content (retry logic improved)",
+            "|cff2dc9b8Fix|r  Auto-skip cinematics error on login (Midnight removed the old hook targets)",
+        },
+    },
+    {
         version = "1.0.15",
         date    = "2026-03-31",
         changes = {

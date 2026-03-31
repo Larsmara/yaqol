@@ -232,29 +232,52 @@ local function SellJunk()
 end
 
 -- ============================================================================
--- FASTER LOOTING  (auto-loot without right-click)
---   Sets the game's built-in autoLootDefault CVar when enabled.
---   Saves the previous value on first enable so it can be restored on disable.
+-- FASTER LOOTING
+--   Suppresses the stock Blizzard loot window entirely by unregistering
+--   LOOT_OPENED/LOOT_CLOSED from LootFrame, then calling LootSlot() for
+--   every slot on LOOT_OPENED ourselves — the same technique used by Plumber.
+--   The window never appears; loot goes straight to your bags.
+--   Also sets autoLootDefault=1 so left-clicking a corpse triggers looting.
 -- ============================================================================
+local lootFrameMuted = false
+
+local function MuteLootFrame(mute)
+    local f = LootFrame
+    if not f then return end
+    if mute and not lootFrameMuted then
+        f:UnregisterEvent("LOOT_OPENED")
+        f:UnregisterEvent("LOOT_CLOSED")
+        lootFrameMuted = true
+    elseif not mute and lootFrameMuted then
+        f:RegisterEvent("LOOT_OPENED")
+        f:RegisterEvent("LOOT_CLOSED")
+        lootFrameMuted = false
+    end
+end
+
+local function OnLootOpened()
+    if not cfg().fasterLooting then return end
+    if InCombatLockdown() then return end
+    for i = GetNumLootItems(), 1, -1 do
+        LootSlot(i)
+    end
+end
+
 local function ApplyFasterLooting()
     local enabled = cfg().fasterLooting
-    -- Snapshot the original values the first time we enable so we can restore them.
     if enabled and cfg().fasterLootingOrig == nil then
-        cfg().fasterLootingOrig      = GetCVarBool("autoLootDefault") and "1" or "0"
-        cfg().fasterLootingDelayOrig = GetCVar("autoLootDelay") or "0.5"
+        cfg().fasterLootingOrig = GetCVarBool("autoLootDefault") and "1" or "0"
     end
     if enabled then
         SetCVar("autoLootDefault", "1")
-        SetCVar("autoLootDelay",   "0")  -- close loot window instantly
+        MuteLootFrame(true)
     else
-        -- Restore the original values (or leave them alone if we never touched them).
         local orig = cfg().fasterLootingOrig
         if orig then
             SetCVar("autoLootDefault", orig)
-            SetCVar("autoLootDelay",   cfg().fasterLootingDelayOrig or "0.5")
-            cfg().fasterLootingOrig      = nil
-            cfg().fasterLootingDelayOrig = nil
+            cfg().fasterLootingOrig = nil
         end
+        MuteLootFrame(false)
     end
 end
 
@@ -687,6 +710,7 @@ local function OnEvent(self, event, arg1)
     elseif event == "MERCHANT_SHOW"                   then
         SellJunk()
         AutoRepair()
+    elseif event == "LOOT_OPENED"                     then OnLootOpened()
     end
 end
 
@@ -706,7 +730,8 @@ local function HookAutoSkip()
 
     -- In-engine rendered cinematics (pre-rendered movies, e.g. login screen,
     -- patch intro videos) shown in MovieFrame.
-    if MovieFrame and MovieFrame.StopMovie then
+    -- Guard: MovieFrame.Play was renamed/removed in Midnight 12.0.
+    if MovieFrame and type(MovieFrame.Play) == "function" then
         hooksecurefunc(MovieFrame, "Play", function()
             if cfg().autoSkipCinematic then
                 C_Timer.After(0.5, function()
@@ -719,15 +744,18 @@ local function HookAutoSkip()
     end
 
     -- In-world scripted cinematics (e.g. quest cutscenes via CinematicFrame).
-    hooksecurefunc("CinematicFrame_StartCinematic", function()
-        if cfg().autoSkipCinematic then
-            C_Timer.After(0.5, function()
-                if cfg().autoSkipCinematic then
-                    CancelCinematic()
-                end
-            end)
-        end
-    end)
+    -- Guard: function may not exist in all Midnight builds.
+    if type(CinematicFrame_StartCinematic) == "function" then
+        hooksecurefunc("CinematicFrame_StartCinematic", function()
+            if cfg().autoSkipCinematic then
+                C_Timer.After(0.5, function()
+                    if cfg().autoSkipCinematic then
+                        CancelCinematic()
+                    end
+                end)
+            end
+        end)
+    end
 end
 
 -- Called from Init.lua: OnEnable
@@ -775,6 +803,7 @@ function QOL.Refresh(addonObj)
 
     -- MERCHANT_SHOW is needed for either sell-junk or auto-repair
     Reg("MERCHANT_SHOW", d.sellJunk or d.autoRepair)
+    Reg("LOOT_OPENED",   d.fasterLooting)
 
     ApplyFasterLooting()
 end

@@ -358,28 +358,37 @@ function AuraReminder.Init(addon)
 
     -- Schedule a check after a short delay. Uses C_Timer.After(0) for
     -- the first frame, then a real delay so the world is fully loaded.
+    -- Uses multiple retries because ZONE_CHANGED_NEW_AREA can fire after
+    -- PLAYER_ENTERING_WORLD and reset the sequence, and GetInstanceInfo()
+    -- sometimes returns "none" on the first frame inside an instance.
     local pendingSeq = 0
     local function ScheduleCheck()
         pendingSeq = pendingSeq + 1
         local seq = pendingSeq
-        local delay = ns.Addon:Profile().reminder.enterDelay
-        -- First check next frame (GetInstanceInfo is valid immediately)
-        C_Timer.After(0, function()
-            if seq ~= pendingSeq then return end
+        local delay = ns.Addon:Profile().reminder.enterDelay or 2
+
+        local function TryActivate()
+            if seq ~= pendingSeq then return true end  -- superseded, stop retrying
             isActive = ShouldActivate()
             if isActive then
                 CheckAndShow()
                 StartPeriodic()
                 StartWeaponTicker()
-            else
-                -- Not in instance yet on frame 0 — try again after full delay
+                return true
+            end
+            return false
+        end
+
+        -- Attempt 1: next frame
+        C_Timer.After(0, function()
+            if not TryActivate() then
+                -- Attempt 2: after enterDelay
                 C_Timer.After(delay, function()
-                    if seq ~= pendingSeq then return end
-                    isActive = ShouldActivate()
-                    if isActive then
-                        CheckAndShow()
-                        StartPeriodic()
-                        StartWeaponTicker()
+                    if not TryActivate() then
+                        -- Attempt 3: one more retry in case the zone was slow
+                        C_Timer.After(delay, function()
+                            TryActivate()
+                        end)
                     end
                 end)
             end

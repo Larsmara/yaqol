@@ -18,6 +18,11 @@ function yaqol:OnInitialize()
     end
     if r.enableClassBuffs == nil then r.enableClassBuffs = true end
     if r.enablePartyBuffs == nil then r.enablePartyBuffs = true end
+
+    -- Migrate: new QOL settings added in v1.0.5
+    local q = self.db.profile.qol
+    if q.questSkipModifier == nil then q.questSkipModifier = "SHIFT" end
+    if q.autoSkipCinematic == nil then q.autoSkipCinematic = false end
     -- Migrate: old profiles had enabledDungeon=false by mistake; default is now true
     if r.enabledDungeon == nil or r.enabledDungeon == false then
         -- Only reset if it was never explicitly set to false by the user.

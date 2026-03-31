@@ -275,12 +275,15 @@ function AuraReminder.Init(addon)
     -- This ticker is only active while the frame is visible and we're out of combat.
     local weaponTicker = nil
     local function HasWeaponBuffDefs()
-        -- We need the 1-second ticker only for classes whose weapon buff check
-        -- relies on GetWeaponEnchantInfo() rather than UNIT_AURA.
-        -- Currently that is only DEATHKNIGHT (runeforge).
-        -- All other weapon imbues (shaman, rogue poisons) fire UNIT_AURA normally.
+        -- We need the 1-second ticker when weapon enchant state can change
+        -- without firing UNIT_AURA:
+        --   • Death Knight runeforge checks (isRuneforge = true)
+        --   • Weapon oil / temp enchant reminder (db.weaponOil = true)
+        -- All other weapon imbues (shaman, rogue poisons) DO fire UNIT_AURA.
         local _, cls = UnitClass("player")
-        return cls == "DEATHKNIGHT"
+        if cls == "DEATHKNIGHT" then return true end
+        local rdb = ns.Addon:Profile().reminder
+        return rdb.weaponOil == true
     end
     local function StartWeaponTicker()
         if weaponTicker then return end

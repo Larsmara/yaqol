@@ -583,6 +583,10 @@ local function BuildReminder(content, db, addon)
     end, 120, 22)
     resetBtn:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
     y = y - 40
+    _, dh = MakeToggle(content, "Warn when main-hand has no weapon oil / temp enchant",
+        function() return db.reminder.weaponOil end,
+        function(v) db.reminder.weaponOil = v; ns.AuraReminder.Refresh(addon) end, y)
+    y = y - dh - 10
     y = BuildSpells(content, db.reminder, y - 10)
     y = BuildClassBuffs(content, db, addon, y - 10)
     return y - 20
@@ -615,6 +619,56 @@ local function BuildQOL(content, db, addon)
     _, dh = MakeToggle(content, "Auto-advance single-option gossip / quest dialogs",
         function() return q.autoGossip end,
         function(v) q.autoGossip = v; ns.QOL.Refresh(addon) end, y)
+    y = y - dh - 4
+
+    -- Quest skip modifier row
+    local qModLabel = Label(content, "  Hold to skip auto-quest:", "GameFontNormalSmall",
+        T.textDim[1], T.textDim[2], T.textDim[3])
+    qModLabel:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
+    local QMODS = { "NONE", "ALT", "SHIFT", "CTRL" }
+    local qModBtns = {}
+    local qBtnX = T.PAD + qModLabel:GetStringWidth() + 14
+    for _, mod in ipairs(QMODS) do
+        local mb = CreateFrame("Button", nil, content)
+        mb:SetSize(52, 18)
+        mb:SetPoint("LEFT", content, "TOPLEFT", qBtnX, y + 9)
+        qBtnX = qBtnX + 56
+        local mbBg = mb:CreateTexture(nil, "BACKGROUND"); mbBg:SetAllPoints()
+        local mbLbl = mb:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        mbLbl:SetPoint("CENTER"); mbLbl:SetText(mod)
+        qModBtns[mod] = { btn = mb, bg = mbBg, lbl = mbLbl }
+        local function RefreshQMod()
+            local cur = q.questSkipModifier or "SHIFT"
+            if (mod == "NONE" and (cur == "NONE" or cur == nil)) or cur == mod then
+                mbBg:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.35)
+                mbLbl:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
+            else
+                mbBg:SetColorTexture(T.bgRow[1], T.bgRow[2], T.bgRow[3], 1)
+                mbLbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
+            end
+        end
+        RefreshQMod()
+        mb:SetScript("OnClick", function()
+            q.questSkipModifier = mod
+            for _, v in pairs(qModBtns) do
+                local cur = q.questSkipModifier or "SHIFT"
+                local selected = (v.lbl:GetText() == cur) or (cur == "NONE" and v.lbl:GetText() == "NONE")
+                if selected then
+                    v.bg:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.35)
+                    v.lbl:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
+                else
+                    v.bg:SetColorTexture(T.bgRow[1], T.bgRow[2], T.bgRow[3], 1)
+                    v.lbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
+                end
+            end
+        end)
+    end
+    y = y - 30
+
+    -- Auto-skip cinematics toggle
+    _, dh = MakeToggle(content, "Auto-skip cinematics and cutscenes",
+        function() return q.autoSkipCinematic end,
+        function(v) q.autoSkipCinematic = v end, y)
     y = y - dh - 14
 
     -- ── SOCIAL / GROUP ────────────────────────────────────────────────────
@@ -654,18 +708,61 @@ local function BuildQOL(content, db, addon)
         function(v) q.autoRezInCombat = v end, y)
     y = y - dh - 10
 
-    _, dh = MakeToggle(content, "Hold modifier key (ALT / SHIFT / CTRL) to release spirit",
+    _, dh = MakeToggle(content, "Hold modifier key to release spirit",
         function() return q.holdToRelease end,
         function(v) q.holdToRelease = v end, y)
     y = y - dh - 2
 
     local noteR = Label(content,
-        "Prevents accidental spirit release mid-progression. Hold any modifier while clicking Release Spirit.",
+        "Prevents accidental spirit release mid-progression.",
         "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
     noteR:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
     noteR:SetWidth(T.PANEL_W - T.PAD*2 - 48)
     noteR:SetJustifyH("LEFT")
-    y = y - 26
+    y = y - 20
+
+    -- Modifier selector dropdown
+    local modLabel = Label(content, "  Required modifier:", "GameFontNormalSmall",
+        T.textDim[1], T.textDim[2], T.textDim[3])
+    modLabel:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
+    local MODS = { "ANY", "ALT", "SHIFT", "CTRL" }
+    local modBtns = {}
+    local btnX = T.PAD + 44 + modLabel:GetStringWidth() + 10
+    for _, mod in ipairs(MODS) do
+        local mb = CreateFrame("Button", nil, content)
+        mb:SetSize(52, 18)
+        mb:SetPoint("LEFT", content, "TOPLEFT", btnX, y + 9)
+        btnX = btnX + 56
+        local mbBg = mb:CreateTexture(nil, "BACKGROUND"); mbBg:SetAllPoints()
+        local mbLbl = mb:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        mbLbl:SetPoint("CENTER"); mbLbl:SetText(mod)
+        modBtns[mod] = { btn = mb, bg = mbBg, lbl = mbLbl }
+        local function RefreshMod()
+            local cur = q.holdModifier or "ANY"
+            if cur == mod then
+                mbBg:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.35)
+                mbLbl:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
+            else
+                mbBg:SetColorTexture(T.bgRow[1], T.bgRow[2], T.bgRow[3], 1)
+                mbLbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
+            end
+        end
+        RefreshMod()
+        mb:SetScript("OnClick", function()
+            q.holdModifier = mod
+            for _, v in pairs(modBtns) do
+                local cur = q.holdModifier or "ANY"
+                if cur == v.lbl:GetText() then
+                    v.bg:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.35)
+                    v.lbl:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
+                else
+                    v.bg:SetColorTexture(T.bgRow[1], T.bgRow[2], T.bgRow[3], 1)
+                    v.lbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
+                end
+            end
+        end)
+    end
+    y = y - 28
 
     y = y - 8
 

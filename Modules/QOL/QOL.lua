@@ -22,8 +22,18 @@ end
 --   QUEST_COMPLETE   – reward-picker screen → GetQuestReward()  (auto only when
 --                      there is exactly one reward or no choice needed)
 -- ============================================================================
+-- Returns true when the player is holding the configured quest-skip modifier.
+local function QuestSkipHeld()
+    local mod = cfg().questSkipModifier or "SHIFT"
+    return (mod == "ANY"   and (IsAltKeyDown() or IsShiftKeyDown() or IsControlKeyDown())) or
+           (mod == "ALT"   and IsAltKeyDown()) or
+           (mod == "SHIFT" and IsShiftKeyDown()) or
+           (mod == "CTRL"  and IsControlKeyDown())
+end
+
 local function OnQuestDetail()
     if not cfg().autoQuest then return end
+    if QuestSkipHeld() then return end
     -- IsQuestCompletable is true if we already have all objectives
     -- (shared-quest confirmation is handled separately by ConfirmAcceptQuest)
     AcceptQuest()
@@ -31,6 +41,7 @@ end
 
 local function OnQuestProgress()
     if not cfg().autoQuest then return end
+    if QuestSkipHeld() then return end
     if IsQuestCompletable() then
         CompleteQuest()
     end
@@ -38,6 +49,7 @@ end
 
 local function OnQuestComplete()
     if not cfg().autoQuest then return end
+    if QuestSkipHeld() then return end
     local numChoices = GetNumQuestChoices()
     if numChoices <= 1 then
         -- Zero or one reward choice – safe to auto-collect
@@ -54,6 +66,7 @@ end
 -- ============================================================================
 local function OnGossipShow()
     if not cfg().autoGossip then return end
+    if QuestSkipHeld() then return end
 
     -- Use the new C_GossipInfo API (10.x+)
     local options = C_GossipInfo.GetOptions()
@@ -74,17 +87,28 @@ end
 
 local function OnQuestGreeting()
     if not cfg().autoGossip then return end
+    if QuestSkipHeld() then return end
 
     local numActive    = GetNumActiveQuests()
     local numAvailable = GetNumAvailableQuests()
 
-    -- One active (in-progress) quest and nothing else → select it
-    if numActive == 1 and numAvailable == 0 then
-        SelectActiveQuest(1)
+    -- Complete ALL active (ready-to-turn-in) quests before accepting new ones.
+    -- Each SelectActiveQuest call closes the dialog when done, so we queue
+    -- the next one on the following frame to give the UI time to settle.
+    if numActive > 0 and numAvailable == 0 then
+        local function TurnInNext(index)
+            if index > GetNumActiveQuests() then return end
+            if IsActiveQuestComplete(index) then
+                SelectActiveQuest(index)
+            else
+                TurnInNext(index + 1)
+            end
+        end
+        TurnInNext(1)
         return
     end
 
-    -- One available quest and nothing else → select it
+    -- One available quest and nothing active → open it
     if numAvailable == 1 and numActive == 0 then
         SelectAvailableQuest(1)
         return
@@ -155,7 +179,12 @@ local function HookHoldToRelease()
         if not cfg().holdToRelease then return end
         -- Only intercept when the player is actually dead/ghost via the UI popup
         if not StaticPopup_Visible("DEATH") then return end
-        if IsAltKeyDown() or IsShiftKeyDown() or IsControlKeyDown() then return end
+        local mod = cfg().holdModifier or "ANY"
+        local held = (mod == "ANY"   and (IsAltKeyDown() or IsShiftKeyDown() or IsControlKeyDown())) or
+                     (mod == "ALT"   and IsAltKeyDown()) or
+                     (mod == "SHIFT" and IsShiftKeyDown()) or
+                     (mod == "CTRL"  and IsControlKeyDown())
+        if held then return end
         -- No modifier: cancel the release by re-queuing the popup next frame.
         -- RepopMe has already been called by the time our hook fires, so we
         -- re-show the dialog and let the player try again with a modifier.
@@ -638,6 +667,42 @@ end
 -- PUBLIC API
 -- ============================================================================
 
+-- ============================================================================
+-- AUTO-SKIP CINEMATICS / CUTSCENES
+--   Hooks MovieFrame and CinematicFrame to auto-cancel when the setting is on.
+-- ============================================================================
+local skipHooked = false
+
+local function HookAutoSkip()
+    if skipHooked then return end
+    skipHooked = true
+
+    -- In-engine rendered cinematics (pre-rendered movies, e.g. login screen,
+    -- patch intro videos) shown in MovieFrame.
+    if MovieFrame and MovieFrame.StopMovie then
+        hooksecurefunc(MovieFrame, "Play", function()
+            if cfg().autoSkipCinematic then
+                C_Timer.After(0.5, function()
+                    if cfg().autoSkipCinematic and MovieFrame:IsShown() then
+                        MovieFrame:StopMovie()
+                    end
+                end)
+            end
+        end)
+    end
+
+    -- In-world scripted cinematics (e.g. quest cutscenes via CinematicFrame).
+    hooksecurefunc("CinematicFrame_StartCinematic", function()
+        if cfg().autoSkipCinematic then
+            C_Timer.After(0.5, function()
+                if cfg().autoSkipCinematic then
+                    CancelCinematic()
+                end
+            end)
+        end
+    end)
+end
+
 -- Called from Init.lua: OnEnable
 function QOL.Init(addonObj)
     addon = addonObj
@@ -645,6 +710,7 @@ function QOL.Init(addonObj)
     frame:SetScript("OnEvent", OnEvent)
     QOL.Refresh(addon)
     HookHoldToRelease()
+    HookAutoSkip()
     -- Build the durability frame now so LayoutMode can find it immediately.
     GetOrMakeDurFrame()
 end

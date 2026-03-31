@@ -14,7 +14,10 @@ ns.Defaults = {
             autoSummon     = false,  -- auto-accept summoning stone (5 s delay)
             autoRez        = false,  -- auto-accept resurrection offers
             autoRezInCombat = false, -- allow auto-rez even if the caster is in combat
-            holdToRelease  = false,  -- require ALT/SHIFT/CTRL to release spirit
+            holdToRelease  = false,  -- require a modifier key to release spirit
+            holdModifier   = "ANY",  -- which modifier: "ANY", "ALT", "SHIFT", "CTRL"
+            questSkipModifier = "SHIFT", -- hold this key to skip auto-quest actions
+            autoSkipCinematic = false, -- auto-skip cinematics and cutscenes
             sellJunk       = false,  -- sell grey items when visiting a vendor
             autoRepair      = false,  -- repair all gear when visiting a repair vendor
             repairGuild     = false,  -- prefer guild bank funds for repairs
@@ -94,6 +97,8 @@ ns.Defaults = {
                 -- Note: Shaman imbues, rogue poisons & paladin rites are class
                 --       mechanics and are best tracked via those class-specific spells.
             },
+            -- Weapon oil / temp enchant reminder (checks main-hand slot)
+            weaponOil = false,
             -- Completely custom extra spells the user wants monitored
             custom = {},
 

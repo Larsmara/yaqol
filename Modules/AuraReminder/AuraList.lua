@@ -129,6 +129,13 @@ AuraList.Categories = {
     { key = "custom",       label = "Custom",          required = true  },
 }
 
+-- Returns true if the player has any temporary weapon enchant on their main-hand.
+-- Oils / whetstones / weightstones all show as temp enchants, not player auras.
+local function HasWeaponOil()
+    local hasMainHandEnchant = GetWeaponEnchantInfo()
+    return hasMainHandEnchant == true
+end
+
 -- [ CLASS BUFF DATA ] ---------------------------------------------------------
 -- Buff IDs that are non-secret in Midnight (all readable via GetPlayerAuraBySpellID)
 -- For weapon imbues (poisons, rites, shaman imbues), buffIDs contains all
@@ -364,6 +371,18 @@ function AuraList.GetMissing(db)
                     required = cat.required,
                 }
             end
+        end
+    end
+
+    -- Weapon oil / temp enchant check (enabled when db.weaponOil == true)
+    if db.weaponOil then
+        if not HasWeaponOil() then
+            missing[#missing + 1] = {
+                label    = "Weapon Oil",
+                spellID  = 0,
+                icon     = 134096,  -- generic weapon enchant icon
+                required = false,
+            }
         end
     end
 

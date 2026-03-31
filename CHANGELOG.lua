@@ -8,6 +8,26 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.0.5",
+        date    = "2026-03-31",
+        changes = {
+            "|cff2dc9b8New|r  Weapon oil / temp enchant reminder (toggle in Buff Reminder tab)",
+            "|cff2dc9b8New|r  Hold-to-release modifier selector: ANY / ALT / SHIFT / CTRL",
+            "|cff2dc9b8New|r  Hold a modifier key to skip auto-quest actions (configurable)",
+            "|cff2dc9b8New|r  Auto-complete all turn-in quests on the same NPC in one interaction",
+            "|cff2dc9b8New|r  Auto-skip cinematics and cutscenes (toggle in QOL tab)",
+            "|cff2dc9b8New|r  Addon icon now shown in the AddOns list",
+        },
+    },
+    {
+        version = "1.0.5",
+        date    = "2026-03-31",
+        changes = {
+            "|cff2dc9b8New|r  Weapon oil / temp enchant reminder (toggle in Buff Reminder tab)",
+            "|cff2dc9b8New|r  Hold-to-release modifier selector: ANY / ALT / SHIFT / CTRL",
+        },
+    },
+    {
         version = "1.0.3",
         date    = "2026-03-31",
         changes = {

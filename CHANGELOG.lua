@@ -8,6 +8,13 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.0.7",
+        date    = "2026-03-31",
+        changes = {
+            "|cff2dc9b8Fix|r  WowUp stable updates now work correctly (release.json added to releases)",
+        },
+    },
+    {
         version = "1.0.6",
         date    = "2026-03-31",
         changes = {

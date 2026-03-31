@@ -8,6 +8,13 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.0.12",
+        date    = "2026-03-31",
+        changes = {
+            "|cff2dc9b8Fix|r  Now available on CurseForge",
+        },
+    },
+    {
         version = "1.0.11",
         date    = "2026-03-31",
         changes = {

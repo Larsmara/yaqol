@@ -6,6 +6,16 @@ A personal World of Warcraft addon for Mythic+ players. Bundles several small qu
 
 ---
 
+## Installation
+
+**WowUp** (recommended): Open WowUp → *Install* tab → *Install from URL* and paste:
+```
+https://github.com/Larsmara/yaqol
+```
+Or download the latest `yaqol-vX.Y.Z.zip` from the [Releases](https://github.com/Larsmara/yaqol/releases) page and extract it into your `World of Warcraft/_retail_/Interface/AddOns/` folder.
+
+---
+
 ## Features
 
 ### 🗺️ Teleport Panel

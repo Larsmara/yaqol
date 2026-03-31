@@ -8,6 +8,13 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.0.10",
+        date    = "2026-03-31",
+        changes = {
+            "|cff2dc9b8Fix|r  WowUp update now works correctly after fresh install",
+        },
+    },
+    {
         version = "1.0.9",
         date    = "2026-03-31",
         changes = {

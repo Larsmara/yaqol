@@ -8,6 +8,13 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.0.8",
+        date    = "2026-03-31",
+        changes = {
+            "|cff2dc9b8Fix|r  Switched to BigWigsMods packager for guaranteed WowUp compatibility",
+        },
+    },
+    {
         version = "1.0.7",
         date    = "2026-03-31",
         changes = {

@@ -8,87 +8,16 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    env:
-      ADDON_NAME: yaqol
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Determine version
-        id: version
-        run: |
-          TAG_NAME="${GITHUB_REF_NAME}"
-          # WowUp stable expects Version without a leading "v"
-          CLEAN_VERSION="${TAG_NAME#v}"
-          echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
-          echo "clean_version=${CLEAN_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "zip_name=${ADDON_NAME}-${TAG_NAME}.zip" >> "$GITHUB_OUTPUT"
-
-      - name: Inject version into TOC
-        run: sed -i "s/@project-version@/${{ steps.version.outputs.clean_version }}/" yaqol.toc
-
-      - name: Package addon
-        run: |
-          mkdir -p build/${ADDON_NAME}
-          rsync -a \
-            --exclude='.git/' \
-            --exclude='.github/' \
-            --exclude='build/' \
-            --exclude='local_stuff/' \
-            --exclude='*.md' \
-            --exclude='TODO.md' \
-            --exclude='.gitignore' \
-            --exclude='.pkgmeta' \
-            --exclude='.vscode/' \
-            ./ build/${ADDON_NAME}/
-          cd build && zip -r "../${{ steps.version.outputs.zip_name }}" "${ADDON_NAME}"
-
-      - name: Validate zip structure
-        run: |
-          ZIP="${{ steps.version.outputs.zip_name }}"
-          # Root entries inside the zip must all start with "yaqol/"
-          BAD=$(unzip -l "${ZIP}" | awk 'NR>3 && NF>=4 {print $4}' | grep -v '^yaqol/' | grep -v '^$' || true)
-          if [ -n "${BAD}" ]; then
-            echo "ERROR: unexpected root entries in zip:"
-            echo "${BAD}"
-            exit 1
-          fi
-          # yaqol.toc must exist at the expected path
-          if ! unzip -l "${ZIP}" | grep -q 'yaqol/yaqol.toc'; then
-            echo "ERROR: yaqol/yaqol.toc not found in zip"
-            exit 1
-          fi
-          echo "Zip structure OK"
-
-      - name: Generate release.json
-        run: |
-          # WowUp stable requires release.json to correctly identify the zip
-          # for the right WoW flavor and to resolve the addon name on updates.
-          cat > release.json << EOF
-          {
-            "releases": [
-              {
-                "filename": "${{ steps.version.outputs.zip_name }}",
-                "nolib": false,
-                "metadata": [
-                  { "flavor": "mainline", "interface": 120001 }
-                ]
-              }
-            ]
-          }
-          EOF
-
-      - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.tag_name }}
-          name: ${{ steps.version.outputs.tag_name }}
-          files: |
-            ${{ steps.version.outputs.zip_name }}
-            release.json
-          generate_release_notes: true
+          fetch-depth: 0
+
+      - name: Package and release via BigWigsMods packager
+        uses: BigWigsMods/packager@v2
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+          WOWI_API_TOKEN: ${{ secrets.WOWI_API_TOKEN }}
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+

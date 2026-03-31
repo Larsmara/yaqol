@@ -12,7 +12,7 @@ local function cfg() return addon.db.profile.qol end
 
 -- Print a short coloured notice to chat
 local function Notify(msg)
-    print("|cff2dc9b8LarsQOL:|r " .. msg)
+    print("|cff2dc9b8yaqol:|r " .. msg)
 end
 
 -- ============================================================================
@@ -263,7 +263,7 @@ local function GetOrMakeDurFrame()
     if durFrame then return durFrame end
 
     local db = addon.db.profile.qol
-    local f = CreateFrame("Frame", "LarsQOLDurabilityFrame", UIParent)
+    local f = CreateFrame("Frame", "yaqolDurabilityFrame", UIParent)
     f:SetSize(260, 44)
     f:SetMovable(true); f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
@@ -378,7 +378,7 @@ local function BuildAffixFrame()
     local PAD         = 12
     local W           = 360
 
-    local f = CreateFrame("Frame", "LarsQOLAffixFrame", UIParent)
+    local f = CreateFrame("Frame", "yaqolAffixFrame", UIParent)
     f:SetFrameStrata("HIGH")
     f:SetMovable(true); f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")

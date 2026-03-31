@@ -2,7 +2,7 @@
 ## Title: yaqol
 ## Notes: Yet Another Quality Of Life — M+ Teleports, Buff Reminders & QoL automation
 ## Author: Lars
-## Version: @project-version@
+## Version: v1.0.1
 ## X-Github-Project: Larsmara/yaqol
 ## X-Github-Releases: https://api.github.com/repos/Larsmara/yaqol/releases
 ## SavedVariables: yaqolDB

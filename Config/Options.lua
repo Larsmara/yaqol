@@ -769,7 +769,7 @@ local function BuildPanel(addon)
 
     local titleLbl = header:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     titleLbl:SetPoint("LEFT", header, "LEFT", 14, 0)
-    titleLbl:SetText("|cff2dc9b8Lars|rQOL")
+    titleLbl:SetText("|cff2dc9b8ya|rqol")
     titleLbl:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
 
     local verLbl = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")

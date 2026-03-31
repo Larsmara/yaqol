@@ -15,7 +15,7 @@ local dismissTimer = nil
 
 -- [ FRAME CONSTRUCTION ] ------------------------------------------------------
 local function MakeFrame()
-    local f = CreateFrame("Frame", "LarsQOLReminderFrame", UIParent)
+    local f = CreateFrame("Frame", "yaqolReminderFrame", UIParent)
     f:SetFrameStrata("HIGH")
     
     f:SetAlpha(0.7)

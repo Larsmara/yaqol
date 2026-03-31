@@ -50,7 +50,7 @@ A collection of small automation toggles, all off by default:
 ### 📐 Layout Mode
 Arrange all on-screen frames at once without hunting through settings.
 
-- Accessible via `/yaqol layout` or the **Arrange** button in the config panel
+- Accessible via `/yaqol layout` (or `/yq layout`) or the **Arrange** button in the config panel
 - All movable frames appear simultaneously with drag handles
 - Click **Done** to save all positions at once
 
@@ -74,7 +74,7 @@ One-click application of a curated set of CVar tweaks aimed at improving frame r
 | Command | Action |
 |---|---|
 | `/yaqol` | Open the configuration panel |
-| `/lqol` | Alias for `/yaqol` |
+| `/yq` | Alias for `/yaqol` |
 | `/yaqol tp` | Toggle the teleport panel |
 | `/yaqol layout` | Enter / exit layout mode |
 
@@ -82,7 +82,7 @@ One-click application of a curated set of CVar tweaks aimed at improving frame r
 
 ## Configuration
 
-Click the minimap button or type `/yaqol` to open the configuration panel. Settings are saved per character profile via AceDB.
+Click the minimap button or type `/yaqol` (or `/yq`) to open the configuration panel. Settings are saved per character profile via AceDB.
 
 ---
 

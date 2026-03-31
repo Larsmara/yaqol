@@ -4,6 +4,7 @@
 ## Author: Lars
 ## Version: @project-version@
 ## X-Github-Project: Larsmara/yaqol
+## X-Github-Releases: https://api.github.com/repos/Larsmara/yaqol/releases
 ## SavedVariables: yaqolDB
 
 ## Libs
@@ -15,8 +16,10 @@ Libs/AceEvent-3.0/AceEvent-3.0.xml
 Libs/AceDB-3.0/AceDB-3.0.xml
 
 ## Addon
+CHANGELOG.lua
 Config/Defaults.lua
 Core/Init.lua
+Core/Changelog.lua
 Core/MinimapButton.lua
 Core/LayoutMode.lua
 Modules/Teleport/Teleport.lua

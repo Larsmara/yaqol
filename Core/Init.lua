@@ -44,7 +44,7 @@ function yaqol:OnInitialize()
 
     ns.Config.Build(self)
     self:RegisterChatCommand("yaqol", "OnSlashCommand")
-    self:RegisterChatCommand("lqol", "OnSlashCommand")
+    self:RegisterChatCommand("yq", "OnSlashCommand")
 end
 
 function yaqol:OnEnable()
@@ -78,4 +78,4 @@ function yaqol:OnSlashCommand(input)
     end
 end
 
-function LarsQOL:Profile() return self.db.profile end
+function yaqol:Profile() return self.db.profile end

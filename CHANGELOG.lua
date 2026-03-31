@@ -8,6 +8,14 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.0.3",
+        date    = "2026-03-31",
+        changes = {
+            "|cffffff00Fix|r  Config panel title still showed LarsQOL → now yaqol",
+            "|cffffff00Fix|r  Frame names and chat prefix renamed to yaqol",
+        },
+    },
+    {
         version = "1.0.1",
         date    = "2026-03-31",
         changes = {

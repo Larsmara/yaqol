@@ -1,9 +1,10 @@
 ## Interface: 120001, 120000
-## Title: yacol
-## Notes: Yet Another Collection Of Lua — M+ Teleports, Buff Reminders & QoL automation
+## Title: yaqol
+## Notes: Yet Another Quality Of Life — M+ Teleports, Buff Reminders & QoL automation
 ## Author: Lars
-## Version: 1.0.0
-## SavedVariables: yacolDB
+## Version: @project-version@
+## X-Github-Project: Larsmara/yaqol
+## SavedVariables: yaqolDB
 
 ## Libs
 Libs/LibStub/LibStub.lua

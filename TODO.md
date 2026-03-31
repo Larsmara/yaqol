@@ -9,3 +9,4 @@
 - Show how many party members have the class buf. Like Power word: fortitude etc
 - Is it possible to get current season dungeons instead of hardcoding their id?
 - Add auto-skip 
+- Incorporate the other addon i made "ClassColor Friends" into this one.

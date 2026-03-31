@@ -1,12 +1,12 @@
 local ADDON_NAME, ns = ...
 
 -- [ INIT ] --------------------------------------------------------------------
-local yacol = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceConsole-3.0", "AceEvent-3.0")
-ns.Addon = yacol
-_G.yacol = yacol
+local yaqol = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceConsole-3.0", "AceEvent-3.0")
+ns.Addon = yaqol
+_G.yaqol = yaqol
 
-function yacol:OnInitialize()
-    self.db = LibStub("AceDB-3.0"):New("yacolDB", ns.Defaults, true)
+function yaqol:OnInitialize()
+    self.db = LibStub("AceDB-3.0"):New("yaqolDB", ns.Defaults, true)
     self.db.RegisterCallback(self, "OnProfileChanged", "OnProfileChanged")
     self.db.RegisterCallback(self, "OnProfileCopied", "OnProfileChanged")
     self.db.RegisterCallback(self, "OnProfileReset", "OnProfileChanged")
@@ -43,25 +43,25 @@ function yacol:OnInitialize()
     end
 
     ns.Config.Build(self)
-    self:RegisterChatCommand("yacol", "OnSlashCommand")
+    self:RegisterChatCommand("yaqol", "OnSlashCommand")
     self:RegisterChatCommand("lqol", "OnSlashCommand")
 end
 
-function yacol:OnEnable()
+function yaqol:OnEnable()
     ns.MinimapButton.Init(self)
     ns.Teleport.Init(self)
     ns.AuraReminder.Init(self)
     ns.QOL.Init(self)
 end
 
-function yacol:OnProfileChanged()
+function yaqol:OnProfileChanged()
     ns.Teleport.Refresh(self)
     ns.AuraReminder.Refresh(self)
     ns.MinimapButton.Refresh(self)
     ns.QOL.Refresh(self)
 end
 
-function yacol:OnSlashCommand(input)
+function yaqol:OnSlashCommand(input)
     input = input and input:trim():lower() or ""
     if input == "teleport" or input == "tp" then
         ns.Teleport.Toggle()

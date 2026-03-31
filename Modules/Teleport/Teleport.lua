@@ -95,7 +95,7 @@ end
 
 local function MakePanel()
     local totalH = (#DUNGEONS * (BTN_H + BTN_PAD)) + PANEL_PAD * 2 - BTN_PAD + HEADER_H
-    local f = CreateFrame("Frame", "yacolTeleportPanel", UIParent)
+    local f = CreateFrame("Frame", "yaqolTeleportPanel", UIParent)
     f:SetSize(FRAME_W, totalH)
     f:SetFrameStrata("MEDIUM")
     f.restingAlpha = 0.8

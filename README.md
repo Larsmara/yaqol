@@ -1,4 +1,4 @@
-# yacol — Yet Another Collection Of Lua
+# yaqol — Yet Another Quality Of Life
 
 > **Disclaimer: This addon is shamelessly vibecoded.**
 
@@ -50,7 +50,7 @@ A collection of small automation toggles, all off by default:
 ### 📐 Layout Mode
 Arrange all on-screen frames at once without hunting through settings.
 
-- Accessible via `/yacol layout` or the **Arrange** button in the config panel
+- Accessible via `/yaqol layout` or the **Arrange** button in the config panel
 - All movable frames appear simultaneously with drag handles
 - Click **Done** to save all positions at once
 
@@ -62,10 +62,10 @@ One-click application of a curated set of CVar tweaks aimed at improving frame r
 ## Installation
 
 1. Download or clone this repository.
-2. Copy the `yacol` folder into your WoW `Interface/AddOns/` directory.
-3. Reload WoW or log in — the addon will appear in your AddOn list as **yacol**.
+2. Copy the `yaqol` folder into your WoW `Interface/AddOns/` directory.
+3. Reload WoW or log in — the addon will appear in your AddOn list as **yaqol**.
 
-> The folder name **must** be `yacol` to match the `.toc` file.
+> The folder name **must** be `yaqol` to match the `.toc` file.
 
 ---
 
@@ -73,16 +73,16 @@ One-click application of a curated set of CVar tweaks aimed at improving frame r
 
 | Command | Action |
 |---|---|
-| `/yacol` | Open the configuration panel |
-| `/lqol` | Alias for `/yacol` |
-| `/yacol tp` | Toggle the teleport panel |
-| `/yacol layout` | Enter / exit layout mode |
+| `/yaqol` | Open the configuration panel |
+| `/lqol` | Alias for `/yaqol` |
+| `/yaqol tp` | Toggle the teleport panel |
+| `/yaqol layout` | Enter / exit layout mode |
 
 ---
 
 ## Configuration
 
-Click the minimap button or type `/yacol` to open the configuration panel. Settings are saved per character profile via AceDB.
+Click the minimap button or type `/yaqol` to open the configuration panel. Settings are saved per character profile via AceDB.
 
 ---
 

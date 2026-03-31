@@ -3,7 +3,7 @@ ns.LayoutMode = {}
 local LayoutMode = ns.LayoutMode
 
 -- [ LAYOUT MODE ] -------------------------------------------------------------
--- Shows all positionable yacol frames simultaneously with a drag overlay,
+-- Shows all positionable yaqol frames simultaneously with a drag overlay,
 -- plus a floating "Done" button to exit.  Replaces per-module demo-mode toggles
 -- for the purpose of repositioning frames.
 --
@@ -91,7 +91,7 @@ end
 -- ─── DONE BUTTON ────────────────────────────────────────────────────────────
 
 local function MakeDoneFrame()
-    local f = CreateFrame("Frame", "yacolLayoutDoneFrame", UIParent)
+    local f = CreateFrame("Frame", "yaqolLayoutDoneFrame", UIParent)
     f:SetSize(160, 40)
     f:SetFrameStrata("TOOLTIP")
     f:SetPoint("TOP", UIParent, "TOP", 0, -60)
@@ -200,7 +200,7 @@ function LayoutMode.Enter()
     doneFrame:SetPoint("TOP", UIParent, "TOP", 0, -60)
     doneFrame:Show()
 
-    print("|cff2dc9b8yacol:|r Layout mode |cffffcc00ON|r — drag frames to reposition, then click Done.")
+    print("|cff2dc9b8yaqol:|r Layout mode |cffffcc00ON|r — drag frames to reposition, then click Done.")
 end
 
 function LayoutMode.Exit()
@@ -223,7 +223,7 @@ function LayoutMode.Exit()
 
     doneFrame:Hide()
 
-    print("|cff2dc9b8yacol:|r Layout mode |cff999999OFF|r — positions saved.")
+    print("|cff2dc9b8yaqol:|r Layout mode |cff999999OFF|r — positions saved.")
 end
 
 function LayoutMode.IsActive()

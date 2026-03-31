@@ -1,0 +1,26 @@
+name: Package and release
+
+# Trigger on annotated tags (e.g. `git tag -a v1.0.0 -m "v1.0.0" && git push --tags`)
+on:
+  push:
+    tags:
+      - '**'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    env:
+      # GITHUB_TOKEN is automatically provided by GitHub Actions.
+      # Make sure your repository's Actions settings have "Read and write permissions"
+      # enabled (Settings → Actions → General → Workflow permissions).
+      GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Clone project
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history needed for automatic changelogs
+
+      - name: Package and release
+        uses: BigWigsMods/packager@v2

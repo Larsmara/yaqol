@@ -1,0 +1,9 @@
+package-as: yaqol
+
+ignore:
+  - .github
+  - .gitignore
+  - .vscode
+  - local_stuff
+  - Development_Notes.md
+  - TODO.md

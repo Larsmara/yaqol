@@ -30,7 +30,7 @@ end
 function MinimapButton.Init(addon)
     local db = addon:Profile().minimap
 
-    btn = CreateFrame("Button", "yacolMinimapButton", Minimap)
+    btn = CreateFrame("Button", "yaqolMinimapButton", Minimap)
     btn:SetSize(BTN_SIZE, BTN_SIZE)
     btn:SetFrameLevel(8)
     btn:SetFrameStrata("MEDIUM")
@@ -79,7 +79,7 @@ function MinimapButton.Init(addon)
 
     btn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:AddLine("|cffffcc00yacol|r")
+        GameTooltip:AddLine("|cffffcc00yaqol|r")
         GameTooltip:AddLine("Left Click: Toggle Teleport Panel", 1, 1, 1)
         GameTooltip:AddLine("Right Click: Open Options", 1, 1, 1)
         GameTooltip:AddLine("Tip: /lqol layout — arrange frames", 0.68, 0.72, 0.74)

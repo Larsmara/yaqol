@@ -328,9 +328,9 @@ local function RestoreFPSSettings(db)
         else fail_n = fail_n + 1 end
     end
     db.fpsBackup = nil
-    print("|cff2dc9b8yacol:|r Restored " .. ok_n .. " settings.")
+    print("|cff2dc9b8yaqol:|r Restored " .. ok_n .. " settings.")
     if fail_n > 0 then
-        print("|cffff6b6byacol:|r " .. fail_n .. " settings could not be restored.")
+        print("|cffff6b6byaqol:|r " .. fail_n .. " settings could not be restored.")
     end
     return true
 end
@@ -342,9 +342,9 @@ local function ApplyFPSSettings(db)
         if pcall(C_CVar.SetCVar, cvar, val) then ok_n = ok_n + 1
         else fail_n = fail_n + 1 end
     end
-    print("|cff2dc9b8yacol:|r Applied " .. ok_n .. " performance settings. Use 'Restore' to undo.")
+    print("|cff2dc9b8yaqol:|r Applied " .. ok_n .. " performance settings. Use 'Restore' to undo.")
     if fail_n > 0 then
-        print("|cffff6b6byacol:|r " .. fail_n .. " settings could not be applied (may need restart).")
+        print("|cffff6b6byaqol:|r " .. fail_n .. " settings could not be applied (may need restart).")
     end
 end
 
@@ -364,7 +364,7 @@ local function BuildGeneral(content, db, addon)
         function() return db.configScale or 1.0 end,
         function(v) 
             db.configScale = v
-            if yacolConfigPanel then yacolConfigPanel:SetScale(v) end
+            if yaqolConfigPanel then yaqolConfigPanel:SetScale(v) end
         end, y,
         function(v) return string.format("%.2f", v) end)
     y = y - dh - 14
@@ -740,7 +740,7 @@ local function BuildPanel(addon)
     local db = addon.db.profile
     local W, H = T.PANEL_W, T.PANEL_H
 
-    local f = CreateFrame("Frame", "yacolConfigPanel", UIParent)
+    local f = CreateFrame("Frame", "yaqolConfigPanel", UIParent)
     f:SetSize(W, H); f:SetPoint("CENTER")
     f:SetScale(db.configScale or 1.0)
     f:SetFrameStrata("DIALOG")

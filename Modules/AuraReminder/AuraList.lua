@@ -368,11 +368,22 @@ function AuraList.GetMissing(db)
                 end
             end
             if not found then
+                -- Sum item counts across all itemIDs listed in every entry in this category.
+                -- This handles food: "Well Fed" comes from many different food items.
+                local itemCount = 0
+                for _, entry in ipairs(list) do
+                    if entry.itemIDs then
+                        for _, itemID in ipairs(entry.itemIDs) do
+                            itemCount = itemCount + (GetItemCount(itemID, true) or 0)
+                        end
+                    end
+                end
                 missing[#missing + 1] = {
-                    label    = cat.label,
-                    spellID  = list[1].spellID,
-                    icon     = SpellIcon(list[1].spellID),
-                    required = cat.required,
+                    label     = cat.label,
+                    spellID   = list[1].spellID,
+                    icon      = SpellIcon(list[1].spellID),
+                    required  = cat.required,
+                    itemCount = itemCount > 0 and itemCount or nil,
                 }
             end
         end

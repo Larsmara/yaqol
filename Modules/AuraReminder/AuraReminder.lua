@@ -55,6 +55,13 @@ local function GetOrMakeRow(idx)
     iconBorder:SetAlpha(0)
     row.iconBorder = iconBorder
 
+    -- Item count badge (bottom-right corner, e.g. "3")
+    local countText = row:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+    countText:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", 2, -1)
+    countText:SetTextColor(1, 1, 1, 1)
+    countText:Hide()
+    row.countText = countText
+
     -- Glowing animation
     local ag = iconBorder:CreateAnimationGroup()
     ag:SetLooping("BOUNCE")
@@ -75,6 +82,12 @@ local function GetOrMakeRow(idx)
             GameTooltip:AddLine(self.spellLabel, 1, 1, 1)
             if self.required then GameTooltip:AddLine("Required", 1, 0.3, 0.3)
             else GameTooltip:AddLine("Optional", 0.7, 0.7, 0.7) end
+            -- Consumable count
+            if self.itemCount and self.itemCount > 0 then
+                GameTooltip:AddLine(
+                    string.format("|cff00ff00%d in bags|r", self.itemCount),
+                    1, 1, 1)
+            end
             -- Party buff: show how many members are missing it
             if self.partyMissingCount and self.partyMissingCount > 0 then
                 GameTooltip:AddLine(
@@ -183,6 +196,14 @@ local function ShowMissing(missing)
         row.required = m.required
         row.spellID = m.spellID or 0
         row.partyMissingCount = m.partyMissingCount or 0
+        row.itemCount = m.itemCount or 0
+        -- Item count badge
+        if m.itemCount and m.itemCount > 0 then
+            row.countText:SetText(m.itemCount)
+            row.countText:Show()
+        else
+            row.countText:Hide()
+        end
         row:Show()
         xOff = xOff + ICON_SIZE + ICON_PAD
     end

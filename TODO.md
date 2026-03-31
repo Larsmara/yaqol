@@ -1,8 +1,5 @@
-- Possibility to click on the buff reminders to cast / use them?
-  - Have default option that the user can set in options
-  - If no default and the user clicks the buff reminder icon, open the options panel
-  - Show how many the user has for each of the consumable buffs in the options and the buff reminder
-- Show how many party members have the class buf. Like Power word: fortitude etc
 - Is it possible to get current season dungeons instead of hardcoding their id?
+  - Partial: `BuildChallengeMapTable()` already uses `C_ChallengeMode.GetMapTable()` dynamically for keystone detection. Teleport spell IDs cannot be derived from any Blizzard API — they must remain hardcoded. Current approach is correct.
 - Incorporate the other addon i made "ClassColor Friends" into this one.
-- QOL: Faster looting
+- Placement of the options for key modifier for auto accept is missplaced. It seems to be under "Auto-advance single-option gossip/quest dialogs"
+- Fast loot: I dont know if its working. The loot window takes what it seems like 2 seconds to close

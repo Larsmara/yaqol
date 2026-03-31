@@ -8,6 +8,14 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.0.14",
+        date    = "2026-04-01",
+        changes = {
+            "|cff00d1b2New|r  Buff reminder icons show item count badge (e.g. how many flasks you have)",
+            "|cff00d1b2New|r  Hover tooltip shows how many of the consumable are in your bags",
+        },
+    },
+    {
         version = "1.0.13",
         date    = "2026-03-31",
         changes = {

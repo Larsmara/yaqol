@@ -20,14 +20,10 @@ local function MakeFrame()
     
     f:SetAlpha(0.7)
     f:SetMovable(true)
-    f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
-        local db = ns.Addon:Profile().reminder
-        db.point, _, db.relPoint, db.x, db.y = self:GetPoint()
-    end)
+    -- Do NOT call f:EnableMouse(true) or f:RegisterForDrag("LeftButton") here.
+    -- Doing so makes the parent frame steal LeftButton mouse-down events before
+    -- child Button rows can receive them, which prevents OnClick from ever firing.
+    -- Dragging is forwarded from each row's OnDragStart → frame:StartMoving().
     f:SetScript("OnEnter", function(self) self:SetAlpha(1) end)
     f:SetScript("OnLeave", function(self) self:SetAlpha(0.7) end)
     f:SetClampedToScreen(true)
@@ -39,8 +35,9 @@ end
 
 local function GetOrMakeRow(idx)
     if frame.rows[idx] then return frame.rows[idx] end
-    local row = CreateFrame("Frame", nil, frame)
+    local row = CreateFrame("Button", nil, frame)
     row:SetSize(ICON_SIZE, ICON_SIZE)
+    row:RegisterForClicks("LeftButtonUp")
 
     local icon = row:CreateTexture(nil, "ARTWORK")
     icon:SetAllPoints()
@@ -112,12 +109,14 @@ local function GetOrMakeRow(idx)
     row:SetScript("OnClick", function(self, button)
         if button ~= "LeftButton" then return end
         if self.spellID and self.spellID > 0 then
-            -- CastSpellByID is protected — use SecureActionButtonTemplate via a
-            -- hidden button so we can cast in any context.
             if not row._castBtn then
                 local cb = CreateFrame("Button", nil, UIParent, "SecureActionButtonTemplate")
                 cb:SetAttribute("type", "spell")
-                cb:Hide()
+                cb:SetSize(1, 1)
+                cb:SetAlpha(0)
+                cb:SetPoint("CENTER", UIParent, "CENTER")
+                -- Must be shown (not hidden) to receive programmatic clicks
+                cb:Show()
                 row._castBtn = cb
             end
             row._castBtn:SetAttribute("spell", self.spellID)
@@ -125,10 +124,10 @@ local function GetOrMakeRow(idx)
         end
     end)
 
-    -- Make dragging pass through to parent
-    row:RegisterForDrag("LeftButton")
+    -- Use RightButton for dragging so LeftButton is free for OnClick.
+    row:RegisterForDrag("RightButton")
     row:SetScript("OnDragStart", function() frame:StartMoving() end)
-    row:SetScript("OnDragStop", function() 
+    row:SetScript("OnDragStop", function()
         frame:StopMovingOrSizing()
         local db = ns.Addon:Profile().reminder
         db.point, _, db.relPoint, db.x, db.y = frame:GetPoint()

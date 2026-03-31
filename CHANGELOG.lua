@@ -8,6 +8,14 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.0.17",
+        date    = "2026-03-31",
+        changes = {
+            "|cff2dc9b8Fix|r  Buff reminder icons: clicking now works (parent frame was stealing mouse-down events)",
+            "|cff2dc9b8Fix|r  Buff reminder dragging: use right-click drag to move the panel",
+        },
+    },
+    {
         version = "1.0.16",
         date    = "2026-03-31",
         changes = {

@@ -1,3 +1,1 @@
-- Is it possible to get current season dungeons instead of hardcoding their id?
-  - Fixed: dungeon list is now fully dynamic from C_ChallengeMode.GetMapTable(). DUNGEON_SPELL_BY_NAME lookup table covers all recent seasons. Spell IDs for new Midnight S1 dungeons need in-game verification.
 - Incorporate the other addon i made "ClassColor Friends" into this one.

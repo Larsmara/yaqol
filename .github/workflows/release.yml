@@ -1,26 +1,53 @@
 name: Package and release
 
-# Trigger on annotated tags (e.g. `git tag -a v1.0.0 -m "v1.0.0" && git push --tags`)
 on:
   push:
     tags:
-      - '**'
+      - "v*.*.*"
 
 jobs:
   release:
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: write
     env:
-      # GITHUB_TOKEN is automatically provided by GitHub Actions.
-      # Make sure your repository's Actions settings have "Read and write permissions"
-      # enabled (Settings → Actions → General → Workflow permissions).
-      GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+      ADDON_NAME: yaqol
 
     steps:
-      - name: Clone project
+      - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # full history needed for automatic changelogs
 
-      - name: Package and release
-        uses: BigWigsMods/packager@v2
+      - name: Determine version
+        id: version
+        run: |
+          TAG_NAME="${GITHUB_REF_NAME}"
+          echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+          echo "zip_name=${ADDON_NAME}-${TAG_NAME}.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Inject version into TOC
+        run: sed -i "s/@project-version@/${{ steps.version.outputs.tag_name }}/" yaqol.toc
+
+      - name: Package addon
+        run: |
+          mkdir -p build/${ADDON_NAME}
+          rsync -a \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='build/' \
+            --exclude='local_stuff/' \
+            --exclude='*.md' \
+            --exclude='TODO.md' \
+            --exclude='.gitignore' \
+            --exclude='.pkgmeta' \
+            --exclude='.vscode/' \
+            ./ build/${ADDON_NAME}/
+          cd build && zip -r "../${{ steps.version.outputs.zip_name }}" "${ADDON_NAME}"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag_name }}
+          files: ${{ steps.version.outputs.zip_name }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

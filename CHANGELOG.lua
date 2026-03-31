@@ -8,6 +8,15 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.0.6",
+        date    = "2026-03-31",
+        changes = {
+            "|cff2dc9b8Fix|r  WowUp stable install now works via 'Install from URL'",
+            "|cff2dc9b8Fix|r  Release zip has correct structure (yaqol/ root folder)",
+            "|cff2dc9b8Fix|r  Version shown in-game no longer has a leading 'v'",
+        },
+    },
+    {
         version = "1.0.5",
         date    = "2026-03-31",
         changes = {

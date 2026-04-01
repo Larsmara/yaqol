@@ -20,10 +20,14 @@ local function MakeFrame()
     
     f:SetAlpha(0.7)
     f:SetMovable(true)
-    -- Do NOT call f:EnableMouse(true) or f:RegisterForDrag("LeftButton") here.
-    -- Doing so makes the parent frame steal LeftButton mouse-down events before
-    -- child Button rows can receive them, which prevents OnClick from ever firing.
-    -- Dragging is forwarded from each row's OnDragStart → frame:StartMoving().
+    f:EnableMouse(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", f.StartMoving)
+    f:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        local db = ns.Addon:Profile().reminder
+        db.point, _, db.relPoint, db.x, db.y = self:GetPoint()
+    end)
     f:SetScript("OnEnter", function(self) self:SetAlpha(1) end)
     f:SetScript("OnLeave", function(self) self:SetAlpha(0.7) end)
     f:SetClampedToScreen(true)
@@ -35,9 +39,8 @@ end
 
 local function GetOrMakeRow(idx)
     if frame.rows[idx] then return frame.rows[idx] end
-    local row = CreateFrame("Button", nil, frame)
+    local row = CreateFrame("Frame", nil, frame)
     row:SetSize(ICON_SIZE, ICON_SIZE)
-    row:RegisterForClicks("LeftButtonUp")
 
     local icon = row:CreateTexture(nil, "ARTWORK")
     icon:SetAllPoints()
@@ -93,44 +96,12 @@ local function GetOrMakeRow(idx)
                         self.partyMissingCount == 1 and " is" or "s are"),
                     1, 1, 1)
             end
-            -- Click hint
-            if self.spellID and self.spellID > 0 then
-                GameTooltip:AddLine("|cff888888Click to cast|r", 1, 1, 1)
-            end
             GameTooltip:Show()
         end
     end)
-    row:SetScript("OnLeave", function(self) 
+    row:SetScript("OnLeave", function(self)
         frame:SetAlpha(0.7)
-        GameTooltip:Hide() 
-    end)
-
-    -- Click to cast the associated spell
-    row:SetScript("OnClick", function(self, button)
-        if button ~= "LeftButton" then return end
-        if self.spellID and self.spellID > 0 then
-            if not row._castBtn then
-                local cb = CreateFrame("Button", nil, UIParent, "SecureActionButtonTemplate")
-                cb:SetAttribute("type", "spell")
-                cb:SetSize(1, 1)
-                cb:SetAlpha(0)
-                cb:SetPoint("CENTER", UIParent, "CENTER")
-                -- Must be shown (not hidden) to receive programmatic clicks
-                cb:Show()
-                row._castBtn = cb
-            end
-            row._castBtn:SetAttribute("spell", self.spellID)
-            row._castBtn:Click()
-        end
-    end)
-
-    -- Use RightButton for dragging so LeftButton is free for OnClick.
-    row:RegisterForDrag("RightButton")
-    row:SetScript("OnDragStart", function() frame:StartMoving() end)
-    row:SetScript("OnDragStop", function()
-        frame:StopMovingOrSizing()
-        local db = ns.Addon:Profile().reminder
-        db.point, _, db.relPoint, db.x, db.y = frame:GetPoint()
+        GameTooltip:Hide()
     end)
 
     frame.rows[idx] = row
@@ -193,7 +164,6 @@ local function ShowMissing(missing)
         row.icon:SetTexture(m.icon)
         row.spellLabel = m.label
         row.required = m.required
-        row.spellID = m.spellID or 0
         row.partyMissingCount = m.partyMissingCount or 0
         row.itemCount = m.itemCount or 0
         -- Item count badge

@@ -74,6 +74,8 @@ ns.Defaults = {
             -- Food is detected via the generic "Well Fed" / "Hearty Well Fed" buff.
             -- spellID 455369 = "Well Fed", 462187 = "Hearty Well Fed"
             -- (These are shared by ALL Midnight food items — one active = satisfied)
+            -- Legacy Well Fed IDs are also included so older foods (e.g. feasts from
+            -- previous expansions) correctly dismiss the reminder.
             -- itemIDs: a selection of common Midnight foods; add more as desired.
             food = {
                 { spellID = 455369,  label = "Well Fed",
@@ -81,6 +83,16 @@ ns.Defaults = {
                                237451, 237452, 237453, 237454 } },
                 { spellID = 462187,  label = "Hearty Well Fed",
                   itemIDs = { 237455, 237456, 237457, 237458 } },
+                -- Legacy Well Fed buff IDs from older expansions
+                { spellID = 185736 },  -- Legion feasts (e.g. Lavish Suramar Feast, item 255847)
+                { spellID = 257410 },  -- BfA Bountiful Captain's Feast
+                { spellID = 291450 },  -- BfA Famine Evaluator and Snack Table
+                { spellID = 308623 },  -- Shadowlands feasts
+                { spellID = 375918 },  -- Dragonflight Grand Banquet
+                { spellID = 382893 },  -- Dragonflight Hoard of Draconic Delicacies
+                { spellID = 428736 },  -- TWW Feast of the Midnight Masquerade
+                { spellID = 430169 },  -- TWW Feast of the Divine Day
+                { spellID = 57550  },  -- Generic Well Fed (classic/older shared ID)
             },
             -- Augment Rune buff IDs (covers all current and legacy rune variants)
             -- Items: 259085 = Void-Touched Augment Rune, 243191 = Ethereal Augment Rune
@@ -120,6 +132,22 @@ ns.Defaults = {
             -- partyBuffs[key] = false disables a single buff (e.g. { fort = false })
             enablePartyBuffs = true,
             partyBuffs = {},
+        },
+
+        -- Friend List styling module (ClassColorFriends)
+        friendList = {
+            enable           = true,
+            useClassColor    = true,
+            showLevel        = false,
+            hideMaxLevel     = true,
+            hideRealm        = false,
+            useNoteAsName    = false,
+            squareIcons      = true,
+            forceClientIcons = true,
+            statusIconPack   = "SQUARE",  -- "NONE" | "SQUARE"
+            favoriteStyle    = "BAR",     -- "STAR" | "BAR" | "OFF"
+            factionTint      = true,
+            factionTintAlpha = 0.14,      -- 0..0.30
         },
     },
 }

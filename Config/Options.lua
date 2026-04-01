@@ -835,6 +835,186 @@ local function BuildQOL(content, db, addon)
     return y - 20
 end
 
+local function BuildFriendList(content, db, addon)
+    local fl  = db.friendList
+    local y   = -T.PAD
+    local _, dh
+
+    local h1 = Label(content, "FRIEND LIST STYLING", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    h1:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    local note = Label(content,
+        "Class-colors friend names, adds custom status icons, and cleans up the Blizzard Friends list.",
+        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+    note:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
+    note:SetWidth(T.PANEL_W - T.PAD*2 - 16)
+    note:SetJustifyH("LEFT")
+    y = y - 30
+
+    _, dh = MakeToggle(content, "Enable Friend List styling",
+        function() return fl.enable end,
+        function(v) fl.enable = v; ns.FriendList.Refresh(addon) end, y)
+    y = y - dh - 14
+
+    -- ── NAMES ─────────────────────────────────────────────────────────────
+    local h2 = Label(content, "NAMES", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    h2:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    _, dh = MakeToggle(content, "Class-color character names",
+        function() return fl.useClassColor end,
+        function(v) fl.useClassColor = v; ns.FriendList.Refresh(addon) end, y)
+    y = y - dh - 2
+    _, dh = MakeToggle(content, "Show character level after name",
+        function() return fl.showLevel end,
+        function(v) fl.showLevel = v; ns.FriendList.Refresh(addon) end, y)
+    y = y - dh - 2
+    _, dh = MakeToggle(content, "  Hide level for max-level characters",
+        function() return fl.hideMaxLevel end,
+        function(v) fl.hideMaxLevel = v; ns.FriendList.Refresh(addon) end, y)
+    y = y - dh - 2
+    _, dh = MakeToggle(content, "Hide realm from info line",
+        function() return fl.hideRealm end,
+        function(v) fl.hideRealm = v; ns.FriendList.Refresh(addon) end, y)
+    y = y - dh - 2
+    _, dh = MakeToggle(content, "Use friend note as display name",
+        function() return fl.useNoteAsName end,
+        function(v) fl.useNoteAsName = v; ns.FriendList.Refresh(addon) end, y)
+    y = y - dh - 14
+
+    -- ── ICONS ─────────────────────────────────────────────────────────────
+    local h3 = Label(content, "ICONS", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    h3:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    _, dh = MakeToggle(content, "Square icon crop",
+        function() return fl.squareIcons end,
+        function(v) fl.squareIcons = v; ns.FriendList.Refresh(addon) end, y)
+    y = y - dh - 2
+    _, dh = MakeToggle(content, "Use WoW client icons (Retail / Classic / etc.)",
+        function() return fl.forceClientIcons end,
+        function(v) fl.forceClientIcons = v; ns.FriendList.Refresh(addon) end, y)
+    y = y - dh - 10
+
+    -- Status icon pack selector
+    local siLabel = Label(content, "Status icons:", "GameFontNormalSmall",
+        T.textDim[1], T.textDim[2], T.textDim[3])
+    siLabel:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
+    y = y - 20
+    local SI_PACKS = { { k="NONE", label="Off" }, { k="SQUARE", label="Square" } }
+    local siBtns = {}
+    local siBtnX = T.PAD
+    for _, pack in ipairs(SI_PACKS) do
+        local mb = CreateFrame("Button", nil, content)
+        mb:SetSize(60, 18)
+        mb:SetPoint("TOPLEFT", content, "TOPLEFT", siBtnX, y)
+        siBtnX = siBtnX + 64
+        local mbBg = mb:CreateTexture(nil, "BACKGROUND"); mbBg:SetAllPoints()
+        local mbLbl = mb:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        mbLbl:SetPoint("CENTER"); mbLbl:SetText(pack.label)
+        siBtns[pack.k] = { btn = mb, bg = mbBg, lbl = mbLbl }
+        local function RefreshSI()
+            local cur = fl.statusIconPack or "SQUARE"
+            if cur == pack.k then
+                mbBg:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.35)
+                mbLbl:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
+            else
+                mbBg:SetColorTexture(T.bgRow[1], T.bgRow[2], T.bgRow[3], 1)
+                mbLbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
+            end
+        end
+        RefreshSI()
+        mb:SetScript("OnClick", function()
+            fl.statusIconPack = pack.k
+            for k, v in pairs(siBtns) do
+                local cur = fl.statusIconPack or "SQUARE"
+                if cur == k then
+                    v.bg:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.35)
+                    v.lbl:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
+                else
+                    v.bg:SetColorTexture(T.bgRow[1], T.bgRow[2], T.bgRow[3], 1)
+                    v.lbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
+                end
+            end
+            ns.FriendList.Refresh(addon)
+        end)
+    end
+    y = y - 32
+
+    -- ── FAVOURITES ────────────────────────────────────────────────────────
+    local h4 = Label(content, "FAVOURITES", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    h4:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    local favLabel = Label(content, "Favourite style:", "GameFontNormalSmall",
+        T.textDim[1], T.textDim[2], T.textDim[3])
+    favLabel:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
+    y = y - 20
+    local FAV_STYLES = { { k="STAR", label="Star" }, { k="BAR", label="Gold stripe" }, { k="OFF", label="Off" } }
+    local favBtns = {}
+    local favBtnX = T.PAD
+    for _, style in ipairs(FAV_STYLES) do
+        local mb = CreateFrame("Button", nil, content)
+        mb:SetSize(76, 18)
+        mb:SetPoint("TOPLEFT", content, "TOPLEFT", favBtnX, y)
+        favBtnX = favBtnX + 80
+        local mbBg = mb:CreateTexture(nil, "BACKGROUND"); mbBg:SetAllPoints()
+        local mbLbl = mb:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        mbLbl:SetPoint("CENTER"); mbLbl:SetText(style.label)
+        favBtns[style.k] = { btn = mb, bg = mbBg, lbl = mbLbl }
+        local function RefreshFav()
+            local cur = fl.favoriteStyle or "BAR"
+            if cur == style.k then
+                mbBg:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.35)
+                mbLbl:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
+            else
+                mbBg:SetColorTexture(T.bgRow[1], T.bgRow[2], T.bgRow[3], 1)
+                mbLbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
+            end
+        end
+        RefreshFav()
+        mb:SetScript("OnClick", function()
+            fl.favoriteStyle = style.k
+            for k, v in pairs(favBtns) do
+                local cur = fl.favoriteStyle or "BAR"
+                if cur == k then
+                    v.bg:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.35)
+                    v.lbl:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
+                else
+                    v.bg:SetColorTexture(T.bgRow[1], T.bgRow[2], T.bgRow[3], 1)
+                    v.lbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
+                end
+            end
+            ns.FriendList.Refresh(addon)
+        end)
+    end
+    y = y - 32
+
+    -- ── FACTION TINT ──────────────────────────────────────────────────────
+    local h5 = Label(content, "FACTION TINT", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    h5:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    _, dh = MakeToggle(content, "Tint friend rows by faction (Horde / Alliance)",
+        function() return fl.factionTint end,
+        function(v) fl.factionTint = v; ns.FriendList.Refresh(addon) end, y)
+    y = y - dh - 8
+
+    _, dh = MakeSlider(content, "Tint strength", 0, 0.30, 0.01,
+        function() return fl.factionTintAlpha or 0.14 end,
+        function(v) fl.factionTintAlpha = v; ns.FriendList.Refresh(addon) end, y,
+        function(v) return string.format("%.2f", v) end)
+    y = y - dh - 10
+
+    return y - 20
+end
+
 -- [ MAIN PANEL ] --------------------------------------------------------------
 local panel
 local TABS = {
@@ -842,6 +1022,7 @@ local TABS = {
     { key="teleport",   label="Teleport"      },
     { key="reminder",   label="Buff Reminder" },
     { key="qol",        label="QOL"           },
+    { key="friendlist", label="Friend List"   },
 }
 
 local function BuildPanel(addon)
@@ -1021,6 +1202,7 @@ local function BuildPanel(addon)
         if tab.key == "teleport"   then finalY = BuildTeleport(tf, db, addon)         end
         if tab.key == "reminder"   then finalY = BuildReminder(tf, db, addon)         end
         if tab.key == "qol"        then finalY = BuildQOL(tf, db, addon)              end
+        if tab.key == "friendlist" then finalY = BuildFriendList(tf, db, addon)       end
         tabHeights[tab.key] = math.abs(finalY)
     end
 

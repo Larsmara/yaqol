@@ -141,6 +141,9 @@ function AuraReminder.Hide()
     if not frame then return end
     StopBlink()
     if dismissTimer then dismissTimer:Cancel(); dismissTimer = nil end
+    -- frame:Hide() is blocked during combat lockdown on named protected frames.
+    -- Skip the hide if we're locked down — CheckAndShow will re-evaluate on PLAYER_REGEN_ENABLED.
+    if InCombatLockdown() then return end
     frame:Hide()
 end
 

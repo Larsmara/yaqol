@@ -71,6 +71,11 @@ local function OnGossipShow()
     -- Use the new C_GossipInfo API (10.x+)
     local options = C_GossipInfo.GetOptions()
     local quests  = C_GossipInfo.GetAvailableQuests()
+    local active  = C_GossipInfo.GetActiveQuests()
+
+    -- If there are any active (ready-to-turn-in) quests, don't auto-click gossip —
+    -- let the player (or OnQuestGreeting) handle the turn-in naturally.
+    if #active > 0 then return end
 
     -- Single gossip option with no quests → select it
     if #options == 1 and #quests == 0 then

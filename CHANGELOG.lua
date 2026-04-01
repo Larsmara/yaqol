@@ -8,6 +8,23 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.0.19",
+        date    = "2026-04-01",
+        changes = {
+            "|cff00d1b2New|r  Friend List: class-colours friend names, custom status icons, client icons & faction tints",
+            "|cff2dc9b8Fix|r  Buff reminder panel no longer throws ADDON_ACTION_BLOCKED error during combat",
+            "|cff2dc9b8Fix|r  Food reminder now dismisses correctly for legacy expansion feasts (e.g. Legion feasts)",
+            "|cff2dc9b8Fix|r  Auto-gossip no longer intercepts quest turn-ins when a completed quest is available",
+        },
+    },
+    {
+        version = "1.0.18",
+        date    = "2026-03-31",
+        changes = {
+            "|cff2dc9b8Fix|r  Removed click-to-cast from buff reminders (not possible from addon code)",
+        },
+    },
+    {
         version = "1.0.17",
         date    = "2026-03-31",
         changes = {

@@ -57,6 +57,7 @@ function yaqol:OnEnable()
     ns.Teleport.Init(self)
     ns.AuraReminder.Init(self)
     ns.QOL.Init(self)
+    ns.FriendList.Init(self)
 end
 
 function yaqol:OnProfileChanged()
@@ -64,6 +65,7 @@ function yaqol:OnProfileChanged()
     ns.AuraReminder.Refresh(self)
     ns.MinimapButton.Refresh(self)
     ns.QOL.Refresh(self)
+    ns.FriendList.Refresh(self)
 end
 
 function yaqol:OnSlashCommand(input)

@@ -8,6 +8,13 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.0.20",
+        date    = "2026-04-01",
+        changes = {
+            "|cff00d1b2New|r  Merchant: window now shows 20 items per page in a 4-column layout",
+        },
+    },
+    {
         version = "1.0.19",
         date    = "2026-04-01",
         changes = {

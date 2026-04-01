@@ -134,6 +134,11 @@ ns.Defaults = {
             partyBuffs = {},
         },
 
+        -- Merchant module
+        merchant = {
+            enable = true,  -- extend merchant window to show 20 items per page
+        },
+
         -- Friend List styling module (ClassColorFriends)
         friendList = {
             enable           = true,

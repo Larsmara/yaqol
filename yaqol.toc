@@ -26,4 +26,5 @@ Modules/AuraReminder/AuraList.lua
 Modules/AuraReminder/AuraReminder.lua
 Modules/QOL/QOL.lua
 Modules/FriendList/FriendList.lua
+Modules/Merchant/Merchant.lua
 Config/Options.lua

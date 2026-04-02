@@ -271,6 +271,14 @@ local function GetMissingPartyBuffs(db)
         for i = 1, GetNumSubgroupMembers() do units[#units+1] = "party"..i end
     end
 
+    -- Build a set of class tokens present in the group (including the player).
+    -- Used to skip PARTY_BUFFS whose class isn't in the party at all.
+    local groupClasses = { [playerClass] = true }
+    for _, u in ipairs(units) do
+        local _, cls = UnitClass(u)
+        if cls then groupClasses[cls] = true end
+    end
+
     local auraCache = {}
     local function cachedSet(unit)
         if not auraCache[unit] then
@@ -281,6 +289,8 @@ local function GetMissingPartyBuffs(db)
 
     for _, def in ipairs(PARTY_BUFFS) do
         if cfg[def.key] == false then
+        elseif not groupClasses[def.class] then
+            -- Class not present in this group — skip entirely
         elseif def.class == playerClass then
             if Known(def.castSpell) then
                 local missing_count, total = 0, 1
@@ -394,64 +404,70 @@ function AuraList.GetMissing(db)
     -- 0 = disabled (any time remaining counts). Default 60 s.
     scanMinRemaining = (db.buffMinRemaining ~= nil) and db.buffMinRemaining or 60
 
+    -- Consumables (flask, food, augment rune, weapon oil) are only relevant at
+    -- max level. Suppress them entirely while the player is still leveling.
+    local atMaxLevel = UnitLevel("player") >= GetMaxPlayerLevel()
+
     local missing = {}
 
-    -- Standard consumable/custom categories
-    for _, cat in ipairs(AuraList.Categories) do
-        local list = db[cat.key]
-        if list and #list > 0 then
-            local found = false
-            for _, entry in ipairs(list) do
-                if PlayerHasAura(entry.spellID) then
-                    found = true; break
-                end
-            end
-            -- Extra fallback for food: "Well Fed" may be ContextuallySecret in Midnight
-            -- and not readable via GetPlayerAuraBySpellID. Check by aura name instead.
-            if not found and cat.key == "food" then
-                if PlayerHasAuraByName("Well Fed") then
-                    found = true
-                end
-            end
-            if not found then
-                -- Sum item counts across all itemIDs listed in every entry in this category.
-                local itemCount = 0
+    -- Standard consumable/custom categories (skipped while leveling)
+    if atMaxLevel then
+        for _, cat in ipairs(AuraList.Categories) do
+            local list = db[cat.key]
+            if list and #list > 0 then
+                local found = false
                 for _, entry in ipairs(list) do
-                    if entry.itemIDs then
-                        for _, itemID in ipairs(entry.itemIDs) do
-                            itemCount = itemCount + (GetItemCount(itemID, true) or 0)
-                        end
+                    if PlayerHasAura(entry.spellID) then
+                        found = true; break
                     end
                 end
-                -- Use the icon from the first entry that has a valid texture,
-                -- rather than always forcing list[1] (which may have a wrong/generic icon).
-                local icon = nil
-                for _, entry in ipairs(list) do
-                    local tex = SpellIcon(entry.spellID)
-                    if tex then icon = tex; break end
+                -- Extra fallback for food: "Well Fed" may be ContextuallySecret in Midnight
+                -- and not readable via GetPlayerAuraBySpellID. Check by aura name instead.
+                if not found and cat.key == "food" then
+                    if PlayerHasAuraByName("Well Fed") then
+                        found = true
+                    end
                 end
+                if not found then
+                    -- Sum item counts across all itemIDs listed in every entry in this category.
+                    local itemCount = 0
+                    for _, entry in ipairs(list) do
+                        if entry.itemIDs then
+                            for _, itemID in ipairs(entry.itemIDs) do
+                                itemCount = itemCount + (GetItemCount(itemID, true) or 0)
+                            end
+                        end
+                    end
+                    -- Use the icon from the first entry that has a valid texture,
+                    -- rather than always forcing list[1] (which may have a wrong/generic icon).
+                    local icon = nil
+                    for _, entry in ipairs(list) do
+                        local tex = SpellIcon(entry.spellID)
+                        if tex then icon = tex; break end
+                    end
+                    missing[#missing + 1] = {
+                        label     = cat.label,
+                        spellID   = list[1].spellID,
+                        icon      = icon,
+                        required  = cat.required,
+                        itemCount = itemCount > 0 and itemCount or nil,
+                    }
+                end
+            end
+        end
+
+        -- Weapon oil / temp enchant check (enabled when db.weaponOil == true)
+        if db.weaponOil then
+            if not HasWeaponOil() then
                 missing[#missing + 1] = {
-                    label     = cat.label,
-                    spellID   = list[1].spellID,
-                    icon      = icon,
-                    required  = cat.required,
-                    itemCount = itemCount > 0 and itemCount or nil,
+                    label    = "Weapon Oil",
+                    spellID  = 0,
+                    icon     = 134096,  -- generic weapon enchant icon
+                    required = false,
                 }
             end
         end
-    end
-
-    -- Weapon oil / temp enchant check (enabled when db.weaponOil == true)
-    if db.weaponOil then
-        if not HasWeaponOil() then
-            missing[#missing + 1] = {
-                label    = "Weapon Oil",
-                spellID  = 0,
-                icon     = 134096,  -- generic weapon enchant icon
-                required = false,
-            }
-        end
-    end
+    end -- atMaxLevel
 
     -- Class-specific buffs (only if enabled in config)
     if db.enableClassBuffs ~= false then

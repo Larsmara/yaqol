@@ -9,9 +9,10 @@ local PANEL_PAD    = 6
 
 -- [ STATE ] -------------------------------------------------------------------
 local frame, rows
-local inInstance   = false
-local isActive     = false
-local dismissTimer = nil
+local inInstance      = false
+local isActive        = false
+local dismissTimer    = nil
+local _unitAuraPending = false  -- coalesce UNIT_AURA burst into one deferred scan
 
 -- [ FRAME CONSTRUCTION ] ------------------------------------------------------
 local function MakeFrame()
@@ -468,11 +469,22 @@ function AuraReminder.Init(addon)
             if not isActive then return end
             if not rdb.remindOnBuffLost then return end
             if rdb.onlyOutOfCombat and InCombatLockdown() then AuraReminder.Hide(); return end
-            local missing = ns.AuraList.GetMissing(rdb)
-            if #missing == 0 then
-                AuraReminder.Hide()
-            else
-                ShowMissing(missing)
+            -- Coalesce burst: UNIT_AURA can fire many times per frame (one per member).
+            -- Defer the actual scan to the next frame so N events = 1 scan.
+            if not _unitAuraPending then
+                _unitAuraPending = true
+                C_Timer.After(0, function()
+                    _unitAuraPending = false
+                    if not isActive then return end
+                    local cdb = ns.Addon:Profile().reminder
+                    if cdb.onlyOutOfCombat and InCombatLockdown() then return end
+                    local missing = ns.AuraList.GetMissing(cdb)
+                    if #missing == 0 then
+                        AuraReminder.Hide()
+                    else
+                        ShowMissing(missing)
+                    end
+                end)
             end
         end
     end)

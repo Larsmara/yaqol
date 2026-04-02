@@ -102,23 +102,29 @@ local function PlayerHasAuraByName(name)
     return false
 end
 
--- Safe unit aura query for party/raid members.
-local function UnitHasAura(unit, spellID)
-    if not UnitExists(unit) or not UnitIsConnected(unit) then return true end
-    local ok, result = pcall(function()
+-- Safe unit aura set builder — scans a unit's buffs ONCE and returns a
+-- spellID-keyed table. Callers check multiple buff IDs with O(1) lookups
+-- instead of re-iterating the aura list per buff ID.
+local function BuildUnitAuraSet(unit)
+    local set = {}
+    if not UnitExists(unit) or not UnitIsConnected(unit) then
+        return set, true  -- second value = "treat as having all buffs" (offline/gone)
+    end
+    local ok = pcall(function()
         local i = 1
         while true do
             local aura = C_UnitAuras.GetAuraDataByIndex(unit, i, "HELPFUL")
-            if not aura then return false end
-            if not IsSecret(aura.spellId) and aura.spellId == spellID then
-                if IsSecret(aura.expirationTime) then return true end
-                if aura.expirationTime == 0 then return true end
-                return (aura.expirationTime - GetTime()) >= scanMinRemaining
+            if not aura then break end
+            if not IsSecret(aura.spellId) then
+                set[aura.spellId] = (not IsSecret(aura.expirationTime))
+                    and (aura.expirationTime == 0
+                         or (aura.expirationTime - GetTime()) >= scanMinRemaining)
+                    or true  -- secret expiry = treat as present
             end
             i = i + 1
         end
     end)
-    return ok and result or false
+    return ok and set or {}
 end
 
 -- Safe spell texture lookup.
@@ -246,41 +252,6 @@ local PARTY_BUFFS = {
       buffIDs = { 381732,381741,381746,381748,381749,381750,381751,381752,381753,381754,381756,381757,381758 } },
 }
 
--- Helper: returns missing, total — how many are missing the buff and total group size.
-local function CountMembersMissingBuff(buffIDs)
-    local missing = 0
-    local total   = 0
-
-    -- Check player
-    local playerHas = false
-    for _, id in ipairs(buffIDs) do
-        if PlayerHasAura(id) then playerHas = true; break end
-    end
-    total = total + 1
-    if not playerHas then missing = missing + 1 end
-
-    -- Check group members
-    local function unitMissing(unit)
-        for _, id in ipairs(buffIDs) do
-            if UnitHasAura(unit, id) then return false end
-        end
-        return true
-    end
-
-    if IsInRaid() then
-        for i = 1, GetNumGroupMembers() do
-            total = total + 1
-            if unitMissing("raid"..i) then missing = missing + 1 end
-        end
-    elseif IsInGroup() then
-        for i = 1, GetNumSubgroupMembers() do
-            total = total + 1
-            if unitMissing("party"..i) then missing = missing + 1 end
-        end
-    end
-    return missing, total
-end
-
 -- Returns missing party buff reminders for the player's class.
 local function GetMissingPartyBuffs(db)
     local missing = {}
@@ -291,12 +262,21 @@ local function GetMissingPartyBuffs(db)
     local inRaid  = IsInRaid()
     local inGroup = inRaid or IsInGroup()
 
-    -- Build unit list once
+    -- Build unit list and scan each unit's auras ONCE.
+    -- auraCache[unit] = spellID-keyed set; built lazily below.
     local units = {}
     if inRaid then
         for i = 1, GetNumGroupMembers() do units[#units+1] = "raid"..i end
     elseif inGroup then
         for i = 1, GetNumSubgroupMembers() do units[#units+1] = "party"..i end
+    end
+
+    local auraCache = {}
+    local function cachedSet(unit)
+        if not auraCache[unit] then
+            auraCache[unit] = BuildUnitAuraSet(unit)
+        end
+        return auraCache[unit]
     end
 
     for _, def in ipairs(PARTY_BUFFS) do
@@ -311,9 +291,10 @@ local function GetMissingPartyBuffs(db)
                 if not playerHas then missing_count = 1 end
                 for _, u in ipairs(units) do
                     total = total + 1
+                    local set = cachedSet(u)
                     local has = false
                     for _, id in ipairs(def.buffIDs) do
-                        if UnitHasAura(u, id) then has = true; break end
+                        if set[id] then has = true; break end
                     end
                     if not has then missing_count = missing_count + 1 end
                 end
@@ -330,8 +311,9 @@ local function GetMissingPartyBuffs(db)
             end
             if not anyoneHas then
                 for _, u in ipairs(units) do
+                    local set = cachedSet(u)
                     for _, id in ipairs(def.buffIDs) do
-                        if UnitHasAura(u, id) then anyoneHas = true; break end
+                        if set[id] then anyoneHas = true; break end
                     end
                     if anyoneHas then break end
                 end

@@ -42,49 +42,83 @@ local function GetOrMakeRow(idx)
     local row = CreateFrame("Frame", nil, frame)
     row:SetSize(ICON_SIZE, ICON_SIZE)
 
+    local bg = row:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetColorTexture(0, 0, 0, 1)
+
     local icon = row:CreateTexture(nil, "ARTWORK")
-    icon:SetAllPoints()
+    icon:SetPoint("TOPLEFT", row, "TOPLEFT", 1, -1)
+    icon:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -1, 1)
     icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
     row.icon = icon
 
     local iconBorder = row:CreateTexture(nil, "OVERLAY")
-    iconBorder:SetTexture("Interface/Buttons/UI-ActionButton-Border")
-    iconBorder:SetPoint("CENTER", icon, "CENTER")
-    iconBorder:SetSize(ICON_SIZE * 1.8, ICON_SIZE * 1.8)
-    iconBorder:SetBlendMode("ADD")
+    iconBorder:SetColorTexture(1, 0, 0, 1)
+    iconBorder:SetPoint("TOPLEFT", icon, "TOPLEFT", 0, 0)
+    iconBorder:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", 0, 0)
     iconBorder:SetAlpha(0)
     row.iconBorder = iconBorder
 
+    local function MakeBadgeBg(textHook)
+        local frame = CreateFrame("Frame", nil, row)
+        frame:SetFrameLevel(row:GetFrameLevel() + 1)
+        local bg = frame:CreateTexture(nil, "BACKGROUND")
+        bg:SetAllPoints()
+        bg:SetColorTexture(0, 0, 0, 0.7)
+        frame.bg = bg
+        return frame
+    end
+
     -- Item count badge (bottom-right corner, e.g. "3 in bags")
-    local countText = row:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
-    countText:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", 2, -1)
+    local countText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    countText:SetShadowColor(0, 0, 0, 1)
+    countText:SetShadowOffset(1, -1)
+    countText:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -2, 2)
     countText:SetTextColor(1, 1, 1, 1)
     countText:Hide()
     row.countText = countText
+    
+    local countBg = MakeBadgeBg(countText)
+    countBg:SetPoint("TOPLEFT", countText, "TOPLEFT", -2, 2)
+    countBg:SetPoint("BOTTOMRIGHT", countText, "BOTTOMRIGHT", 2, -2)
+    countText.bg = countBg
 
     -- Party missing badge (top-right corner): red number = how many members missing
-    local partyBadge = row:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
-    partyBadge:SetPoint("TOPRIGHT", icon, "TOPRIGHT", 3, 3)
+    local partyBadge = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    partyBadge:SetShadowColor(0, 0, 0, 1)
+    partyBadge:SetShadowOffset(1, -1)
+    partyBadge:SetPoint("TOPRIGHT", icon, "TOPRIGHT", -2, -2)
     partyBadge:SetTextColor(1, 0.25, 0.25, 1)
     partyBadge:Hide()
     row.partyBadge = partyBadge
+    
+    local partyBg = MakeBadgeBg(partyBadge)
+    partyBg:SetPoint("TOPLEFT", partyBadge, "TOPLEFT", -2, 2)
+    partyBg:SetPoint("BOTTOMRIGHT", partyBadge, "BOTTOMRIGHT", 2, -2)
+    partyBadge.bg = partyBg
 
     -- "Missing from group" indicator (top-left): orange ! when another class's buff is absent
-    local groupBadge = row:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
-    groupBadge:SetPoint("TOPLEFT", icon, "TOPLEFT", -2, 3)
+    local groupBadge = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    groupBadge:SetShadowColor(0, 0, 0, 1)
+    groupBadge:SetShadowOffset(1, -1)
+    groupBadge:SetPoint("TOPLEFT", icon, "TOPLEFT", 2, -2)
     groupBadge:SetTextColor(1, 0.55, 0.1, 1)
     groupBadge:SetText("!")
     groupBadge:Hide()
     row.groupBadge = groupBadge
+    
+    local groupBg = MakeBadgeBg(groupBadge)
+    groupBg:SetPoint("TOPLEFT", groupBadge, "TOPLEFT", -2, 2)
+    groupBg:SetPoint("BOTTOMRIGHT", groupBadge, "BOTTOMRIGHT", 2, -2)
+    groupBadge.bg = groupBg
 
     -- Glowing animation
-    local ag = iconBorder:CreateAnimationGroup()
+    local ag = icon:CreateAnimationGroup()
     ag:SetLooping("BOUNCE")
     local alpha = ag:CreateAnimation("Alpha")
-    alpha:SetFromAlpha(0.2)
+    alpha:SetFromAlpha(0.4)
     alpha:SetToAlpha(1.0)
     alpha:SetDuration(0.7)
-    alpha:SetSmoothing("IN_OUT")
     row.ag = ag
 
     -- Tooltip handling
@@ -140,14 +174,12 @@ end
 local function StartBlink()
     for _, row in ipairs(frame.rows) do
         if row:IsShown() and row.required then
-            row.iconBorder:SetVertexColor(1, 0.4, 0.4, 1) -- red alert border
-            row.iconBorder:SetSize(ICON_SIZE * 1.8, ICON_SIZE * 1.8)
+            row.iconBorder:SetAlpha(0)
             row.ag:Play()
         else
             row.ag:Stop()
-            row.iconBorder:SetVertexColor(0.8, 0.8, 0.8, 0.5) -- calm border
-            row.iconBorder:SetSize(ICON_SIZE * 1.8, ICON_SIZE * 1.8)
             row.iconBorder:SetAlpha(0)
+            row.icon:SetAlpha(1)
         end
     end
 end
@@ -155,6 +187,7 @@ end
 local function StopBlink()
     for _, row in ipairs(frame.rows) do
         row.ag:Stop()
+        row.icon:SetAlpha(1)
     end
 end
 
@@ -197,22 +230,25 @@ local function ShowMissing(missing)
         if m.itemCount and m.itemCount > 0 then
             row.countText:SetText(m.itemCount)
             row.countText:Show()
+            row.countText.bg:Show()
         else
             row.countText:Hide()
+            row.countText.bg:Hide()
         end
-        -- Party badge: "have/total" format (top-right, red)
-        if m.partyMissingCount and m.partyMissingCount > 0 and m.partyTotalCount and m.partyTotalCount > 0 then
-            local have = m.partyTotalCount - m.partyMissingCount
-            row.partyBadge:SetText(have .. "/" .. m.partyTotalCount)
+        if m.partyMissingCount and m.partyMissingCount > 0 then
+            row.partyBadge:SetText(m.partyMissingCount)
             row.partyBadge:Show()
+            row.partyBadge.bg:Show()
         else
             row.partyBadge:Hide()
+            row.partyBadge.bg:Hide()
         end
-        -- Missing-from-group indicator (top-left, orange !)
         if m.missingFromGroup then
             row.groupBadge:Show()
+            row.groupBadge.bg:Show()
         else
             row.groupBadge:Hide()
+            row.groupBadge.bg:Hide()
         end
         row:Show()
         xOff = xOff + ICON_SIZE + ICON_PAD
@@ -350,6 +386,7 @@ function AuraReminder.Init(addon)
     local function StartWeaponTicker()
         if weaponTicker then return end
         if not HasWeaponBuffDefs() then return end
+        if IsInRaid() then return end  -- enchants don't change mid-raid; 5s ticker is enough
         weaponTicker = C_Timer.NewTicker(1, function()
             if not isActive or InCombatLockdown() then return end
             local wdb = ns.Addon:Profile().reminder

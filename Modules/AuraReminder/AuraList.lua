@@ -103,21 +103,22 @@ local function PlayerHasAuraByName(name)
 end
 
 -- Safe unit aura query for party/raid members.
--- Iterates GetAuraDataByIndex (the correct API for group unit auras).
--- Treats missing/offline units as "has the buff" to avoid false positives.
 local function UnitHasAura(unit, spellID)
     if not UnitExists(unit) or not UnitIsConnected(unit) then return true end
-    local i = 1
-    while true do
-        local ok, aura = pcall(C_UnitAuras.GetAuraDataByIndex, unit, i, "HELPFUL")
-        if not ok or aura == nil then return false end
-        if not IsSecret(aura.spellId) and aura.spellId == spellID then
-            if IsSecret(aura.expirationTime) then return true end
-            if aura.expirationTime == 0 then return true end
-            return (aura.expirationTime - GetTime()) >= scanMinRemaining
+    local ok, result = pcall(function()
+        local i = 1
+        while true do
+            local aura = C_UnitAuras.GetAuraDataByIndex(unit, i, "HELPFUL")
+            if not aura then return false end
+            if not IsSecret(aura.spellId) and aura.spellId == spellID then
+                if IsSecret(aura.expirationTime) then return true end
+                if aura.expirationTime == 0 then return true end
+                return (aura.expirationTime - GetTime()) >= scanMinRemaining
+            end
+            i = i + 1
         end
-        i = i + 1
-    end
+    end)
+    return ok and result or false
 end
 
 -- Safe spell texture lookup.
@@ -287,68 +288,57 @@ local function GetMissingPartyBuffs(db)
     if not playerClass then return missing end
 
     local cfg = db.partyBuffs or {}
+    local inRaid  = IsInRaid()
+    local inGroup = inRaid or IsInGroup()
 
-    -- Only check party buffs when actually in a group.
-    local inGroup = IsInGroup() or IsInRaid()
+    -- Build unit list once
+    local units = {}
+    if inRaid then
+        for i = 1, GetNumGroupMembers() do units[#units+1] = "raid"..i end
+    elseif inGroup then
+        for i = 1, GetNumSubgroupMembers() do units[#units+1] = "party"..i end
+    end
 
     for _, def in ipairs(PARTY_BUFFS) do
         if cfg[def.key] == false then
-            -- user disabled this specific buff check
         elseif def.class == playerClass then
-            -- YOUR buff: remind you to cast it if anyone is missing it.
             if Known(def.castSpell) then
-                local missingCount, totalCount = CountMembersMissingBuff(def.buffIDs)
-                if missingCount > 0 then
-                    missing[#missing + 1] = {
-                        label             = def.label,
-                        spellID           = def.castSpell,
-                        icon              = SpellIcon(def.castSpell),
-                        required          = true,
-                        partyMissingCount = missingCount,
-                        partyTotalCount   = totalCount,
-                    }
+                local missing_count, total = 0, 1
+                local playerHas = false
+                for _, id in ipairs(def.buffIDs) do
+                    if PlayerHasAura(id) then playerHas = true; break end
+                end
+                if not playerHas then missing_count = 1 end
+                for _, u in ipairs(units) do
+                    total = total + 1
+                    local has = false
+                    for _, id in ipairs(def.buffIDs) do
+                        if UnitHasAura(u, id) then has = true; break end
+                    end
+                    if not has then missing_count = missing_count + 1 end
+                end
+                if missing_count > 0 then
+                    missing[#missing+1] = { label=def.label, spellID=def.castSpell,
+                        icon=SpellIcon(def.castSpell), required=true,
+                        partyMissingCount=missing_count, partyTotalCount=total }
                 end
             end
         elseif inGroup then
-            -- ANOTHER CLASS's buff: show a reminder if NOBODY in the group has it.
-            -- This tells you the group is missing the buff (so you can ask someone to cast it).
-            -- Only relevant when actually grouped.
             local anyoneHas = false
-
-            -- Check if any group member is providing the buff.
-            local function unitHasBuff(unit)
-                for _, id in ipairs(def.buffIDs) do
-                    if UnitHasAura(unit, id) then return true end
-                end
-                return false
-            end
-
-            -- Also check the player themselves (e.g. solo with group buffs active).
             for _, id in ipairs(def.buffIDs) do
                 if PlayerHasAura(id) then anyoneHas = true; break end
             end
-
             if not anyoneHas then
-                if IsInRaid() then
-                    for i = 1, GetNumGroupMembers() do
-                        if unitHasBuff("raid"..i) then anyoneHas = true; break end
+                for _, u in ipairs(units) do
+                    for _, id in ipairs(def.buffIDs) do
+                        if UnitHasAura(u, id) then anyoneHas = true; break end
                     end
-                else
-                    for i = 1, GetNumSubgroupMembers() do
-                        if unitHasBuff("party"..i) then anyoneHas = true; break end
-                    end
+                    if anyoneHas then break end
                 end
             end
-
             if not anyoneHas then
-                missing[#missing + 1] = {
-                    label             = def.label,
-                    spellID           = def.castSpell,
-                    icon              = SpellIcon(def.castSpell),
-                    required          = false,   -- informational: you can't cast it yourself
-                    partyMissingCount = nil,
-                    missingFromGroup  = true,    -- flag: show as "missing from group"
-                }
+                missing[#missing+1] = { label=def.label, spellID=def.castSpell,
+                    icon=SpellIcon(def.castSpell), required=false, missingFromGroup=true }
             end
         end
     end

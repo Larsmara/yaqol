@@ -4,35 +4,30 @@ local Teleport = ns.Teleport
 
 -- [ CONSTANTS ] ---------------------------------------------------------------
 local DUNGEONS = {
-    { name = "The Rookery",              spellID = 393273  },
-    { name = "Priory of the Sacred Flame",spellID = 1254572 },
-    { name = "The Nexus-Princess",       spellID = 1254563 },
-    { name = "The Stonevault Spire",     spellID = 1254400 },
+    { name = "Academy",                  spellID = 393273  },
+    { name = "Terrace",                  spellID = 1254572 },
+    { name = "Nexuspoint",               spellID = 1254563 },
+    { name = "Spire",                    spellID = 1254400 },
     { name = "Skyreach",                 spellID = 159898  },
-    { name = "City of Threads Caverns",  spellID = 1254559 },
+    { name = "Caverns",                  spellID = 1254559 },
     { name = "Pit of Saron",             spellID = 1254555 },
-    { name = "Operation: Floodgate",     spellID = 1254551 },
+    { name = "Triumvirate",              spellID = 1254551 },
 }
 
--- challengeMapID → DUNGEONS index, built at runtime from C_ChallengeMode
-local challengeMapToDungeon = {}
-
-local function BuildChallengeMapTable()
-    if not C_ChallengeMode or not C_ChallengeMode.GetMapTable then return end
-    local maps = C_ChallengeMode.GetMapTable()
-    if not maps then return end
-    for _, mapID in ipairs(maps) do
-        local name = C_ChallengeMode.GetMapUIInfo(mapID)
-        if name then
-            for i, d in ipairs(DUNGEONS) do
-                if d.name == name then
-                    challengeMapToDungeon[mapID] = i
-                    break
-                end
-            end
-        end
-    end
-end
+-- challengeMapID → DUNGEONS index
+-- Hardcoded to match the DUNGEONS table order above; same IDs used by BigWigs.
+-- DUNGEONS order: 1=Academy, 2=Terrace, 3=Nexuspoint, 4=Spire,
+--                 5=Skyreach, 6=Caverns, 7=Pit of Saron, 8=Triumvirate
+local challengeMapToDungeon = {
+    [402] = 1,  -- Algeth'ar Academy
+    [558] = 2,  -- Magister's Terrace  ("Terrace")
+    [559] = 3,  -- Nexus-Point Xenas
+    [557] = 4,  -- Windrunner's Spire
+    [161] = 5,  -- Skyreach
+    [560] = 6,  -- Maisara Caverns
+    [556] = 7,  -- Pit of Saron
+    [583] = 8,  -- Seat of the Triumvirate
+}
 
 local BTN_W, BTN_H = 180, 22
 local BTN_PAD = 1
@@ -43,6 +38,85 @@ local FRAME_W = BTN_W + PANEL_PAD * 2
 local DISABLED_ALPHA = 0.3
 local LEARNED_COLOR = { 0.9, 0.9, 0.9 }
 local UNKNOWN_COLOR = { 0.5, 0.5, 0.5 }
+
+-- [ KEYSTONE DATA VIA LIBKEYSTONE ] -----------------------------------------
+-- LibKeystone is compatible with BigWigs, DBM, and any addon using the same
+-- library. It broadcasts over "LibKS" prefix automatically.
+-- Callback args: keyLevel, keyMapID, playerRating, playerName, channel
+
+local LibKeystone = LibStub and LibStub("LibKeystone", true)
+local partyKeyCache = {}  -- ["PlayerName"] = { mapID=n, level=n }
+local libKeystoneTable = {}  -- unique table used as our identifier with LibKeystone
+
+local function OnLibKeystoneData(keyLevel, keyMapID, playerRating, playerName, channel)
+    if channel ~= "PARTY" then return end  -- ignore GUILD broadcasts
+    if keyLevel and keyLevel > 0 and keyMapID and keyMapID > 0 then
+        partyKeyCache[playerName] = { mapID = keyMapID, level = keyLevel }
+    else
+        partyKeyCache[playerName] = nil
+    end
+    if buttons then RefreshButtons() end
+end
+
+local function RequestPartyKeystones()
+    if LibKeystone then
+        LibKeystone.Request("PARTY")
+    end
+end
+
+-- Build the result table that RefreshButtons consumes.
+-- Returns: [dungeonIdx] = { {r,g,b,level,name,unit}, ... }
+local function CollectPartyKeystones()
+    local result = {}
+
+    local function AddEntry(mapID, level, unit, nameKey)
+        if not mapID or mapID == 0 or not level or level == 0 then return end
+        local dungeonIdx = challengeMapToDungeon[mapID]
+        if not dungeonIdx then return end
+        local r, g, b = 1, 0.82, 0.1  -- fallback gold
+        local _, classFile = UnitClass(unit)
+        if classFile and C_ClassColor and C_ClassColor.GetClassColor then
+            local c = C_ClassColor.GetClassColor(classFile)
+            if c then r, g, b = c.r, c.g, c.b end
+        end
+        if not result[dungeonIdx] then result[dungeonIdx] = {} end
+        result[dungeonIdx][#result[dungeonIdx] + 1] = { r=r, g=g, b=b, level=level, name=nameKey, unit=unit }
+    end
+
+    -- All party data (including self) comes through LibKeystone callback.
+    -- LibKeystone.Request() fires our callback with the player's own key too.
+    -- We also add own key directly in case not in a group / lib not loaded.
+    if C_MythicPlus then
+        local mapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID and C_MythicPlus.GetOwnedKeystoneChallengeMapID()
+        local level = C_MythicPlus.GetOwnedKeystoneLevel and C_MythicPlus.GetOwnedKeystoneLevel()
+        local myName = UnitName("player") or "player"
+        AddEntry(mapID, level, "player", myName)
+    end
+
+    -- Party members from LibKeystone cache (playerName is already ambiguated by the lib)
+    local myName = UnitName("player") or ""
+    for playerName, data in pairs(partyKeyCache) do
+        if playerName == myName then
+            -- own key already added above via C_MythicPlus
+        else
+            -- Try to resolve a unit token for class colour; fall back to gold if not found
+            local unit = nil
+            for i = 1, 4 do
+                local u = "party" .. i
+                if UnitExists(u) then
+                    local n = (UnitName(u) or ""):lower()
+                    if n == playerName:lower() then
+                        unit = u
+                        break
+                    end
+                end
+            end
+            AddEntry(data.mapID, data.level, unit or "player", playerName)
+        end
+    end
+
+    return result
+end
 
 -- [ FRAME ] -------------------------------------------------------------------
 local panel, buttons
@@ -94,38 +168,52 @@ local function CheckVisibility()
 end
 
 local function MakePanel()
-    local totalH = (#DUNGEONS * (BTN_H + BTN_PAD)) + PANEL_PAD * 2 - BTN_PAD + HEADER_H
+    local totalH = (#DUNGEONS * (BTN_H + BTN_PAD)) + PANEL_PAD * 2 - BTN_PAD
     local f = CreateFrame("Frame", "yaqolTeleportPanel", UIParent)
     f:SetSize(FRAME_W, totalH)
     f:SetFrameStrata("MEDIUM")
     f.restingAlpha = 0.8
-
+    
+    -- Hidden background and header as requested
     local bg = f:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
-    bg:SetColorTexture(0.05, 0.05, 0.05, 0.75)
-
-    -- Thin header divider line
+    bg:SetColorTexture(0, 0, 0, 0)
+    
     local div = f:CreateTexture(nil, "ARTWORK")
     div:SetHeight(1)
     div:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, -HEADER_H)
     div:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -HEADER_H)
-    div:SetColorTexture(1, 1, 1, 0.08)
+    div:SetColorTexture(0, 0, 0, 0)
 
-    -- Close button (×) in the top-right of the header
+    -- Close button (-) sitting clearly atop the panel
     local closeBtn = CreateFrame("Button", nil, f)
-    closeBtn:SetSize(HEADER_H, HEADER_H)
-    closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-    local closeLbl = closeBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    closeLbl:SetAllPoints()
-    closeLbl:SetJustifyH("CENTER")
-    closeLbl:SetText("|cffaaaaaa\195\151|r")  -- × in grey (UTF-8 0xC3 0x97)
+    closeBtn:SetSize(18, 18)
+    closeBtn:SetPoint("BOTTOMRIGHT", f, "TOPRIGHT", -PANEL_PAD, 2)
+    
+    local cBorder = closeBtn:CreateTexture(nil, "BACKGROUND")
+    cBorder:SetAllPoints()
+    cBorder:SetColorTexture(0, 0, 0, 1)
+
+    local cBg = closeBtn:CreateTexture(nil, "BORDER")
+    cBg:SetPoint("TOPLEFT", closeBtn, "TOPLEFT", 1, -1)
+    cBg:SetPoint("BOTTOMRIGHT", closeBtn, "BOTTOMRIGHT", -1, 1)
+    cBg:SetColorTexture(0.1, 0.1, 0.1, 0.8)
+    
+    local closeLbl = closeBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    closeLbl:SetPoint("CENTER", closeBtn, "CENTER", 0, 0)
+    closeLbl:SetShadowColor(0, 0, 0, 1)
+    closeLbl:SetShadowOffset(1, -1)
+    closeLbl:SetText("-")  -- Crisp minus icon
+    
     closeBtn:SetScript("OnEnter", function(self)
         f:SetAlpha(1)
-        closeLbl:SetText("|cffffffff\195\151|r")
+        cBg:SetColorTexture(0.2, 0.2, 0.2, 1)
+        closeLbl:SetTextColor(1, 1, 1, 1)
     end)
     closeBtn:SetScript("OnLeave", function(self)
         f:SetAlpha(f.restingAlpha)
-        closeLbl:SetText("|cffaaaaaa\195\151|r")
+        cBg:SetColorTexture(0.1, 0.1, 0.1, 0.8)
+        closeLbl:SetTextColor(0.8, 0.8, 0.8, 1)
     end)
     closeBtn:SetScript("OnClick", function()
         userClosed = true
@@ -147,7 +235,7 @@ local function MakePanel()
 end
 
 local function MakeButton(parent, dungeon, idx)
-    local yOff = -(HEADER_H + PANEL_PAD + (idx - 1) * (BTN_H + BTN_PAD))
+    local yOff = -(PANEL_PAD + (idx - 1) * (BTN_H + BTN_PAD))
     local btn = CreateFrame("Button", nil, parent, "InsecureActionButtonTemplate")
     btn:SetSize(BTN_W, BTN_H)
     btn:SetPoint("TOPLEFT", parent, "TOPLEFT", PANEL_PAD, yOff)
@@ -158,20 +246,37 @@ local function MakeButton(parent, dungeon, idx)
     btn:SetAttribute("type", "spell")
     btn:SetAttribute("spell", dungeon.spellID)
 
-    local bg = btn:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetColorTexture(0.1, 0.1, 0.1, 0.3)
+    -- 1px border using OVERLAY sublayer 7 (highest) so they render above
+    -- InsecureActionButtonTemplate's own overlay textures.
+    -- Thickness is set dynamically in RefreshButtons (1px default, 2px when key present).
+    local function MakeEdge()
+        local t = btn:CreateTexture(nil, "OVERLAY", nil, 7)
+        t:SetColorTexture(0, 0, 0, 1)
+        return t
+    end
+    local edgeT = MakeEdge(); edgeT:SetPoint("TOPLEFT",btn,"TOPLEFT",0,0);      edgeT:SetPoint("TOPRIGHT",btn,"TOPRIGHT",0,0);    edgeT:SetHeight(1)
+    local edgeB = MakeEdge(); edgeB:SetPoint("BOTTOMLEFT",btn,"BOTTOMLEFT",0,0); edgeB:SetPoint("BOTTOMRIGHT",btn,"BOTTOMRIGHT",0,0); edgeB:SetHeight(1)
+    local edgeL = MakeEdge(); edgeL:SetPoint("TOPLEFT",btn,"TOPLEFT",0,0);      edgeL:SetPoint("BOTTOMLEFT",btn,"BOTTOMLEFT",0,0);  edgeL:SetWidth(1)
+    local edgeR = MakeEdge(); edgeR:SetPoint("TOPRIGHT",btn,"TOPRIGHT",0,0);    edgeR:SetPoint("BOTTOMRIGHT",btn,"BOTTOMRIGHT",0,0); edgeR:SetWidth(1)
+    btn.edgeT, btn.edgeB, btn.edgeL, btn.edgeR = edgeT, edgeB, edgeL, edgeR
+
+    local bg = btn:CreateTexture(nil, "BORDER")
+    bg:SetPoint("TOPLEFT", btn, "TOPLEFT", 1, -1)
+    bg:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -1, 1)
+    bg:SetColorTexture(0.1, 0.1, 0.1, 0.8)
     btn.bg = bg
 
     -- Spell icon
     local icon = btn:CreateTexture(nil, "ARTWORK")
-    icon:SetSize(BTN_H - 4, BTN_H - 4)
-    icon:SetPoint("LEFT", btn, "LEFT", 2, 0)
+    icon:SetSize(BTN_H - 2, BTN_H - 2)
+    icon:SetPoint("LEFT", btn, "LEFT", 1, 0)
     icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
     btn.icon = icon
 
     -- Label
-    local label = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local label = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    label:SetShadowColor(0, 0, 0, 1)
+    label:SetShadowOffset(1, -1)
     label:SetPoint("LEFT", icon, "RIGHT", 6, 0)
     label:SetPoint("RIGHT", btn, "RIGHT", -4, 0)
     label:SetJustifyH("LEFT")
@@ -187,8 +292,8 @@ local function MakeButton(parent, dungeon, idx)
         GameTooltip:Show()
     end)
     btn:SetScript("OnLeave", function(self)
-        parent:SetAlpha(0.8)
-        self.bg:SetColorTexture(0.1, 0.1, 0.1, 0.3)
+        parent:SetAlpha(parent.restingAlpha)
+        self.bg:SetColorTexture(0.1, 0.1, 0.1, 0.8)
         GameTooltip:Hide()
     end)
 
@@ -201,81 +306,115 @@ local function RefreshButtons()
     if not buttons then return end
     local db = ns.Addon:Profile().teleport
 
-    -- Determine player's own keystone dungeon index (if any)
-    local keystoneIdx = nil
-    local keystoneLevel = nil
-    if C_MythicPlus then
-        local mapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID and C_MythicPlus.GetOwnedKeystoneChallengeMapID()
-        keystoneLevel = C_MythicPlus.GetOwnedKeystoneLevel and C_MythicPlus.GetOwnedKeystoneLevel()
-        if mapID then keystoneIdx = challengeMapToDungeon[mapID] end
-    end
+    -- Collect all party keystones (includes player)
+    local partyKeys = CollectPartyKeystones()
 
+    local visibleCount = 0
+    
     for i, btn in ipairs(buttons) do
-        local known = IsSpellKnown(btn.spellID)
-        btn.learned = known
-        local iconID = C_Spell.GetSpellTexture(btn.spellID)
-        btn.icon:SetTexture(iconID)
-        if known then
-            btn.label:SetTextColor(LEARNED_COLOR[1], LEARNED_COLOR[2], LEARNED_COLOR[3])
-            btn:SetAlpha(1)
-            btn:EnableMouse(true)
+        local learned = IsSpellKnown(btn.spellID)
+        btn.learned = learned
+        
+        local spellInfo = C_Spell.GetSpellInfo(btn.spellID)
+        if spellInfo and spellInfo.iconID then
+            btn.icon:SetTexture(spellInfo.iconID)
         else
-            btn.label:SetTextColor(UNKNOWN_COLOR[1], UNKNOWN_COLOR[2], UNKNOWN_COLOR[3])
-            btn:SetAlpha(DISABLED_ALPHA)
-            btn:EnableMouse(false)
+            btn.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
         end
-        if not known and not db.showUnknown then
+        
+        btn.icon:SetDesaturated(not learned)
+        
+        if learned then
+            btn:Enable()
+            btn.label:SetTextColor(LEARNED_COLOR[1], LEARNED_COLOR[2], LEARNED_COLOR[3])
+        else
+            btn:Disable()
+            btn.label:SetTextColor(UNKNOWN_COLOR[1], UNKNOWN_COLOR[2], UNKNOWN_COLOR[3])
+        end
+        
+        -- ── Keystone border + badge ──────────────────────────────────────────
+        local owners = partyKeys[i]  -- array of { r,g,b,level,name,unit } or nil
+
+        -- Show if: spell learned, OR showUnknown is on, OR a party member has this key
+        local hasPartyKey = owners and #owners > 0
+        if not learned and not db.showUnknown and not hasPartyKey then
             btn:Hide()
         else
             btn:Show()
+            visibleCount = visibleCount + 1
+            btn:SetPoint("TOPLEFT", panel, "TOPLEFT", PANEL_PAD, -(PANEL_PAD + (visibleCount - 1) * (BTN_H + BTN_PAD)))
         end
 
-        -- Keystone badge: show "+N" and gold border on the button matching the player's key
-        if i == keystoneIdx and keystoneLevel then
-            if not btn.keyBadge then
-                -- Gold border (four 1-px edge textures)
-                local function MakeEdge(anchor, w, h, xOff, yOff)
-                    local t = btn:CreateTexture(nil, "OVERLAY")
-                    t:SetSize(w, h)
-                    t:SetPoint(anchor, btn, anchor, xOff, yOff)
-                    t:SetColorTexture(1, 0.82, 0.1, 1)
-                    return t
-                end
-                btn.borderT = MakeEdge("TOPLEFT",    BTN_W, 1,  0,  0)
-                btn.borderB = MakeEdge("BOTTOMLEFT", BTN_W, 1,  0,  0)
-                btn.borderL = MakeEdge("TOPLEFT",    1, BTN_H,  0,  0)
-                btn.borderR = MakeEdge("TOPRIGHT",   1, BTN_H,  0,  0)
+        if owners and #owners > 0 then
+            -- Sort so "player" is always first (gets the top/left border)
+            table.sort(owners, function(a, b)
+                if a.unit == "player" then return true end
+                if b.unit == "player" then return false end
+                return (a.name or "") < (b.name or "")
+            end)
 
-                -- Tiny key icon
+            local c1 = owners[1]
+            local c2 = owners[2]  -- may be nil
+
+            -- Boost class colour slightly so 2px border is vivid against the dark bg
+            local function boost(v) return math.min(1, v * 1.25 + 0.1) end
+            local r1b, g1b, b1b = boost(c1.r), boost(c1.g), boost(c1.b)
+            local r2b, g2b, b2b = c2 and boost(c2.r) or r1b, c2 and boost(c2.g) or g1b, c2 and boost(c2.b) or b1b
+
+            -- 2px thick colored border
+            btn.edgeT:SetHeight(2); btn.edgeT:SetColorTexture(r1b, g1b, b1b, 1)
+            btn.edgeL:SetWidth(2);  btn.edgeL:SetColorTexture(r1b, g1b, b1b, 1)
+            btn.edgeB:SetHeight(2); btn.edgeB:SetColorTexture(r2b, g2b, b2b, 1)
+            btn.edgeR:SetWidth(2);  btn.edgeR:SetColorTexture(r2b, g2b, b2b, 1)
+
+            -- Badge: show highest level key among owners (likely the player's)
+            local highestLevel = 0
+            for _, o in ipairs(owners) do
+                if o.level > highestLevel then highestLevel = o.level end
+            end
+
+            if not btn.keyBadge then
                 local keyIcon = btn:CreateTexture(nil, "OVERLAY")
-                keyIcon:SetSize(14, 14)
+                keyIcon:SetSize(12, 12)
                 keyIcon:SetPoint("RIGHT", btn, "RIGHT", -4, 0)
                 keyIcon:SetTexture("Interface\\Icons\\INV_Misc_Key_14")
                 keyIcon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
                 btn.keyIcon = keyIcon
 
-                local badge = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                local badge = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
                 badge:SetPoint("RIGHT", keyIcon, "LEFT", -2, 0)
-                badge:SetTextColor(1, 0.85, 0, 1)  -- gold
+                badge:SetShadowColor(0, 0, 0, 1)
+                badge:SetShadowOffset(1, -1)
                 btn.keyBadge = badge
             end
-            btn.keyBadge:SetText("+" .. keystoneLevel)
+
+            -- Colour badge text to match first owner's class colour
+            btn.keyBadge:SetTextColor(c1.r, c1.g, c1.b, 1)
+            btn.keyBadge:SetText("+" .. highestLevel)
             btn.keyBadge:Show()
             btn.keyIcon:Show()
-            btn.borderT:Show(); btn.borderB:Show()
-            btn.borderL:Show(); btn.borderR:Show()
-            -- Shift label right edge so it doesn't overlap the badge
+            btn.label:ClearAllPoints()
+            btn.label:SetPoint("LEFT", btn.icon, "RIGHT", 6, 0)
             btn.label:SetPoint("RIGHT", btn.keyBadge, "LEFT", -4, 0)
         else
-            if btn.keyBadge then btn.keyBadge:Hide() end
-            if btn.keyIcon  then btn.keyIcon:Hide()  end
-            if btn.borderT  then
-                btn.borderT:Hide(); btn.borderB:Hide()
-                btn.borderL:Hide(); btn.borderR:Hide()
+            -- Reset to 1px black border
+            btn.edgeT:SetHeight(1); btn.edgeT:SetColorTexture(0, 0, 0, 1)
+            btn.edgeB:SetHeight(1); btn.edgeB:SetColorTexture(0, 0, 0, 1)
+            btn.edgeL:SetWidth(1);  btn.edgeL:SetColorTexture(0, 0, 0, 1)
+            btn.edgeR:SetWidth(1);  btn.edgeR:SetColorTexture(0, 0, 0, 1)
+            if btn.keyBadge then
+                btn.keyBadge:Hide()
+                btn.keyIcon:Hide()
             end
+            btn.label:ClearAllPoints()
+            btn.label:SetPoint("LEFT", btn.icon, "RIGHT", 6, 0)
             btn.label:SetPoint("RIGHT", btn, "RIGHT", -4, 0)
         end
     end
+    
+    -- Dynamically shrink the main panel if spells are hidden
+    local dynamicH = visibleCount > 0 and (visibleCount * (BTN_H + BTN_PAD)) + PANEL_PAD * 2 - BTN_PAD or PANEL_PAD * 2
+    panel:SetHeight(dynamicH)
 end
 
 -- [ PUBLIC API ] --------------------------------------------------------------
@@ -287,9 +426,13 @@ function Teleport.Init(addon)
     end
     panel:SetScale(addon:Profile().teleport.scale)
     ApplyPos()
-    BuildChallengeMapTable()
     RefreshButtons()
     CheckVisibility()
+
+    -- Register with LibKeystone for cross-addon keystone sharing (BigWigs, DBM, etc.)
+    if LibKeystone then
+        LibKeystone.Register(libKeystoneTable, OnLibKeystoneData)
+    end
 
     -- Refresh known spells when spellbook changes and monitor group status
     local watcher = CreateFrame("Frame")
@@ -298,13 +441,35 @@ function Teleport.Init(addon)
     watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
     watcher:RegisterEvent("CHALLENGE_MODE_KEYSTONE_SLOTTED")
     watcher:RegisterEvent("BAG_UPDATE_DELAYED")
-    watcher:SetScript("OnEvent", function(self, event)
+    watcher:SetScript("OnEvent", function(self, event, ...)
         if event == "SPELLS_CHANGED" then
             RefreshButtons()
         elseif event == "CHALLENGE_MODE_KEYSTONE_SLOTTED" or event == "BAG_UPDATE_DELAYED" then
+            RequestPartyKeystones()
             RefreshButtons()
-        else
+        elseif event == "GROUP_ROSTER_UPDATE" then
+            -- Wipe stale cache entries for players no longer in group
+            for playerName in pairs(partyKeyCache) do
+                local found = false
+                for i = 1, 4 do
+                    local u = "party" .. i
+                    if UnitExists(u) then
+                        local n = UnitName(u) or ""
+                        if n == playerName then found = true; break end
+                    end
+                end
+                if not found then partyKeyCache[playerName] = nil end
+            end
+            -- Delay so members' addons have time to respond
+            C_Timer.After(1.5, function() RequestPartyKeystones(); C_Timer.After(1, RefreshButtons) end)
             CheckVisibility()
+            RefreshButtons()
+        elseif event == "PLAYER_ENTERING_WORLD" then
+            partyKeyCache = {}
+            CheckVisibility()
+            -- Delay so other addons (BigWigs, DBM) finish initialising before we request,
+            -- then refresh once responses have arrived
+            C_Timer.After(3, function() RequestPartyKeystones(); C_Timer.After(1, RefreshButtons) end)
         end
     end)
 end
@@ -326,5 +491,6 @@ end
 function Teleport.GetPanel()
     return panel
 end
+
 
 

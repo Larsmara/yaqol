@@ -478,23 +478,44 @@ local function BuildGeneral(content, db, addon)
     hPerf:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
-    local descPerf = Label(content,
-        "Applies a preset of 58 graphics CVars tuned for competitive play: "
-        .."disables or minimises projected textures, environmental detail, ground clutter, "
-        .."shadows, and spell density — then uncaps the frame rate to 144 FPS. "
-        .."These are the settings most M+ and raiding players run manually. "
-        .."Your current values are snapshot automatically before applying, "
-        .."so you can Restore at any time to get everything back exactly as it was.",
-        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
-    descPerf:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
-    descPerf:SetWidth(T.PANEL_W - T.PAD*2 - 16)
-    descPerf:SetJustifyH("LEFT")
-    y = y - 62
+    local infoBtn = CreateFrame("Button", nil, content)
+    infoBtn:SetSize(16, 16)
+    infoBtn:SetPoint("LEFT", h10, "RIGHT", 6, 0)
+    local infoLbl = infoBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    infoLbl:SetPoint("CENTER")
+    infoLbl:SetText("[?]")
+    infoBtn:SetScript("OnEnter", function()
+        GameTooltip:SetOwner(infoBtn, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Competitive FPS Settings", 1, 1, 1)
+        GameTooltip:AddLine("Applies a preset of 58 graphics CVars tuned for competitive play: \n"
+        .."disables or minimises projected textures, environmental detail, ground clutter, \n"
+        .."shadows, and spell density — then uncaps the frame rate to 144 FPS. \n"
+        .."These are the settings most M+ and raiding players run manually. \n"
+        .."Your current values are snapshot automatically before applying, \n"
+        .."so you can Restore at any time to get everything back exactly as it was.", 0.68, 0.72, 0.74, true)
+        GameTooltip:Show()
+    end)
+    infoBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    y = y - 10
+    
+    StaticPopupDialogs["YAQOL_CONFIRM_FPS"] = {
+        text = "Are you sure you want to apply competitive FPS settings and modify 58 CVars?\n\n(A backup will be saved).",
+        button1 = YES,
+        button2 = NO,
+        OnAccept = function()
+            ApplyFPSSettings(db)
+            if tabRebuildFns["general_fps"] then tabRebuildFns["general_fps"]() end
+        end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+        preferredIndex = 3,
+    }
 
     local restoreBtn
     local applyBtn = MakeButton(content, "Apply FPS Settings", function()
-        ApplyFPSSettings(db)
-        restoreBtn:Enable()
+        StaticPopup_Show("YAQOL_CONFIRM_FPS")
     end, 150, 24)
     applyBtn:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
 
@@ -541,11 +562,6 @@ local function BuildTeleport(content, db, addon)
         function(v) db.teleport.scale = v; ns.Teleport.Refresh(addon) end, y,
         function(v) return string.format("%.2f", v) end)
     y = y - dh - 10
-    local resetBtn = MakeButton(content, "Reset Position", function()
-        db.teleport.point="CENTER"; db.teleport.relPoint="CENTER"
-        db.teleport.x=0; db.teleport.y=0; ns.Teleport.Refresh(addon)
-    end, 120, 22)
-    resetBtn:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
     return y - 30
 end
 
@@ -672,12 +688,6 @@ local function BuildReminder(content, db, addon)
         function(v) db.reminder.buffMinRemaining = v end, y,
         function(v) return v == 0 and "Off" or string.format("%ds", v) end)
     y = y - dh - 8
-    local resetBtn = MakeButton(content, "Reset Position", function()
-        db.reminder.point="TOP"; db.reminder.relPoint="TOP"
-        db.reminder.x=0; db.reminder.y=-150; ns.AuraReminder.Refresh(addon)
-    end, 120, 22)
-    resetBtn:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
-    y = y - 40
     _, dh = MakeToggle(content, "Warn when main-hand has no weapon oil / temp enchant",
         function() return db.reminder.weaponOil end,
         function(v) db.reminder.weaponOil = v; ns.AuraReminder.Refresh(addon) end, y)
@@ -1031,10 +1041,6 @@ local function BuildFriendList(content, db, addon)
         function() return fl.showLevel end,
         function(v) fl.showLevel = v; ns.FriendList.Refresh(addon) end, y)
     y = y - dh - 2
-    _, dh = MakeToggle(content, "  Hide level for max-level characters",
-        function() return fl.hideMaxLevel end,
-        function(v) fl.hideMaxLevel = v; ns.FriendList.Refresh(addon) end, y)
-    y = y - dh - 2
     _, dh = MakeToggle(content, "Hide realm from info line",
         function() return fl.hideRealm end,
         function(v) fl.hideRealm = v; ns.FriendList.Refresh(addon) end, y)
@@ -1285,26 +1291,28 @@ local function BuildPanel(addon)
     layoutBtn:SetScript("OnClick", function() ns.LayoutMode.Enter() end)
 
     -- tab bar
+    local SIDEBAR_W = 140
     local tabBar = CreateFrame("Frame", nil, f)
-    tabBar:SetSize(W, T.TAB_H); tabBar:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -T.HEADER_H)
+    tabBar:SetSize(SIDEBAR_W, H - T.HEADER_H); tabBar:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -T.HEADER_H)
     Bg(tabBar, T.bg[1]*0.80, T.bg[2]*0.80, T.bg[3]*0.80, 1)
-    local tabBotLine = f:CreateTexture(nil, "BORDER")
-    tabBotLine:SetSize(W, 1); tabBotLine:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -(T.HEADER_H + T.TAB_H))
-    tabBotLine:SetColorTexture(T.border[1], T.border[2], T.border[3], T.border[4])
+
+    local tabRightLine = f:CreateTexture(nil, "BORDER")
+    tabRightLine:SetSize(1, H - T.HEADER_H); tabRightLine:SetPoint("TOPLEFT", f, "TOPLEFT", SIDEBAR_W, -T.HEADER_H)
+    tabRightLine:SetColorTexture(T.border[1], T.border[2], T.border[3], T.border[4])
 
     -- sliding tab indicator
     local indicator = tabBar:CreateTexture(nil, "OVERLAY")
-    indicator:SetSize(1, 2); indicator:SetPoint("BOTTOMLEFT", tabBar, "BOTTOMLEFT")
+    indicator:SetSize(3, T.TAB_H); indicator:SetPoint("TOPRIGHT", tabBar, "TOPRIGHT")
     indicator:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 1)
 
     -- scrollable content
-    local CONTENT_Y = T.HEADER_H + T.TAB_H + 1
+    local CONTENT_Y = T.HEADER_H
     local scrollFrame = CreateFrame("ScrollFrame", nil, f)
-    scrollFrame:SetSize(W - 16, H - CONTENT_Y)
-    scrollFrame:SetPoint("TOPLEFT", f, "TOPLEFT", 3, -CONTENT_Y)
+    scrollFrame:SetSize(W - SIDEBAR_W - 16, H - CONTENT_Y)
+    scrollFrame:SetPoint("TOPLEFT", f, "TOPLEFT", SIDEBAR_W + 3, -CONTENT_Y)
     
     local content = CreateFrame("Frame", nil, scrollFrame)
-    content:SetSize(W - 16, 1400)
+    content:SetSize(W - SIDEBAR_W - 16, 1400)
     scrollFrame:SetScrollChild(content)
 
     -- scrollbar
@@ -1339,21 +1347,21 @@ local function BuildPanel(addon)
     -- build tab frames
     local tabFrames, tabBtns = {}, {}
     local tabHeights = {}
-    local totalTabW = W / #TABS
+    local totalTabW = SIDEBAR_W
 
     for i, tab in ipairs(TABS) do
         local btn = CreateFrame("Button", nil, tabBar)
         btn:SetSize(totalTabW, T.TAB_H)
-        btn:SetPoint("TOPLEFT", tabBar, "TOPLEFT", (i-1)*totalTabW, 0)
+        btn:SetPoint("TOPLEFT", tabBar, "TOPLEFT", 0, -(i-1)*T.TAB_H)
         local hl = btn:CreateTexture(nil, "HIGHLIGHT")
         hl:SetAllPoints(); hl:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.08)
         local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        lbl:SetPoint("CENTER"); lbl:SetText(tab.label)
-        btn.lbl = lbl; btn.tabW = totalTabW; btn.tabX = (i-1)*totalTabW
+        lbl:SetPoint("LEFT", btn, "LEFT", 12, 0); lbl:SetText(tab.label)
+        btn.lbl = lbl; btn.tabH = T.TAB_H; btn.tabY = -(i-1)*T.TAB_H
         tabBtns[tab.key] = btn
 
         local tf = CreateFrame("Frame", nil, content)
-        tf:SetSize(W - 3, 1400); tf:SetPoint("TOPLEFT", content, "TOPLEFT", 0, 0); tf:Hide()
+        tf:SetSize(W - SIDEBAR_W - 16, 1400); tf:SetPoint("TOPLEFT", content, "TOPLEFT", 0, 0); tf:Hide()
         tabFrames[tab.key] = tf
 
         local finalY = 0
@@ -1384,9 +1392,9 @@ local function BuildPanel(addon)
         for k, btn in pairs(tabBtns) do
             if k == key then
                 btn.lbl:SetTextColor(T.accent[1], T.accent[2], T.accent[3], 1)
-                indicator:SetSize(btn.tabW, 2)
+                indicator:SetSize(3, btn.tabH)
                 indicator:ClearAllPoints()
-                indicator:SetPoint("BOTTOMLEFT", tabBar, "BOTTOMLEFT", btn.tabX, 0)
+                indicator:SetPoint("TOPRIGHT", tabBar, "TOPRIGHT", 0, btn.tabY)
             else
                 btn.lbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
             end

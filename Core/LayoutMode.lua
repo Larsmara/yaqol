@@ -154,6 +154,14 @@ local function GetDescriptors()
             show     = function() ns.AuraReminder.ShowForLayout() end,
         },
         {
+            getFrame = function() return ns.RaidTools and ns.RaidTools.GetPanel and ns.RaidTools.GetPanel() end,
+            label    = "Raid Tools",
+            show     = function()
+                local f = ns.RaidTools and ns.RaidTools.GetPanel()
+                if f then f:Show() end
+            end,
+        },
+        {
             getFrame = function() return ns.QOL.GetDurabilityFrame() end,
             label    = "Durability Warning",
             show     = function()

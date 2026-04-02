@@ -5,8 +5,9 @@ local RaidTools = ns.RaidTools
 -- ============================================================================
 -- RAID TOOLS BAR
 --   A compact always-visible toolbar with:
---     • 8 world marker toggle buttons (active state shown; requires lead/assist)
---     • Clear All button
+--     • 8 world marker buttons — left-click to place, right-click to clear
+--       (uses SecureActionButtonTemplate; requires lead/assist)
+--     • Clear All markers button
 --     • Ready Check button          (requires lead/assist)
 --     • Countdown: 3 s / 5 s / 10 s (requires lead/assist)
 --   Collapsible, movable, position saved.
@@ -40,7 +41,6 @@ local ACT_W_CLR = 36   -- clear all button width
 
 -- [ STATE ] -------------------------------------------------------------------
 local panel
-local minimized = false   -- collapse state (not persisted — resets on reload)
 
 -- [ HELPERS ] -----------------------------------------------------------------
 local function CanAct()
@@ -48,12 +48,9 @@ local function CanAct()
 end
 
 -- Returns the current active state of world marker index i (1–8).
--- C_WorldMarkers.GetWorldMarkerAtIndex returns nil if not active.
+-- IsRaidMarkerActive is a standard (non-restricted) global.
 local function MarkerActive(i)
-    if C_WorldMarkers and C_WorldMarkers.GetWorldMarkerAtIndex then
-        return C_WorldMarkers.GetWorldMarkerAtIndex(i) ~= nil
-    end
-    return false
+    return IsRaidMarkerActive and IsRaidMarkerActive(i) or false
 end
 
 -- [ SAVED POSITION ] ----------------------------------------------------------
@@ -70,7 +67,7 @@ end
 
 -- [ BUILD BAR ] ---------------------------------------------------------------
 local markerBtns = {}
-local allActionBtns = {}   -- every non-marker button, for bulk enable/disable
+local allActionBtns = {}    -- non-secure action buttons (Ready Check, Countdown)
 
 local function CheckVisibility()
     if not panel then return end
@@ -93,7 +90,6 @@ local function RefreshMarkerStates()
             entry.activeBg:Hide()
             entry.icon:SetVertexColor(0.55, 0.55, 0.55, 1)
         end
-        entry.btn:SetEnabled(canAct)
         entry.btn:SetAlpha(canAct and 1 or 0.4)
     end
     for _, btn in ipairs(allActionBtns) do
@@ -103,6 +99,7 @@ local function RefreshMarkerStates()
 end
 
 local function MakePanel()
+    local minimized = false   -- collapse state (resets on reload)
     -- ── dimensions ────────────────────────────────────────────────────────
     local markerW    = 8 * BTN_SZ + 7 * BTN_GAP
     local sep1W      = SEP_W + SEP_GAP * 2
@@ -212,7 +209,6 @@ local function MakePanel()
         local bbg = btn:CreateTexture(nil, "BACKGROUND")
         bbg:SetAllPoints()
         bbg:SetColorTexture(0.15, 0.17, 0.20, 1)
-        btn.bbg = bbg
 
         local bhl = btn:CreateTexture(nil, "HIGHLIGHT")
         bhl:SetAllPoints()
@@ -227,7 +223,6 @@ local function MakePanel()
         local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         lbl:SetPoint("CENTER")
         lbl:SetText(label)
-        btn.lbl = lbl
 
         if tooltip then
             btn:SetScript("OnEnter", function(self)
@@ -245,10 +240,24 @@ local function MakePanel()
     end
 
     -- ── 8 world marker buttons ────────────────────────────────────────────
+    -- PlaceRaidMarker/ClearRaidMarker are protected (HasRestrictions=true).
+    -- Use SecureActionButtonTemplate.  Critical requirements (from wMarker):
+    --   • RegisterForClicks("AnyUp","AnyDown") — without this secure clicks don't fire
+    --   • Numbered attributes: type1/marker1/action1 (left), type2/marker2/action2 (right)
+    --   • SetScript is fine on these buttons
+    local MARKER_NAMES = { "Star", "Circle", "Diamond", "Triangle", "Moon", "Square", "X", "Skull" }
     for i = 1, 8 do
-        local btn = CreateFrame("Button", nil, content)
+        local btn = CreateFrame("Button", "yaqolMarkerBtn"..i, content, "SecureActionButtonTemplate")
         btn:SetSize(BTN_SZ, BTN_SZ)
         btn:SetPoint("TOPLEFT", content, "TOPLEFT", cx, actY)
+        -- Left-click: place; right-click: clear
+        btn:SetAttribute("type1", "worldmarker")
+        btn:SetAttribute("marker1", i)
+        btn:SetAttribute("action1", "set")
+        btn:SetAttribute("type2", "worldmarker")
+        btn:SetAttribute("marker2", i)
+        btn:SetAttribute("action2", "clear")
+        btn:RegisterForClicks("AnyUp", "AnyDown")
 
         local bbg = btn:CreateTexture(nil, "BACKGROUND")
         bbg:SetAllPoints()
@@ -269,31 +278,16 @@ local function MakePanel()
         icon:SetTexture(MARKER_ICONS[i])
         icon:SetVertexColor(0.55, 0.55, 0.55, 1)
 
-        local MARKER_NAMES = { "Star", "Circle", "Diamond", "Triangle", "Moon", "Square", "X", "Skull" }
         btn:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
-            local active = MarkerActive(i)
-            GameTooltip:SetText(MARKER_NAMES[i] .. (active and " — click to remove" or " — click to place at cursor"), 1, 1, 1, 1, true)
+            GameTooltip:SetText(MARKER_NAMES[i] .. " (L: place / R: clear)", 1, 1, 1, 1, true)
             if not CanAct() then
                 GameTooltip:AddLine("Requires leader or assistant", 1, 0.4, 0.4, true)
             end
             GameTooltip:Show()
         end)
         btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-        btn:SetScript("OnClick", function()
-            if not CanAct() then return end
-            if MarkerActive(i) then
-                if C_WorldMarkers and C_WorldMarkers.RemoveWorldMarker then
-                    C_WorldMarkers.RemoveWorldMarker(i)
-                end
-            else
-                if C_WorldMarkers and C_WorldMarkers.SetWorldMarker then
-                    C_WorldMarkers.SetWorldMarker(i)
-                end
-            end
-            C_Timer.After(0.05, RefreshMarkerStates)
-        end)
+        btn:HookScript("OnClick", function() C_Timer.After(0.1, RefreshMarkerStates) end)
 
         markerBtns[i] = { btn = btn, activeBg = activeBg, icon = icon }
         cx = cx + BTN_SZ + BTN_GAP
@@ -305,13 +299,43 @@ local function MakePanel()
     Separator(cx)
     cx = cx + SEP_W + SEP_GAP
 
-    ActionBtn("CLR", ACT_W_CLR, ACT_H, function()
-        if not CanAct() then return end
-        if C_WorldMarkers and C_WorldMarkers.RemoveAllWorldMarkers then
-            C_WorldMarkers.RemoveAllWorldMarkers()
-        end
-        C_Timer.After(0.05, RefreshMarkerStates)
-    end, "Clear all world markers")
+    -- CLR: "/cwm all" macro — same approach as wMarker addon.
+    do
+        local btn = CreateFrame("Button", "yaqolMarkerBtnCLR", content, "SecureActionButtonTemplate")
+        btn:SetSize(ACT_W_CLR, ACT_H)
+        btn:SetPoint("TOPLEFT", content, "TOPLEFT", cx, actY - (BTN_SZ - ACT_H) / 2)
+        btn:SetAttribute("type1", "macro")
+        btn:SetAttribute("macrotext1", "/cwm all")
+        btn:RegisterForClicks("AnyUp", "AnyDown")
+
+        local bbg = btn:CreateTexture(nil, "BACKGROUND")
+        bbg:SetAllPoints()
+        bbg:SetColorTexture(0.15, 0.17, 0.20, 1)
+
+        local bhl = btn:CreateTexture(nil, "HIGHLIGHT")
+        bhl:SetAllPoints()
+        bhl:SetColorTexture(0.18, 0.78, 0.72, 0.18)
+
+        local line = btn:CreateTexture(nil, "ARTWORK")
+        line:SetHeight(1)
+        line:SetPoint("BOTTOMLEFT",  btn, "BOTTOMLEFT",  0, 0)
+        line:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 0, 0)
+        line:SetColorTexture(0.14, 0.62, 0.58, 0.5)
+
+        local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        lbl:SetPoint("CENTER")
+        lbl:SetText("CLR")
+
+        btn:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:SetText("Clear all world markers", 1, 1, 1, 1, true)
+            GameTooltip:Show()
+        end)
+        btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        btn:HookScript("OnClick", function() C_Timer.After(0.1, RefreshMarkerStates) end)
+
+        cx = cx + ACT_W_CLR
+    end
 
     -- ── Separator + Ready Check ───────────────────────────────────────────
     cx = cx + SEP_GAP
@@ -331,18 +355,17 @@ local function MakePanel()
     for i, secs in ipairs({ 3, 5, 10 }) do
         ActionBtn(secs .. "s", ACT_W_CD, ACT_H, function()
             if not CanAct() then return end
-            local channel = IsInRaid() and "RAID" or IsInGroup() and "PARTY" or "SAY"
-            SendChatMessage("/countdown " .. secs, channel)
+            C_PartyInfo.DoCountdown(secs)
         end, "Start a " .. secs .. "-second countdown")
         if i < 3 then cx = cx + BTN_GAP end
     end
 
-    return f, content
+    return f
 end
 
 -- [ PUBLIC API ] --------------------------------------------------------------
 function RaidTools.Init(addon)
-    local f, _content = MakePanel()
+    local f = MakePanel()
     panel = f
 
     local db = ns.Addon:Profile().raidTools
@@ -376,4 +399,8 @@ function RaidTools.Refresh(addon)
     else
         panel:Hide()
     end
+end
+
+function RaidTools.GetPanel()
+    return panel
 end

@@ -457,7 +457,7 @@ local function StyleFriendButton(button)
     if db.showLevel and isWoW and type(level) == "number" and level > 0 then
         local maxLevel = GetMaxLevelSafe()
         local shouldShow = true
-        if db.hideMaxLevel and maxLevel and level == maxLevel then shouldShow = false end
+        if maxLevel and level == maxLevel then shouldShow = false end
         if shouldShow and type(_G.GetQuestDifficultyColor) == "function" then
             local c = _G.GetQuestDifficultyColor(level)
             baseName = (baseName or "") .. ColorText(": " .. level, c.r, c.g, c.b)
@@ -504,28 +504,12 @@ local function StyleFriendButton(button)
     local desiredStatusTex = (db.statusIconPack and db.statusIconPack ~= "NONE")
         and ResolveStatusIconTexture(status) or nil
 
-    local sig = table.concat({
-        tostring(db.enable),
-        tostring(db.useClassColor),
-        tostring(db.showLevel),
-        tostring(db.hideMaxLevel),
-        tostring(db.hideRealm),
-        tostring(db.useNoteAsName),
-        tostring(db.squareIcons),
-        tostring(db.forceClientIcons),
-        tostring(db.statusIconPack),
-        tostring(db.favoriteStyle),
-        tostring(isFavorite),
-        tostring(status),
-        tostring(displayTitle),
-        tostring(displayInfo),
-        tostring(isWoW),
-        tostring(factionKey),
-        tostring(db.factionTint),
-        tostring(db.factionTintAlpha),
-        tostring(desiredGameIcon),
-        tostring(desiredStatusTex),
-    }, "|")
+    local sig = tostring(db.enable)..tostring(db.useClassColor)..tostring(db.showLevel)
+        ..tostring(db.hideRealm)..tostring(db.useNoteAsName)..tostring(db.squareIcons)
+        ..tostring(db.forceClientIcons)..tostring(db.statusIconPack)..tostring(db.favoriteStyle)
+        ..tostring(isFavorite)..tostring(status)..tostring(displayTitle)..tostring(displayInfo)
+        ..tostring(isWoW)..tostring(factionKey)..tostring(db.factionTint)
+        ..tostring(db.factionTintAlpha)..tostring(desiredGameIcon)..tostring(desiredStatusTex)
 
     local sigSame = (button.__ccfSig == sig)
 

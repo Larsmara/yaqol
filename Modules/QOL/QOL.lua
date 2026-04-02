@@ -392,26 +392,18 @@ end
 
 local function ShowDurWarning(pct)
     local f = GetOrMakeDurFrame()
-    -- Colour: orange above 10%, deep red at/below 10%
     local r, g = 1, pct <= 10 and 0 or 0.45
     f.txt:SetText(string.format("|cff%02x%02x00⚠ Low Durability: %.0f%%|r", math.floor(r*255), math.floor(g*255), pct))
     f:SetAlpha(1)
     f:Show()
-
-    -- Cancel any existing fade timer
-    if durFadeTimer then durFadeTimer:Cancel() end
-    -- Fade out after 8 seconds
-    durFadeTimer = C_Timer.NewTicker(0.05, function(ticker)
+    if durFadeTimer then durFadeTimer:Cancel(); durFadeTimer = nil end
+    local function FadeStep()
         local a = f:GetAlpha() - 0.008
-        if a <= 0 then
-            f:Hide()
-            f:SetAlpha(1)
-            ticker:Cancel()
-            durFadeTimer = nil
-        else
-            f:SetAlpha(a)
-        end
-    end)
+        if a <= 0 then f:Hide(); f:SetAlpha(1); durFadeTimer = nil; return end
+        f:SetAlpha(a)
+        durFadeTimer = C_Timer.NewTimer(0.05, FadeStep)
+    end
+    durFadeTimer = C_Timer.NewTimer(8, FadeStep)
 end
 
 local function OnDurabilityUpdate()
@@ -675,14 +667,16 @@ local function ShowAffixFrame()
 end
 
 local function OnAffixUpdate()
-    -- Repopulate whenever the frame exists:
-    --   * If shown: keep the live data current.
-    --   * If hidden but built: it means ShowAffixFrame() already requested data
-    --     and will show the frame; populate now so it has fresh content when shown.
     if not affixFrame then return end
     local list = C_MythicPlus and C_MythicPlus.GetCurrentAffixes and C_MythicPlus.GetCurrentAffixes()
+    -- Skip repopulate if data hasn't changed
+    local sig = list and #list > 0 and table.concat((function() local t={} for _,a in ipairs(list) do t[#t+1]=a.id end return t end)(), ",") or ""
+    if sig ~= "" and affixFrame._lastSig == sig then
+        if affixFrame._pendingShow then affixFrame._pendingShow = nil; affixFrame:Show() end
+        return
+    end
+    affixFrame._lastSig = sig
     affixFrame:Populate(list)
-    -- If the frame was waiting for data (built but hidden), show it now.
     if affixFrame._pendingShow then
         affixFrame._pendingShow = nil
         affixFrame:Show()

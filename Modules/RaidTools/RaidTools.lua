@@ -43,12 +43,8 @@ local panel
 local minimized = false   -- collapse state (not persisted — resets on reload)
 
 -- [ HELPERS ] -----------------------------------------------------------------
-local function IsLeaderOrAssist()
-    return UnitIsGroupLeader("player") or UnitIsRaidOfficer("player")
-end
-
 local function CanAct()
-    return IsLeaderOrAssist() or not IsInGroup()
+    return IsInGroup() and (UnitIsGroupLeader("player") or UnitIsRaidOfficer("player"))
 end
 
 -- Returns the current active state of world marker index i (1–8).
@@ -75,6 +71,16 @@ end
 -- [ BUILD BAR ] ---------------------------------------------------------------
 local markerBtns = {}
 local allActionBtns = {}   -- every non-marker button, for bulk enable/disable
+
+local function CheckVisibility()
+    if not panel then return end
+    local db = ns.Addon:Profile().raidTools
+    if db.enabled and CanAct() then
+        panel:Show()
+    else
+        panel:Hide()
+    end
+end
 
 local function RefreshMarkerStates()
     local canAct = CanAct()
@@ -346,6 +352,7 @@ function RaidTools.Init(addon)
     end
 
     ApplyPos()
+    CheckVisibility()
     RefreshMarkerStates()
 
     -- Event watcher: re-check leader status and marker state
@@ -354,6 +361,7 @@ function RaidTools.Init(addon)
     watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
     watcher:RegisterEvent("RAID_TARGET_UPDATE")    -- fires when world markers change
     watcher:SetScript("OnEvent", function()
+        CheckVisibility()
         RefreshMarkerStates()
     end)
 end
@@ -363,7 +371,7 @@ function RaidTools.Refresh(addon)
     local db = ns.Addon:Profile().raidTools
     if db.enabled then
         ApplyPos()
-        panel:Show()
+        CheckVisibility()
         RefreshMarkerStates()
     else
         panel:Hide()

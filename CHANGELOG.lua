@@ -8,6 +8,13 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.0.23",
+        date    = "2026-04-02",
+        changes = {
+            "|cff2dc9b8Fix|r  Raid Tools bar now only shows when in a group as leader or assist — hides otherwise",
+        },
+    },
+    {
         version = "1.0.22",
         date    = "2026-04-02",
         changes = {

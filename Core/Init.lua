@@ -59,6 +59,7 @@ function yaqol:OnEnable()
     ns.QOL.Init(self)
     ns.FriendList.Init(self)
     ns.Merchant.Init(self)
+    ns.RaidTools.Init(self)
 end
 
 function yaqol:OnProfileChanged()
@@ -68,6 +69,7 @@ function yaqol:OnProfileChanged()
     ns.QOL.Refresh(self)
     ns.FriendList.Refresh(self)
     ns.Merchant.Refresh(self)
+    ns.RaidTools.Refresh(self)
 end
 
 function yaqol:OnSlashCommand(input)

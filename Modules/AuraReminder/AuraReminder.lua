@@ -55,12 +55,27 @@ local function GetOrMakeRow(idx)
     iconBorder:SetAlpha(0)
     row.iconBorder = iconBorder
 
-    -- Item count badge (bottom-right corner, e.g. "3")
+    -- Item count badge (bottom-right corner, e.g. "3 in bags")
     local countText = row:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
     countText:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", 2, -1)
     countText:SetTextColor(1, 1, 1, 1)
     countText:Hide()
     row.countText = countText
+
+    -- Party missing badge (top-right corner): red number = how many members missing
+    local partyBadge = row:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+    partyBadge:SetPoint("TOPRIGHT", icon, "TOPRIGHT", 3, 3)
+    partyBadge:SetTextColor(1, 0.25, 0.25, 1)
+    partyBadge:Hide()
+    row.partyBadge = partyBadge
+
+    -- "Missing from group" indicator (top-left): orange ! when another class's buff is absent
+    local groupBadge = row:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+    groupBadge:SetPoint("TOPLEFT", icon, "TOPLEFT", -2, 3)
+    groupBadge:SetTextColor(1, 0.55, 0.1, 1)
+    groupBadge:SetText("!")
+    groupBadge:Hide()
+    row.groupBadge = groupBadge
 
     -- Glowing animation
     local ag = iconBorder:CreateAnimationGroup()
@@ -80,21 +95,28 @@ local function GetOrMakeRow(idx)
         if db.showTooltip ~= false and self.spellLabel then
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
             GameTooltip:AddLine(self.spellLabel, 1, 1, 1)
-            if self.required then GameTooltip:AddLine("Required", 1, 0.3, 0.3)
-            else GameTooltip:AddLine("Optional", 0.7, 0.7, 0.7) end
+            if self.missingFromGroup then
+                GameTooltip:AddLine("Missing from group", 1, 0.6, 0.1)
+            elseif self.required then
+                GameTooltip:AddLine("Required", 1, 0.3, 0.3)
+            else
+                GameTooltip:AddLine("Optional", 0.7, 0.7, 0.7)
+            end
             -- Consumable count
             if self.itemCount and self.itemCount > 0 then
                 GameTooltip:AddLine(
-                    string.format("|cff00ff00%d in bags|r", self.itemCount),
+                    string.format("|cff00ff00%d in bags|r", self.itemCount), 1, 1, 1)
+            end
+            -- Party missing count (expands on the badge)
+            if self.partyMissingCount and self.partyMissingCount > 0 and self.partyTotalCount and self.partyTotalCount > 0 then
+                local have = self.partyTotalCount - self.partyMissingCount
+                GameTooltip:AddLine(
+                    string.format("|cffff4444%d/%d members have this buff|r", have, self.partyTotalCount),
                     1, 1, 1)
             end
-            -- Party buff: show how many members are missing it
-            if self.partyMissingCount and self.partyMissingCount > 0 then
-                GameTooltip:AddLine(
-                    string.format("|cffff9900%d group member%s missing this buff|r",
-                        self.partyMissingCount,
-                        self.partyMissingCount == 1 and " is" or "s are"),
-                    1, 1, 1)
+            -- Missing-from-group (expands on the ! badge)
+            if self.missingFromGroup then
+                GameTooltip:AddLine("|cffff8822Nobody in group has this buff|r", 1, 1, 1)
             end
             GameTooltip:Show()
         end
@@ -168,13 +190,29 @@ local function ShowMissing(missing)
         row.spellLabel = m.label
         row.required = m.required
         row.partyMissingCount = m.partyMissingCount or 0
+        row.partyTotalCount   = m.partyTotalCount or 0
         row.itemCount = m.itemCount or 0
-        -- Item count badge
+        row.missingFromGroup = m.missingFromGroup or false
+        -- Item count badge (bottom-right)
         if m.itemCount and m.itemCount > 0 then
             row.countText:SetText(m.itemCount)
             row.countText:Show()
         else
             row.countText:Hide()
+        end
+        -- Party badge: "have/total" format (top-right, red)
+        if m.partyMissingCount and m.partyMissingCount > 0 and m.partyTotalCount and m.partyTotalCount > 0 then
+            local have = m.partyTotalCount - m.partyMissingCount
+            row.partyBadge:SetText(have .. "/" .. m.partyTotalCount)
+            row.partyBadge:Show()
+        else
+            row.partyBadge:Hide()
+        end
+        -- Missing-from-group indicator (top-left, orange !)
+        if m.missingFromGroup then
+            row.groupBadge:Show()
+        else
+            row.groupBadge:Hide()
         end
         row:Show()
         xOff = xOff + ICON_SIZE + ICON_PAD

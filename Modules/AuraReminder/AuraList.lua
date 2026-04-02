@@ -86,6 +86,22 @@ local function PlayerHasAura(spellID)
     return (aura.expirationTime - GetTime()) >= scanMinRemaining
 end
 
+-- Fallback: scan all player auras by name. Used for categories like food where
+-- the Well Fed spell may be ContextuallySecret in Midnight and not readable
+-- via GetPlayerAuraBySpellID.
+local function PlayerHasAuraByName(name)
+    if not name or name == "" then return false end
+    local i = 1
+    while true do
+        local ok, data = pcall(C_UnitAuras.GetAuraDataByIndex, "player", i, "HELPFUL")
+        if not ok or not data then break end
+        local nameOk, auraName = pcall(function() return data.name end)
+        if nameOk and auraName == name then return true end
+        i = i + 1
+    end
+    return false
+end
+
 -- Safe unit aura query for party/raid members.
 -- Iterates GetAuraDataByIndex (the correct API for group unit auras).
 -- Treats missing/offline units as "has the buff" to avoid false positives.
@@ -229,17 +245,18 @@ local PARTY_BUFFS = {
       buffIDs = { 381732,381741,381746,381748,381749,381750,381751,381752,381753,381754,381756,381757,381758 } },
 }
 
--- Helper: returns the number of group members (including player) missing the buff.
--- All party buff IDs are in the NON_SECRET whitelist so safe in all contexts.
+-- Helper: returns missing, total — how many are missing the buff and total group size.
 local function CountMembersMissingBuff(buffIDs)
-    local count = 0
+    local missing = 0
+    local total   = 0
 
     -- Check player
     local playerHas = false
     for _, id in ipairs(buffIDs) do
         if PlayerHasAura(id) then playerHas = true; break end
     end
-    if not playerHas then count = count + 1 end
+    total = total + 1
+    if not playerHas then missing = missing + 1 end
 
     -- Check group members
     local function unitMissing(unit)
@@ -251,14 +268,16 @@ local function CountMembersMissingBuff(buffIDs)
 
     if IsInRaid() then
         for i = 1, GetNumGroupMembers() do
-            if unitMissing("raid"..i) then count = count + 1 end
+            total = total + 1
+            if unitMissing("raid"..i) then missing = missing + 1 end
         end
     elseif IsInGroup() then
         for i = 1, GetNumSubgroupMembers() do
-            if unitMissing("party"..i) then count = count + 1 end
+            total = total + 1
+            if unitMissing("party"..i) then missing = missing + 1 end
         end
     end
-    return count
+    return missing, total
 end
 
 -- Returns missing party buff reminders for the player's class.
@@ -269,10 +288,16 @@ local function GetMissingPartyBuffs(db)
 
     local cfg = db.partyBuffs or {}
 
+    -- Only check party buffs when actually in a group.
+    local inGroup = IsInGroup() or IsInRaid()
+
     for _, def in ipairs(PARTY_BUFFS) do
-        if def.class == playerClass then
-            if cfg[def.key] ~= false and Known(def.castSpell) then
-                local missingCount = CountMembersMissingBuff(def.buffIDs)
+        if cfg[def.key] == false then
+            -- user disabled this specific buff check
+        elseif def.class == playerClass then
+            -- YOUR buff: remind you to cast it if anyone is missing it.
+            if Known(def.castSpell) then
+                local missingCount, totalCount = CountMembersMissingBuff(def.buffIDs)
                 if missingCount > 0 then
                     missing[#missing + 1] = {
                         label             = def.label,
@@ -280,8 +305,50 @@ local function GetMissingPartyBuffs(db)
                         icon              = SpellIcon(def.castSpell),
                         required          = true,
                         partyMissingCount = missingCount,
+                        partyTotalCount   = totalCount,
                     }
                 end
+            end
+        elseif inGroup then
+            -- ANOTHER CLASS's buff: show a reminder if NOBODY in the group has it.
+            -- This tells you the group is missing the buff (so you can ask someone to cast it).
+            -- Only relevant when actually grouped.
+            local anyoneHas = false
+
+            -- Check if any group member is providing the buff.
+            local function unitHasBuff(unit)
+                for _, id in ipairs(def.buffIDs) do
+                    if UnitHasAura(unit, id) then return true end
+                end
+                return false
+            end
+
+            -- Also check the player themselves (e.g. solo with group buffs active).
+            for _, id in ipairs(def.buffIDs) do
+                if PlayerHasAura(id) then anyoneHas = true; break end
+            end
+
+            if not anyoneHas then
+                if IsInRaid() then
+                    for i = 1, GetNumGroupMembers() do
+                        if unitHasBuff("raid"..i) then anyoneHas = true; break end
+                    end
+                else
+                    for i = 1, GetNumSubgroupMembers() do
+                        if unitHasBuff("party"..i) then anyoneHas = true; break end
+                    end
+                end
+            end
+
+            if not anyoneHas then
+                missing[#missing + 1] = {
+                    label             = def.label,
+                    spellID           = def.castSpell,
+                    icon              = SpellIcon(def.castSpell),
+                    required          = false,   -- informational: you can't cast it yourself
+                    partyMissingCount = nil,
+                    missingFromGroup  = true,    -- flag: show as "missing from group"
+                }
             end
         end
     end
@@ -367,9 +434,15 @@ function AuraList.GetMissing(db)
                     found = true; break
                 end
             end
+            -- Extra fallback for food: "Well Fed" may be ContextuallySecret in Midnight
+            -- and not readable via GetPlayerAuraBySpellID. Check by aura name instead.
+            if not found and cat.key == "food" then
+                if PlayerHasAuraByName("Well Fed") then
+                    found = true
+                end
+            end
             if not found then
                 -- Sum item counts across all itemIDs listed in every entry in this category.
-                -- This handles food: "Well Fed" comes from many different food items.
                 local itemCount = 0
                 for _, entry in ipairs(list) do
                     if entry.itemIDs then
@@ -378,10 +451,17 @@ function AuraList.GetMissing(db)
                         end
                     end
                 end
+                -- Use the icon from the first entry that has a valid texture,
+                -- rather than always forcing list[1] (which may have a wrong/generic icon).
+                local icon = nil
+                for _, entry in ipairs(list) do
+                    local tex = SpellIcon(entry.spellID)
+                    if tex then icon = tex; break end
+                end
                 missing[#missing + 1] = {
                     label     = cat.label,
                     spellID   = list[1].spellID,
-                    icon      = SpellIcon(list[1].spellID),
+                    icon      = icon,
                     required  = cat.required,
                     itemCount = itemCount > 0 and itemCount or nil,
                 }

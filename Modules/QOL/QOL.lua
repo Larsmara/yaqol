@@ -61,37 +61,46 @@ end
 -- ============================================================================
 -- AUTOMATE GOSSIP
 --   GOSSIP_SHOW / QUEST_GREETING – NPC gossip / quest list dialog
---   If there is exactly one available quest and no gossip options we auto-
---   select it.  If there is only one gossip option we auto-select that.
+--   autoGossip: auto-click single-option gossip entries.
+--   autoQuest:  auto-open/accept all available quests; auto-turn-in all active ones.
+--   In modern WoW, NPCs with multiple quests fire GOSSIP_SHOW (not QUEST_GREETING),
+--   so both quest and gossip automation must live here.
 -- ============================================================================
 local function OnGossipShow()
-    if not cfg().autoGossip then return end
+    if not cfg().autoGossip and not cfg().autoQuest then return end
     if QuestSkipHeld() then return end
 
-    -- Use the new C_GossipInfo API (10.x+)
     local options = C_GossipInfo.GetOptions()
     local quests  = C_GossipInfo.GetAvailableQuests()
     local active  = C_GossipInfo.GetActiveQuests()
 
-    -- If there are any active (ready-to-turn-in) quests, don't auto-click gossip —
-    -- let the player (or OnQuestGreeting) handle the turn-in naturally.
-    if #active > 0 then return end
+    -- autoQuest: turn in the first ready active quest, then re-evaluate.
+    -- GOSSIP_SHOW will re-fire after each turn-in.
+    if cfg().autoQuest and #active > 0 then
+        for _, q in ipairs(active) do
+            if q.isComplete then
+                C_GossipInfo.SelectActiveQuest(q.questID)
+                return
+            end
+        end
+    end
 
-    -- Single gossip option with no quests → select it
-    if #options == 1 and #quests == 0 then
-        C_GossipInfo.SelectOption(options[1].gossipOptionID)
+    -- autoQuest: open the first available quest and accept it.
+    -- GOSSIP_SHOW re-fires after each accept, cycling through all of them.
+    if cfg().autoQuest and #quests > 0 then
+        C_GossipInfo.SelectAvailableQuest(quests[1].questID)
         return
     end
 
-    -- No gossip options and exactly one available quest → open it
-    if #options == 0 and #quests == 1 then
-        C_GossipInfo.SelectAvailableQuest(quests[1].questID)
+    -- autoGossip: single gossip option with no quests → select it.
+    if cfg().autoGossip and #options == 1 and #quests == 0 and #active == 0 then
+        C_GossipInfo.SelectOption(options[1].gossipOptionID)
         return
     end
 end
 
 local function OnQuestGreeting()
-    if not cfg().autoGossip then return end
+    if not cfg().autoGossip and not cfg().autoQuest then return end
     if QuestSkipHeld() then return end
 
     local numActive    = GetNumActiveQuests()
@@ -113,8 +122,10 @@ local function OnQuestGreeting()
         return
     end
 
-    -- One available quest and nothing active → open it
-    if numAvailable == 1 and numActive == 0 then
+    -- Always open the first available quest. After OnQuestDetail fires and
+    -- AcceptQuest() is called, QUEST_GREETING re-fires with one fewer quest,
+    -- and we select index 1 again — no timer chain needed.
+    if numAvailable > 0 and numActive == 0 then
         SelectAvailableQuest(1)
         return
     end

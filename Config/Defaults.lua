@@ -139,6 +139,12 @@ ns.Defaults = {
             enable = true,  -- extend merchant window to show 20 items per page
         },
 
+        -- Raid Tools bar
+        raidTools = {
+            enabled  = true,
+            point    = "CENTER", relPoint = "CENTER", x = 0, y = 200,
+        },
+
         -- Friend List styling module (ClassColorFriends)
         friendList = {
             enable           = true,

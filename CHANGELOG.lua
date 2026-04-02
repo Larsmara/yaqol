@@ -8,6 +8,22 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.0.21",
+        date    = "2026-04-02",
+        changes = {
+            "|cff00d1b2New|r  Raid Tools bar: world markers (toggle on/off with active state), Clear All, Ready Check, and 3 s / 5 s / 10 s countdown buttons",
+            "|cff00d1b2New|r  Raid Tools bar collapses to a slim side tab with '<' / '>' toggle",
+            "|cff00d1b2New|r  Buff reminder: party badge shows how many group members have each buff (X/Y format)",
+            "|cff00d1b2New|r  Buff reminder: orange '!' badge on icons when a non-player-class buff is missing from the entire group",
+            "|cff00d1b2New|r  General settings: Game UI Scale picker with pixel-perfect presets for 4K / 1440p / 1080p at 100% / 125% / 150% DPI",
+            "|cff888888New|r  Merchant window toggle moved into QOL tab - Vendor section",
+            "|cff2dc9b8Fix|r  Well Fed buff now correctly dismissed when the aura is ContextuallySecret (Midnight API)",
+            "|cff2dc9b8Fix|r  Food icon now shows the first available texture instead of always using the first list entry",
+            "|cff2dc9b8Fix|r  Quest auto-accept now works for multi-quest NPCs using GOSSIP_SHOW (modern WoW path)",
+            "|cff2dc9b8Fix|r  Merchant extended window no longer throws a nil-frame error before first vendor visit",
+        },
+    },
+    {
         version = "1.0.20",
         date    = "2026-04-01",
         changes = {

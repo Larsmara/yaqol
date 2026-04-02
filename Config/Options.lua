@@ -369,6 +369,100 @@ local function BuildGeneral(content, db, addon)
         function(v) return string.format("%.2f", v) end)
     y = y - dh - 14
 
+    -- ── GAME UI SCALE ─────────────────────────────────────────────────────
+    -- Scale = 768 / (physicalHeight / dpiScaleFactor)
+    -- 768 is WoW's original UI coordinate height (1024×768 era).
+    -- Setting this value makes every UI unit equal exactly one physical pixel.
+    local UI_SCALE_PRESETS = {
+        -- label (line1, line2),    scale = 768 / renderedHeight
+        { "4K",     "100%",  768/2160 },  -- 0.3556
+        { "4K",     "125%",  768/1728 },  -- 0.4444
+        { "1440p",  "100%",  768/1440 },  -- 0.5333  (= 4K 150%)
+        { "1440p",  "125%",  768/1152 },  -- 0.6667
+        { "1080p",  "100%",  768/1080 },  -- 0.7111
+        { "1440p",  "150%",  768/960  },  -- 0.8000
+        { "1080p",  "125%",  768/864  },  -- 0.8889
+        { "1080p",  "150%",  768/720  },  -- 1.0000  (= Default)
+        { "Default","1.00",  1.0      },  -- explicit 1.0
+    }
+
+    local uiScaleLabel = Label(content, "Game UI Scale", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    uiScaleLabel:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
+    y = y - 20
+
+    local uiScaleBtns = {}
+
+    local function RefreshUIScaleBtns()
+        local cur = tonumber(GetCVar("uiScale")) or 1.0
+        for _, entry in ipairs(uiScaleBtns) do
+            local active = math.abs(entry.value - cur) < 0.005
+            if active then
+                entry.bg:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.35)
+                entry.line1:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
+                entry.line2:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
+            else
+                entry.bg:SetColorTexture(T.bgRow[1], T.bgRow[2], T.bgRow[3], 1)
+                entry.line1:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
+                entry.line2:SetTextColor(T.textDim[1]*0.75, T.textDim[2]*0.75, T.textDim[3]*0.75, 1)
+            end
+        end
+    end
+
+    -- Layout: up to 5 per row, auto-wrap
+    local BTN_W, BTN_H, BTN_GAP = 84, 34, 6
+    local BTNS_PER_ROW = 5
+    local rowStartY = y
+    for i, preset in ipairs(UI_SCALE_PRESETS) do
+        local col = (i - 1) % BTNS_PER_ROW
+        local row = math.floor((i - 1) / BTNS_PER_ROW)
+        local bx = T.PAD + col * (BTN_W + BTN_GAP)
+        local by = rowStartY - row * (BTN_H + BTN_GAP)
+
+        local mb = CreateFrame("Button", nil, content)
+        mb:SetSize(BTN_W, BTN_H)
+        mb:SetPoint("TOPLEFT", content, "TOPLEFT", bx, by)
+
+        local mbBg = mb:CreateTexture(nil, "BACKGROUND")
+        mbBg:SetAllPoints()
+        mbBg:SetColorTexture(T.bgRow[1], T.bgRow[2], T.bgRow[3], 1)
+        local mbHl = mb:CreateTexture(nil, "HIGHLIGHT")
+        mbHl:SetAllPoints()
+        mbHl:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.15)
+        -- accent bottom line
+        local mbLine = mb:CreateTexture(nil, "ARTWORK")
+        mbLine:SetHeight(1)
+        mbLine:SetPoint("BOTTOMLEFT",  mb, "BOTTOMLEFT",  0, 0)
+        mbLine:SetPoint("BOTTOMRIGHT", mb, "BOTTOMRIGHT", 0, 0)
+        mbLine:SetColorTexture(T.accentDim[1], T.accentDim[2], T.accentDim[3], 0.4)
+
+        local stepVal = preset[3]
+        local l1 = mb:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        l1:SetPoint("TOP", mb, "TOP", 0, -5)
+        l1:SetText(preset[1])
+        local l2 = mb:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        l2:SetPoint("BOTTOM", mb, "BOTTOM", 0, 5)
+        l2:SetText(preset[1] == "Default" and preset[2] or
+                   (preset[2] .. "  " .. string.format("%.4f", stepVal)))
+
+        uiScaleBtns[#uiScaleBtns + 1] = { value = stepVal, bg = mbBg, line1 = l1, line2 = l2 }
+
+        mb:SetScript("OnClick", function()
+            SetCVar("useUiScale", "1")
+            SetCVar("uiScale", string.format("%.4f", stepVal))
+            UIParent:SetScale(stepVal)
+            RefreshUIScaleBtns()
+        end)
+    end
+
+    -- advance y past all rows
+    local totalRows = math.ceil(#UI_SCALE_PRESETS / BTNS_PER_ROW)
+    y = rowStartY - totalRows * (BTN_H + BTN_GAP) + BTN_GAP
+
+    RefreshUIScaleBtns()
+
+    y = y - 4
+
     local h1 = Label(content, "MINIMAP BUTTON", "GameFontNormalSmall",
         T.textHeader[1], T.textHeader[2], T.textHeader[3])
     h1:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
@@ -413,9 +507,10 @@ local function BuildGeneral(content, db, addon)
     restoreBtn:SetPoint("TOP", applyBtn, "TOP", 0, 0)
     if not db.fpsBackup then restoreBtn:Disable() end
 
-    -- re-sync restore button when tab is shown
+    -- re-sync restore button and UI scale buttons when tab is shown
     tabRebuildFns["general_fps"] = function()
         if db.fpsBackup then restoreBtn:Enable() else restoreBtn:Disable() end
+        if RefreshUIScaleBtns then RefreshUIScaleBtns() end
     end
 
     return y - 30
@@ -596,6 +691,28 @@ local function BuildQOL(content, db, addon)
     local q   = db.qol
     local y   = -T.PAD
     local _, dh
+
+    -- ── RAID TOOLS ────────────────────────────────────────────────────────
+    local hRT = Label(content, "RAID TOOLS", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    hRT:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    _, dh = MakeToggle(content, "Show Raid Tools bar",
+        function() return db.raidTools.enabled end,
+        function(v) db.raidTools.enabled = v; ns.RaidTools.Refresh(addon) end, y)
+    y = y - dh - 4
+
+    local rtNote = Label(content,
+        "Always-visible bar with world markers, ready check and countdown buttons. "
+        .."Drag to reposition. Actions require party leader or assistant.",
+        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+    rtNote:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
+    rtNote:SetWidth(T.PANEL_W - T.PAD*2 - 48)
+    rtNote:SetJustifyH("LEFT")
+    y = y - 30
+
+    y = y - 8
 
     -- ── QUESTS & DIALOGUE ─────────────────────────────────────────────────
     local h1 = Label(content, "QUESTS & DIALOGUE", "GameFontNormalSmall",
@@ -796,7 +913,22 @@ local function BuildQOL(content, db, addon)
     _, dh = MakeToggle(content, "  Prefer guild bank funds for repairs",
         function() return q.repairGuild end,
         function(v) q.repairGuild = v end, y)
-    y = y - dh - 14
+    y = y - dh - 10
+
+    _, dh = MakeToggle(content, "Extended merchant window (20 items per page)",
+        function() return db.merchant.enable end,
+        function(v) db.merchant.enable = v; ns.Merchant.Refresh(addon) end, y)
+    y = y - dh - 4
+
+    local mNote = Label(content,
+        "Re-open the vendor window after toggling.",
+        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+    mNote:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 32, y)
+    mNote:SetWidth(T.PANEL_W - T.PAD*2 - 32)
+    mNote:SetJustifyH("LEFT")
+    y = y - 20
+
+    y = y - 6
 
     -- ── GEAR ──────────────────────────────────────────────────────────────
     local h5 = Label(content, "GEAR", "GameFontNormalSmall",
@@ -831,6 +963,33 @@ local function BuildQOL(content, db, addon)
     end, 130, 22)
     showBtn:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
     y = y - 34
+
+    return y - 20
+end
+
+local function BuildMerchant(content, db, addon)
+    local m = db.merchant
+    local y = -T.PAD
+
+    local h1 = Label(content, "MERCHANT WINDOW", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    h1:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
+    y = y - 20
+
+    local _, dh
+    _, dh = MakeToggle(content, "Show 20 items per page (4-column layout)",
+        function() return m.enable end,
+        function(v) m.enable = v; ns.Merchant.Refresh(addon) end, y)
+    y = y - dh
+
+    local note = Label(content,
+        "Doubles the default 10-item page to 20 by adding a second pair of columns.\n" ..
+        "Requires a UI reload or re-opening the merchant to take effect after toggling.",
+        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+    note:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 32, y)
+    note:SetWidth(content:GetWidth() - T.PAD * 2 - 32)
+    note:SetJustifyH("LEFT")
+    y = y - 36
 
     return y - 20
 end
@@ -1203,6 +1362,7 @@ local function BuildPanel(addon)
         if tab.key == "reminder"   then finalY = BuildReminder(tf, db, addon)         end
         if tab.key == "qol"        then finalY = BuildQOL(tf, db, addon)              end
         if tab.key == "friendlist" then finalY = BuildFriendList(tf, db, addon)       end
+        if tab.key == "merchant"   then finalY = BuildMerchant(tf, db, addon)         end
         tabHeights[tab.key] = math.abs(finalY)
     end
 

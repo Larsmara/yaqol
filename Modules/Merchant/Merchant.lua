@@ -56,18 +56,6 @@ local function RebuildFrame()
     local frameW = colX[4] + ITEM_W + 11
     MerchantFrame:SetWidth(frameW)
     -- Ensure the frame is tall enough: original is 444px for 5 rows starting at y=-69.
-    -- Our right block uses the same 5-row height so no extra height is needed,
-    -- but we set it explicitly to match to avoid clipping.
-    MerchantFrame:SetHeight(444)
-
-    -- Create item slots 13–20 (1–12 already exist in Blizzard XML).
-    for i = 13, ITEMS_PER_PAGE do
-        if not _G["MerchantItem" .. i] then
-            CreateFrame("Frame", "MerchantItem" .. i, MerchantFrame, "MerchantItemTemplate")
-        end
-    end
-
-    -- Position all 20 slots using absolute coords relative to MerchantFrame.
     -- Items are arranged so that odd-numbered slots are in the left column of
     -- their block and even-numbered are in the right column, stepping down 5 rows.
     --
@@ -136,14 +124,21 @@ function Merchant.Init(addonObj)
     -- Override the global page-size constant before any merchant code runs.
     MERCHANT_ITEMS_PER_PAGE = ITEMS_PER_PAGE
 
-    -- Hook MERCHANT_SHOW to rebuild the frame on first open.
+    -- Create the extra item frames immediately so Blizzard's update loop
+    -- (which iterates 1–MERCHANT_ITEMS_PER_PAGE) never hits a nil frame.
+    -- Blizzard XML ships items 1–12; we add 13–20 here.
+    for i = 13, ITEMS_PER_PAGE do
+        if not _G["MerchantItem" .. i] then
+            CreateFrame("Frame", "MerchantItem" .. i, MerchantFrame, "MerchantItemTemplate")
+        end
+    end
+
+    -- Hook MERCHANT_SHOW to reposition everything on first open.
     local watcher = CreateFrame("Frame")
     watcher:RegisterEvent("MERCHANT_SHOW")
     watcher:SetScript("OnEvent", function(_, event)
-        if event == "MERCHANT_SHOW" then
-            if cfg().enable then
-                RebuildFrame()
-            end
+        if event == "MERCHANT_SHOW" and cfg().enable then
+            RebuildFrame()
         end
     end)
 

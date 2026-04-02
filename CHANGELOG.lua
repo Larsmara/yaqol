@@ -8,6 +8,15 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.0.22",
+        date    = "2026-04-02",
+        changes = {
+            "|cff2dc9b8Fix|r  Raid Tools: removed unknown event WORLD_MAP_UPDATE (caused load error on some clients)",
+            "|cff2dc9b8Fix|r  Raid Tools: removed RunMacroText calls (not available in addon environment)",
+            "|cff2dc9b8Fix|r  Raid Tools: countdown now uses SendChatMessage to RAID/PARTY/SAY channel",
+        },
+    },
+    {
         version = "1.0.21",
         date    = "2026-04-02",
         changes = {

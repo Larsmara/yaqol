@@ -284,8 +284,6 @@ local function MakePanel()
             else
                 if C_WorldMarkers and C_WorldMarkers.SetWorldMarker then
                     C_WorldMarkers.SetWorldMarker(i)
-                else
-                    RunMacroText("/wm [@cursor]" .. i)
                 end
             end
             C_Timer.After(0.05, RefreshMarkerStates)
@@ -305,8 +303,6 @@ local function MakePanel()
         if not CanAct() then return end
         if C_WorldMarkers and C_WorldMarkers.RemoveAllWorldMarkers then
             C_WorldMarkers.RemoveAllWorldMarkers()
-        else
-            RunMacroText("/clearworldmarkers")
         end
         C_Timer.After(0.05, RefreshMarkerStates)
     end, "Clear all world markers")
@@ -329,7 +325,8 @@ local function MakePanel()
     for i, secs in ipairs({ 3, 5, 10 }) do
         ActionBtn(secs .. "s", ACT_W_CD, ACT_H, function()
             if not CanAct() then return end
-            RunMacroText("/countdown " .. secs)
+            local channel = IsInRaid() and "RAID" or IsInGroup() and "PARTY" or "SAY"
+            SendChatMessage("/countdown " .. secs, channel)
         end, "Start a " .. secs .. "-second countdown")
         if i < 3 then cx = cx + BTN_GAP end
     end
@@ -356,7 +353,6 @@ function RaidTools.Init(addon)
     watcher:RegisterEvent("GROUP_ROSTER_UPDATE")
     watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
     watcher:RegisterEvent("RAID_TARGET_UPDATE")    -- fires when world markers change
-    watcher:RegisterEvent("WORLD_MAP_UPDATE")
     watcher:SetScript("OnEvent", function()
         RefreshMarkerStates()
     end)

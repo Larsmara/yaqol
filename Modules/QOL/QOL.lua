@@ -702,6 +702,121 @@ local function MaybeShowAffixFrame()
 end
 
 -- ============================================================================
+-- AUTO-SKIP CINEMATICS / CUTSCENES
+--   Event-based: PLAY_MOVIE fires for pre-rendered movies, CINEMATIC_START
+--   fires for in-world scripted cinematics.  Both events are reliable across
+--   all WoW builds (unlike the old hook on MovieFrame:Play / CinematicFrame).
+-- ============================================================================
+local function OnPlayMovie()
+    if not cfg().autoSkipCinematic then return end
+    C_Timer.After(0.1, function()
+        if cfg().autoSkipCinematic and MovieFrame and MovieFrame:IsShown() then
+            GameMovieFinished()
+        end
+    end)
+end
+
+local function OnCinematicStart()
+    if not cfg().autoSkipCinematic then return end
+    C_Timer.After(0.1, function()
+        if cfg().autoSkipCinematic and CinematicFrame and CinematicFrame:IsShown() then
+            StopCinematic()
+        end
+    end)
+end
+
+-- ============================================================================
+-- PET REMINDER  (forward declarations; full setup is after Init)
+-- ============================================================================
+local PET_CLASSES = { HUNTER = true, WARLOCK = true }
+local petFrame
+local petFadeTimer
+
+local function GetOrMakePetFrame()
+    if petFrame then return petFrame end
+    local d = addon.db.profile.qol
+    local f = CreateFrame("Frame", "yaqolPetReminderFrame", UIParent)
+    f:SetSize(280, 44)
+    f:SetFrameStrata("HIGH")
+    f:SetMovable(true); f:EnableMouse(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetClampedToScreen(true)
+    f:SetScript("OnDragStart", f.StartMoving)
+    f:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        local p = addon.db.profile.qol
+        p.petPoint, _, p.petRelPoint, p.petX, p.petY = self:GetPoint()
+    end)
+    -- Semi-transparent dark background
+    local bg = f:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetColorTexture(0.1, 0.02, 0.02, 0.75)
+    local txt = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    txt:SetPoint("CENTER"); txt:SetJustifyH("CENTER")
+    f.txt = txt
+    f:SetPoint(
+        d.petPoint    or "CENTER",
+        UIParent,
+        d.petRelPoint or "CENTER",
+        d.petX        or 0,
+        d.petY        or 100
+    )
+    f:Hide()
+    petFrame = f
+    return f
+end
+
+local function HidePetWarning()
+    local f = petFrame
+    if not f then return end
+    if petFadeTimer then petFadeTimer:Cancel(); petFadeTimer = nil end
+    f:Hide(); f:SetAlpha(1)
+end
+
+--- @param msg string
+--- @param persistent boolean  if true the warning stays until the situation changes
+local function ShowPetWarning(msg, persistent)
+    local f = GetOrMakePetFrame()
+    f.txt:SetText("|cffee2222" .. msg .. "|r")
+    f:SetAlpha(1); f:Show()
+    if petFadeTimer then petFadeTimer:Cancel(); petFadeTimer = nil end
+    if not persistent then
+        local function FadeStep()
+            local a = f:GetAlpha() - 0.008
+            if a <= 0 then f:Hide(); f:SetAlpha(1); petFadeTimer = nil; return end
+            f:SetAlpha(a)
+            petFadeTimer = C_Timer.NewTimer(0.05, FadeStep)
+        end
+        petFadeTimer = C_Timer.NewTimer(8, FadeStep)
+    end
+end
+
+local function CheckPetNow()
+    local enabled = cfg().petReminder
+    if not enabled then HidePetWarning() return end
+    local _, classFile = UnitClass("player")
+    if not PET_CLASSES[classFile] then return end
+    if InCombatLockdown() then return end
+    local petExists = UnitExists("pet")
+    local petDead = petExists and UnitIsDead("pet")
+    if not petExists then
+        ShowPetWarning("No active pet!", true)   -- stays until a pet is summoned
+    elseif petDead then
+        ShowPetWarning("Your pet is dead!", false) -- fades after 8 s
+    else
+        HidePetWarning()                           -- pet is alive, dismiss warning
+    end
+end
+
+-- UNIT_PET fires before the game state fully updates; delay so
+-- UnitExists("pet") reflects the new state.  Also filters out
+-- party member pet changes (arg1 ~= "player").
+local function CheckPet(unit)
+    if unit and unit ~= "player" then return end
+    C_Timer.After(0.5, CheckPetNow)
+end
+
+-- ============================================================================
 -- EVENT DISPATCH
 -- ============================================================================
 local function OnEvent(self, event, arg1)
@@ -715,12 +830,17 @@ local function OnEvent(self, event, arg1)
     elseif event == "DUEL_REQUESTED"             then OnDuelRequested()
     elseif event == "GUILD_INVITE_REQUEST"        then OnGuildInviteRequest()
     elseif event == "UPDATE_INVENTORY_DURABILITY"    then OnDurabilityUpdate()
-    elseif event == "PLAYER_ENTERING_WORLD"           then MaybeShowAffixFrame()
     elseif event == "MYTHIC_PLUS_CURRENT_AFFIX_UPDATE" then OnAffixUpdate()
     elseif event == "MERCHANT_SHOW"                   then
         SellJunk()
         AutoRepair()
     elseif event == "LOOT_OPENED"                     then OnLootOpened()
+    elseif event == "PLAY_MOVIE"                       then OnPlayMovie()
+    elseif event == "CINEMATIC_START"                   then OnCinematicStart()
+    elseif event == "UNIT_PET"                          then CheckPet(arg1)
+    elseif event == "PLAYER_ENTERING_WORLD"             then
+        MaybeShowAffixFrame()
+        CheckPet("player")
     end
 end
 
@@ -729,43 +849,50 @@ end
 -- ============================================================================
 
 -- ============================================================================
--- AUTO-SKIP CINEMATICS / CUTSCENES
---   Hooks MovieFrame and CinematicFrame to auto-cancel when the setting is on.
+-- AUTO-SLOT KEYSTONE
+--   When ChallengesKeystoneFrame opens, find the keystone in bags and slot it.
 -- ============================================================================
-local skipHooked = false
+local keystoneHooked = false
 
-local function HookAutoSkip()
-    if skipHooked then return end
-    skipHooked = true
-
-    -- In-engine rendered cinematics (pre-rendered movies, e.g. login screen,
-    -- patch intro videos) shown in MovieFrame.
-    -- Guard: MovieFrame.Play was renamed/removed in Midnight 12.0.
-    if MovieFrame and type(MovieFrame.Play) == "function" then
-        hooksecurefunc(MovieFrame, "Play", function()
-            if cfg().autoSkipCinematic then
-                C_Timer.After(0.5, function()
-                    if cfg().autoSkipCinematic and MovieFrame:IsShown() then
-                        MovieFrame:StopMovie()
-                    end
-                end)
+local function SlotKeystone()
+    if not cfg().autoSlotKeystone then return end
+    for container = BACKPACK_CONTAINER, NUM_BAG_SLOTS do
+        local slots = C_Container.GetContainerNumSlots(container)
+        for slot = 1, slots do
+            local link = C_Container.GetContainerItemLink(container, slot)
+            if link and link:match("|Hkeystone:") then
+                C_Container.PickupContainerItem(container, slot)
+                if CursorHasItem() then
+                    C_ChallengeMode.SlotKeystone()
+                    return
+                end
             end
-        end)
+        end
     end
+end
 
-    -- In-world scripted cinematics (e.g. quest cutscenes via CinematicFrame).
-    -- Guard: function may not exist in all Midnight builds.
-    if type(CinematicFrame_StartCinematic) == "function" then
-        hooksecurefunc("CinematicFrame_StartCinematic", function()
-            if cfg().autoSkipCinematic then
-                C_Timer.After(0.5, function()
-                    if cfg().autoSkipCinematic then
-                        CancelCinematic()
-                    end
-                end)
-            end
-        end)
+local function HookAutoSlotKeystone()
+    if keystoneHooked then return end
+    keystoneHooked = true
+    -- ChallengesKeystoneFrame is a load-on-demand frame; hook when it appears.
+    local hookFrame = CreateFrame("Frame")
+    hookFrame:RegisterEvent("ADDON_LOADED")
+    hookFrame:SetScript("OnEvent", function(_, _, name)
+        if name == "Blizzard_ChallengesUI" and ChallengesKeystoneFrame then
+            ChallengesKeystoneFrame:HookScript("OnShow", SlotKeystone)
+            hookFrame:UnregisterAllEvents()
+        end
+    end)
+    -- If already loaded (e.g. reload while frame is open)
+    if ChallengesKeystoneFrame then
+        ChallengesKeystoneFrame:HookScript("OnShow", SlotKeystone)
+        hookFrame:UnregisterAllEvents()
     end
+end
+
+function QOL.GetPetFrame()
+    if not addon then return nil end
+    return GetOrMakePetFrame()
 end
 
 -- Called from Init.lua: OnEnable
@@ -775,9 +902,12 @@ function QOL.Init(addonObj)
     frame:SetScript("OnEvent", OnEvent)
     QOL.Refresh(addon)
     HookHoldToRelease()
-    HookAutoSkip()
-    -- Build the durability frame now so LayoutMode can find it immediately.
+    HookAutoSlotKeystone()
+    -- Build frames now so LayoutMode can find them immediately.
     GetOrMakeDurFrame()
+    -- Check for pet class before building pet frame
+    local _, classFile = UnitClass("player")
+    if PET_CLASSES[classFile] then GetOrMakePetFrame() end
 end
 
 -- Opens the affix popup frame manually (e.g. from the Options panel)
@@ -808,12 +938,15 @@ function QOL.Refresh(addonObj)
     Reg("DUEL_REQUESTED",              d.declineDuel)
     Reg("GUILD_INVITE_REQUEST",        d.declineGuild)
     Reg("UPDATE_INVENTORY_DURABILITY",        d.durabilityWarn)
-    Reg("PLAYER_ENTERING_WORLD",              d.affixReminder)
+    Reg("PLAYER_ENTERING_WORLD",              d.affixReminder or d.petReminder)
     Reg("MYTHIC_PLUS_CURRENT_AFFIX_UPDATE",   true)  -- always needed to refresh open frame
 
     -- MERCHANT_SHOW is needed for either sell-junk or auto-repair
     Reg("MERCHANT_SHOW", d.sellJunk or d.autoRepair)
     Reg("LOOT_OPENED",   d.fasterLooting)
+    Reg("PLAY_MOVIE",       d.autoSkipCinematic)
+    Reg("CINEMATIC_START",  d.autoSkipCinematic)
+    Reg("UNIT_PET",         d.petReminder)
 
     ApplyFasterLooting()
 end

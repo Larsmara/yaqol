@@ -29,6 +29,16 @@ ns.Defaults = {
             durabilityThresh = 20,    -- percent threshold for durability warning
             durPoint = "CENTER", durRelPoint = "CENTER", durX = 0, durY = -200,
             affixReminder   = false,  -- show this week's M+ affixes on login
+            autoSlotKeystone = false, -- auto-slot keystone when opening the challenge UI
+            petReminder     = false,  -- warn when hunter/warlock pet is dead or missing
+            petPoint = "CENTER", petRelPoint = "CENTER", petX = 0, petY = 100,
+        },
+
+        -- Mythic+ Timer module
+        mythicTimer = {
+            enabled       = true,
+            hideBlizzard  = true,   -- hide default Blizzard M+ block in objective tracker
+            point = "CENTER", relPoint = "CENTER", x = 300, y = 200,
         },
 
         -- Teleport module

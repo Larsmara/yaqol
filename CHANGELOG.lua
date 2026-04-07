@@ -8,6 +8,20 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.0.27",
+        date    = "2026-04-07",
+        changes = {
+            "|cff00d1b2New|r  Mythic+ Timer overlay — countdown, +2/+3 cutoffs, pull count, boss progress, death counter",
+            "|cff00d1b2New|r  M+ Timer options tab with demo/test mode (simulates a +12 run at 30× speed)",
+            "|cff00d1b2New|r  Pet reminder for Hunters / Warlocks — persistent red warning when no pet summoned",
+            "|cff00d1b2New|r  Auto-slot keystone when opening the Challenge Mode UI",
+            "|cff2dc9b8Fix|r  Auto-skip cinematics: switched to PLAY_MOVIE / CINEMATIC_START events (12.x compatible)",
+            "|cff2dc9b8Fix|r  Buff Reminder delete button no longer bleeds outside scroll frame",
+            "|cff2dc9b8Fix|r  Layout Mode properly hides Pet Reminder and M+ Timer on exit",
+            "|cffffff00Improved|r  Teleport keystone sharing — better caching, re-request after key completion, /reload keeps cache",
+        },
+    },
+    {
         version = "1.0.23",
         date    = "2026-04-02",
         changes = {

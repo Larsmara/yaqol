@@ -23,6 +23,14 @@ function yaqol:OnInitialize()
     local q = self.db.profile.qol
     if q.questSkipModifier == nil then q.questSkipModifier = "SHIFT" end
     if q.autoSkipCinematic == nil then q.autoSkipCinematic = false end
+    if q.autoSlotKeystone == nil then q.autoSlotKeystone = false end
+    if q.petReminder == nil then q.petReminder = false end
+    -- Migrate: move pet reminder from below-center to above-center
+    if q.petY and q.petY == -240 then q.petY = 100 end
+    -- Migrate: ensure mythicTimer defaults exist for old profiles
+    if not self.db.profile.mythicTimer then
+        self.db.profile.mythicTimer = CopyTable(ns.Defaults.profile.mythicTimer)
+    end
     -- Migrate: old profiles had enabledDungeon=false by mistake; default is now true
     if r.enabledDungeon == nil or r.enabledDungeon == false then
         -- Only reset if it was never explicitly set to false by the user.
@@ -60,6 +68,7 @@ function yaqol:OnEnable()
     ns.FriendList.Init(self)
     ns.Merchant.Init(self)
     ns.RaidTools.Init(self)
+    ns.MythicTimer.Init(self)
 end
 
 function yaqol:OnProfileChanged()
@@ -70,6 +79,7 @@ function yaqol:OnProfileChanged()
     ns.FriendList.Refresh(self)
     ns.Merchant.Refresh(self)
     ns.RaidTools.Refresh(self)
+    ns.MythicTimer.Refresh(self)
 end
 
 function yaqol:OnSlashCommand(input)

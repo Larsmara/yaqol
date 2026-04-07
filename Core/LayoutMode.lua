@@ -174,6 +174,37 @@ local function GetDescriptors()
                 end
             end,
         },
+        {
+            getFrame = function() return ns.QOL.GetPetFrame and ns.QOL.GetPetFrame() end,
+            label    = "Pet Reminder",
+            show     = function()
+                local f = ns.QOL.GetPetFrame and ns.QOL.GetPetFrame()
+                if f then
+                    f.txt:SetText("|cffee2222No active pet!|r")
+                    f:SetAlpha(1)
+                    f:Show()
+                end
+            end,
+        },
+        {
+            getFrame = function() return ns.MythicTimer and ns.MythicTimer.GetFrame and ns.MythicTimer.GetFrame() end,
+            label    = "M+ Timer",
+            show     = function()
+                local f = ns.MythicTimer and ns.MythicTimer.GetFrame and ns.MythicTimer.GetFrame()
+                if f then
+                    f.title:SetText("|cff2dc9b8[+12]|r The Stonevault")
+                    f.timerText:SetText("|cff44ee4422:15|r")
+                    f.plus3:SetText("|cff44ee44+3  18:30|r")
+                    f.plus2:SetText("|cffeeee44+2  24:40|r")
+                    f.deathIcon:Show()
+                    f.deathText:SetText("|cffee22222|r  |cff999999(-0:10)|r")
+                    f.pullText:SetText("|cffcccccc85%|r  (272/320)")
+                    f:SetHeight(160)
+                    f:SetAlpha(1)
+                    f:Show()
+                end
+            end,
+        },
     }
 end
 
@@ -228,6 +259,17 @@ function LayoutMode.Exit()
     ns.AuraReminder.Refresh(ns.Addon)
     local df = ns.QOL.GetDurabilityFrame()
     if df then df:Hide() end
+    -- Pet Reminder: hide unless a real warning is active
+    local pf = ns.QOL.GetPetFrame and ns.QOL.GetPetFrame()
+    if pf then pf:Hide() end
+    -- M+ Timer: hide unless a real key is running; stop demo if active
+    if ns.MythicTimer then
+        if ns.MythicTimer.StopDemo then ns.MythicTimer.StopDemo() end
+        if not ns.MythicTimer.IsActive() then
+            local mf = ns.MythicTimer.GetFrame()
+            if mf then mf:Hide() end
+        end
+    end
 
     doneFrame:Hide()
 

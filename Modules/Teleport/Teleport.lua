@@ -50,10 +50,13 @@ local libKeystoneTable = {}  -- unique table used as our identifier with LibKeys
 
 local function OnLibKeystoneData(keyLevel, keyMapID, playerRating, playerName, channel)
     if channel ~= "PARTY" then return end  -- ignore GUILD broadcasts
+    if not playerName or playerName == "" then return end  -- lib captured pName before player logged in
+    -- Normalize: strip realm suffix so "Name-Realm" and "Name" are the same key
+    local shortName = playerName:match("^([^%-]+)") or playerName
     if keyLevel and keyLevel > 0 and keyMapID and keyMapID > 0 then
-        partyKeyCache[playerName] = { mapID = keyMapID, level = keyLevel }
+        partyKeyCache[shortName] = { mapID = keyMapID, level = keyLevel }
     else
-        partyKeyCache[playerName] = nil
+        partyKeyCache[shortName] = nil
     end
     if buttons then RefreshButtons() end
 end
@@ -73,11 +76,13 @@ local function CollectPartyKeystones()
         if not mapID or mapID == 0 or not level or level == 0 then return end
         local dungeonIdx = challengeMapToDungeon[mapID]
         if not dungeonIdx then return end
-        local r, g, b = 1, 0.82, 0.1  -- fallback gold
-        local _, classFile = UnitClass(unit)
-        if classFile and C_ClassColor and C_ClassColor.GetClassColor then
-            local c = C_ClassColor.GetClassColor(classFile)
-            if c then r, g, b = c.r, c.g, c.b end
+        local r, g, b = 1, 0.82, 0.1  -- fallback gold (used when unit token is unknown)
+        if unit then
+            local _, classFile = UnitClass(unit)
+            if classFile and C_ClassColor and C_ClassColor.GetClassColor then
+                local c = C_ClassColor.GetClassColor(classFile)
+                if c then r, g, b = c.r, c.g, c.b end
+            end
         end
         if not result[dungeonIdx] then result[dungeonIdx] = {} end
         result[dungeonIdx][#result[dungeonIdx] + 1] = { r=r, g=g, b=b, level=level, name=nameKey, unit=unit }
@@ -93,25 +98,34 @@ local function CollectPartyKeystones()
         AddEntry(mapID, level, "player", myName)
     end
 
-    -- Party members from LibKeystone cache (playerName is already ambiguated by the lib)
-    local myName = UnitName("player") or ""
+    -- Party members from LibKeystone cache
+    local myName = (UnitName("player") or ""):lower()
     for playerName, data in pairs(partyKeyCache) do
-        if playerName == myName then
+        -- playerName is already normalized (no realm suffix) by OnLibKeystoneData
+        if playerName:lower() == myName then
             -- own key already added above via C_MythicPlus
         else
-            -- Try to resolve a unit token for class colour; fall back to gold if not found
+            -- Resolve unit token for class colour; search raid OR party tokens
             local unit = nil
-            for i = 1, 4 do
-                local u = "party" .. i
-                if UnitExists(u) then
-                    local n = (UnitName(u) or ""):lower()
-                    if n == playerName:lower() then
-                        unit = u
-                        break
+            local lowerName = playerName:lower()
+            if IsInRaid() then
+                for i = 1, GetNumGroupMembers() do
+                    local u = "raid" .. i
+                    if UnitExists(u) and (UnitName(u) or ""):lower() == lowerName then
+                        unit = u; break
+                    end
+                end
+            else
+                for i = 1, GetNumSubgroupMembers() do
+                    local u = "party" .. i
+                    if UnitExists(u) and (UnitName(u) or ""):lower() == lowerName then
+                        unit = u; break
                     end
                 end
             end
-            AddEntry(data.mapID, data.level, unit or "player", playerName)
+            -- unit may still be nil if the player hasn't fully loaded; AddEntry
+            -- handles nil gracefully by falling back to the gold colour.
+            AddEntry(data.mapID, data.level, unit, playerName)
         end
     end
 
@@ -218,6 +232,49 @@ local function MakePanel()
     closeBtn:SetScript("OnClick", function()
         userClosed = true
         f:Hide()
+    end)
+
+    -- Refresh (⟳) button — re-requests keystones from party/raid members.
+    -- Useful when joining a group whose members already broadcast before we loaded.
+    local refreshBtn = CreateFrame("Button", nil, f)
+    refreshBtn:SetSize(18, 18)
+    refreshBtn:SetPoint("BOTTOMRIGHT", closeBtn, "BOTTOMLEFT", -2, 0)
+
+    local rBorder = refreshBtn:CreateTexture(nil, "BACKGROUND")
+    rBorder:SetAllPoints()
+    rBorder:SetColorTexture(0, 0, 0, 1)
+
+    local rBg = refreshBtn:CreateTexture(nil, "BORDER")
+    rBg:SetPoint("TOPLEFT",     refreshBtn, "TOPLEFT",     1, -1)
+    rBg:SetPoint("BOTTOMRIGHT", refreshBtn, "BOTTOMRIGHT", -1, 1)
+    rBg:SetColorTexture(0.1, 0.1, 0.1, 0.8)
+
+    local rIcon = refreshBtn:CreateTexture(nil, "OVERLAY")
+    rIcon:SetPoint("CENTER", refreshBtn, "CENTER", 0, 0)
+    rIcon:SetSize(12, 12)
+    rIcon:SetTexture("Interface\\Buttons\\UI-RefreshButton")
+    rIcon:SetVertexColor(0.8, 0.8, 0.8, 1)
+
+    refreshBtn:SetScript("OnEnter", function()
+        f:SetAlpha(1)
+        rBg:SetColorTexture(0.2, 0.2, 0.2, 1)
+        rIcon:SetVertexColor(0.18, 0.78, 0.72, 1)
+        GameTooltip:SetOwner(refreshBtn, "ANCHOR_TOP")
+        GameTooltip:SetText("Refresh keystones", 1, 1, 1, 1, true)
+        GameTooltip:AddLine("Re-request keystone data from party members.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    refreshBtn:SetScript("OnLeave", function()
+        f:SetAlpha(f.restingAlpha)
+        rBg:SetColorTexture(0.1, 0.1, 0.1, 0.8)
+        rIcon:SetVertexColor(0.8, 0.8, 0.8, 1)
+        GameTooltip:Hide()
+    end)
+    refreshBtn:SetScript("OnClick", function()
+        wipe(partyKeyCache)
+        RequestPartyKeystones()
+        -- LibKeystone throttles broadcasts at 3s; wait 4s for all members to respond
+        C_Timer.After(4, RefreshButtons)
     end)
 
     f:SetAlpha(0.8)
@@ -434,42 +491,109 @@ function Teleport.Init(addon)
         LibKeystone.Register(libKeystoneTable, OnLibKeystoneData)
     end
 
+    -- Track whether we already have a group on login (to avoid nuking the cache
+    -- on /reload when we're already in an established party).
+    local firstEnterWorld = true
+
+    -- Helper: prune cache entries for players no longer in the group.
+    local function PruneStaleEntries()
+        local present = { [(UnitName("player") or ""):lower()] = true }
+        if IsInRaid() then
+            for i = 1, GetNumGroupMembers() do
+                local n = UnitName("raid" .. i)
+                if n then present[n:lower()] = true end
+            end
+        elseif IsInGroup() then
+            for i = 1, GetNumSubgroupMembers() do
+                local n = UnitName("party" .. i)
+                if n then present[n:lower()] = true end
+            end
+        end
+        for playerName in pairs(partyKeyCache) do
+            if not present[playerName:lower()] then
+                partyKeyCache[playerName] = nil
+            end
+        end
+    end
+
+    -- Helper: staggered request pattern that respects LibKeystone's 3 s throttle.
+    -- Each call sends a request; the lib internally throttles and queues.
+    local function RequestWithRetries(delay1, delay2, delay3)
+        C_Timer.After(delay1, function()
+            RequestPartyKeystones()
+        end)
+        if delay2 then
+            C_Timer.After(delay2, function()
+                RequestPartyKeystones()
+                C_Timer.After(1, RefreshButtons)
+            end)
+        end
+        if delay3 then
+            C_Timer.After(delay3, function()
+                RequestPartyKeystones()
+                C_Timer.After(1, RefreshButtons)
+            end)
+        end
+    end
+
     -- Refresh known spells when spellbook changes and monitor group status
     local watcher = CreateFrame("Frame")
     watcher:RegisterEvent("SPELLS_CHANGED")
     watcher:RegisterEvent("GROUP_ROSTER_UPDATE")
     watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
     watcher:RegisterEvent("CHALLENGE_MODE_KEYSTONE_SLOTTED")
+    watcher:RegisterEvent("CHALLENGE_MODE_COMPLETED")
     watcher:RegisterEvent("BAG_UPDATE_DELAYED")
+    watcher:RegisterEvent("MYTHIC_PLUS_CURRENT_AFFIX_UPDATE")
     watcher:SetScript("OnEvent", function(self, event, ...)
         if event == "SPELLS_CHANGED" then
             RefreshButtons()
-        elseif event == "CHALLENGE_MODE_KEYSTONE_SLOTTED" or event == "BAG_UPDATE_DELAYED" then
-            RequestPartyKeystones()
+
+        elseif event == "CHALLENGE_MODE_KEYSTONE_SLOTTED" then
+            -- Key slotted — we're about to start; grab latest party keys.
             RefreshButtons()
-        elseif event == "GROUP_ROSTER_UPDATE" then
-            -- Wipe stale cache entries for players no longer in group
-            for playerName in pairs(partyKeyCache) do
-                local found = false
-                for i = 1, 4 do
-                    local u = "party" .. i
-                    if UnitExists(u) then
-                        local n = UnitName(u) or ""
-                        if n == playerName then found = true; break end
-                    end
-                end
-                if not found then partyKeyCache[playerName] = nil end
+            RequestWithRetries(1, 5)
+
+        elseif event == "CHALLENGE_MODE_COMPLETED" then
+            -- Key finished — everyone will receive a new keystone shortly.
+            -- LibKeystone listens to this internally and auto-broadcasts the
+            -- new key, but we need to re-request after a delay for party members.
+            RequestWithRetries(4, 8, 14)
+
+        elseif event == "BAG_UPDATE_DELAYED" then
+            -- New keystone landed in bags (after key completion or weekly chest).
+            -- Re-read our own key and repaint.
+            RefreshButtons()
+
+        elseif event == "MYTHIC_PLUS_CURRENT_AFFIX_UPDATE" then
+            -- M+ data became available (delayed on login). Re-read own key.
+            RefreshButtons()
+            if IsInGroup() then
+                RequestWithRetries(1, 5)
             end
-            -- Delay so members' addons have time to respond
-            C_Timer.After(1.5, function() RequestPartyKeystones(); C_Timer.After(1, RefreshButtons) end)
+
+        elseif event == "GROUP_ROSTER_UPDATE" then
+            PruneStaleEntries()
+            -- Request keystones from (possibly new) party members.
+            RequestWithRetries(1.5, 5, 10)
             CheckVisibility()
             RefreshButtons()
+
         elseif event == "PLAYER_ENTERING_WORLD" then
-            partyKeyCache = {}
+            if firstEnterWorld then
+                firstEnterWorld = false
+                -- First login: cache is empty anyway; request aggressively.
+                wipe(partyKeyCache)
+            else
+                -- /reload while in a group: keep the cache intact, just prune
+                -- anyone who left. This avoids losing data we already have.
+                PruneStaleEntries()
+            end
             CheckVisibility()
-            -- Delay so other addons (BigWigs, DBM) finish initialising before we request,
-            -- then refresh once responses have arrived
-            C_Timer.After(3, function() RequestPartyKeystones(); C_Timer.After(1, RefreshButtons) end)
+            RefreshButtons()
+            if IsInGroup() then
+                RequestWithRetries(2, 6, 12)
+            end
         end
     end)
 end

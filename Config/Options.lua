@@ -216,10 +216,17 @@ local function MakeSpellList(parent, db, key, startY)
             local name = Label(row, entry.label, "GameFontNormal")
             name:SetPoint("LEFT", icon, "RIGHT", 8, 0)
             
-            -- Delete Button (X)
-            local delBtn = CreateFrame("Button", nil, row, "UIPanelCloseButton")
-            delBtn:SetSize(24, 24)
-            delBtn:SetPoint("RIGHT", row, "RIGHT", -2, 0)
+            -- Delete Button (X) — plain button; UIPanelCloseButton's
+            -- oversized hit-rect bleeds outside the scroll frame.
+            local delBtn = CreateFrame("Button", nil, row)
+            delBtn:SetSize(20, 20)
+            delBtn:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+            delBtn:SetFrameLevel(row:GetFrameLevel() + 5)
+            local delLbl = delBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            delLbl:SetPoint("CENTER"); delLbl:SetText("✕")
+            delLbl:SetTextColor(0.85, 0.30, 0.30, 1)
+            delBtn:SetScript("OnEnter", function() delLbl:SetTextColor(1, 0.45, 0.45, 1) end)
+            delBtn:SetScript("OnLeave", function() delLbl:SetTextColor(0.85, 0.30, 0.30, 1) end)
             delBtn:SetScript("OnClick", function()
                 table.remove(db[key], i)
                 Config.Refresh()
@@ -795,7 +802,7 @@ local function BuildQOL(content, db, addon)
     -- Auto-skip cinematics toggle
     _, dh = MakeToggle(content, "Auto-skip cinematics and cutscenes",
         function() return q.autoSkipCinematic end,
-        function(v) q.autoSkipCinematic = v end, y)
+        function(v) q.autoSkipCinematic = v; ns.QOL.Refresh(addon) end, y)
     y = y - dh - 14
 
     -- ── SOCIAL / GROUP ────────────────────────────────────────────────────
@@ -973,6 +980,30 @@ local function BuildQOL(content, db, addon)
     end, 130, 22)
     showBtn:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
     y = y - 34
+
+    _, dh = MakeToggle(content, "Auto-slot keystone when opening the Keystone UI",
+        function() return q.autoSlotKeystone end,
+        function(v) q.autoSlotKeystone = v end, y)
+    y = y - dh - 14
+
+    -- ── PETS ──────────────────────────────────────────────────────────────
+    local h7 = Label(content, "PETS", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    h7:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    _, dh = MakeToggle(content, "Warn when pet is dead or missing (Hunter / Warlock)",
+        function() return q.petReminder end,
+        function(v) q.petReminder = v; ns.QOL.Refresh(addon) end, y)
+    y = y - dh - 4
+
+    local petNote = Label(content,
+        "Shows a fading on-screen warning when your pet is dead or dismissed.",
+        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+    petNote:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
+    petNote:SetWidth(T.PANEL_W - T.PAD*2 - 48)
+    petNote:SetJustifyH("LEFT")
+    y = y - 20
 
     return y - 20
 end
@@ -1180,6 +1211,132 @@ local function BuildFriendList(content, db, addon)
     return y - 20
 end
 
+-- [ M+ TIMER OPTIONS ] --------------------------------------------------------
+local function BuildMythicTimer(content, db, addon)
+    local mt = db.mythicTimer
+    local y  = -T.PAD
+    local _, dh
+
+    -- ── GENERAL ───────────────────────────────────────────────────────────
+    local h1 = Label(content, "MYTHIC+ TIMER", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    h1:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    _, dh = MakeToggle(content, "Enable Mythic+ timer overlay",
+        function() return mt.enabled end,
+        function(v) mt.enabled = v; ns.MythicTimer.Refresh(addon) end, y)
+    y = y - dh - 4
+
+    local note1 = Label(content,
+        "A cleaner, more readable M+ timer with +2 / +3 cutoffs, pull count, "
+        .. "boss progress and death counter. Drag to reposition.",
+        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+    note1:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
+    note1:SetWidth(T.PANEL_W - T.PAD*2 - 48)
+    note1:SetJustifyH("LEFT")
+    y = y - 38
+
+    _, dh = MakeToggle(content, "Hide default Blizzard M+ block (objective tracker)",
+        function() return mt.hideBlizzard end,
+        function(v) mt.hideBlizzard = v end, y)
+    y = y - dh - 4
+
+    local note2 = Label(content,
+        "Hides the built-in Challenge Mode block from the objective tracker "
+        .. "to avoid duplicate timers.",
+        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+    note2:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
+    note2:SetWidth(T.PANEL_W - T.PAD*2 - 48)
+    note2:SetJustifyH("LEFT")
+    y = y - 30
+
+    y = y - 8
+
+    -- ── DISPLAY INFO ──────────────────────────────────────────────────────
+    local h2 = Label(content, "DISPLAY", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    h2:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    local info = Label(content,
+        "The overlay shows:|n"
+        .. "|cff2dc9b8•|r  Remaining time (colour-coded by pace)|n"
+        .. "|cff2dc9b8•|r  +2 and +3 time cutoffs|n"
+        .. "|cff2dc9b8•|r  Time progress bar with +2 / +3 markers|n"
+        .. "|cff2dc9b8•|r  Death count with time penalty|n"
+        .. "|cff2dc9b8•|r  Enemy forces (pull count) percentage|n"
+        .. "|cff2dc9b8•|r  Boss kill progress with checkmarks",
+        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+    info:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
+    info:SetWidth(T.PANEL_W - T.PAD*2)
+    info:SetJustifyH("LEFT")
+    y = y - 110
+
+    y = y - 8
+
+    -- ── POSITION ──────────────────────────────────────────────────────────
+    local h3 = Label(content, "POSITION", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    h3:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    local posNote = Label(content,
+        "Use the Arrange button in the header bar to drag the timer frame "
+        .. "to your preferred position, or drag it during a live M+ run.",
+        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+    posNote:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
+    posNote:SetWidth(T.PANEL_W - T.PAD*2)
+    posNote:SetJustifyH("LEFT")
+    y = y - 30
+
+    local resetBtn = MakeButton(content, "Reset Position", function()
+        mt.point = "CENTER"; mt.relPoint = "CENTER"; mt.x = 300; mt.y = 200
+        local f = ns.MythicTimer.GetFrame()
+        if f then
+            f:ClearAllPoints()
+            f:SetPoint("CENTER", UIParent, "CENTER", 300, 200)
+        end
+    end, 130, 22)
+    resetBtn:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
+    y = y - 34
+
+    y = y - 8
+
+    -- ── TEST / DEMO ───────────────────────────────────────────────────────
+    local h4 = Label(content, "TEST", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    h4:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    local demoNote = Label(content,
+        "Run a simulated dungeon to preview the timer. "
+        .. "The demo takes about 38 seconds and plays a scripted +12 key at 30× speed.",
+        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+    demoNote:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
+    demoNote:SetWidth(T.PANEL_W - T.PAD*2)
+    demoNote:SetJustifyH("LEFT")
+    y = y - 34
+
+    local stopBtn
+    local startBtn = MakeButton(content, "Start Demo", function()
+        if ns.MythicTimer.IsDemoActive() then
+            ns.MythicTimer.StopDemo()
+        else
+            ns.MythicTimer.StartDemo()
+        end
+    end, 130, 22)
+    startBtn:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
+
+    stopBtn = MakeButton(content, "Stop Demo", function()
+        ns.MythicTimer.StopDemo()
+    end, 130, 22)
+    stopBtn:SetPoint("LEFT", startBtn, "RIGHT", 10, 0)
+    y = y - 34
+
+    return y - 20
+end
+
 -- [ MAIN PANEL ] --------------------------------------------------------------
 local panel
 local TABS = {
@@ -1187,6 +1344,7 @@ local TABS = {
     { key="teleport",   label="Teleport"      },
     { key="reminder",   label="Buff Reminder" },
     { key="qol",        label="QOL"           },
+    { key="mythictimer",label="M+ Timer"      },
     { key="friendlist", label="Friend List"   },
 }
 
@@ -1369,6 +1527,7 @@ local function BuildPanel(addon)
         if tab.key == "teleport"   then finalY = BuildTeleport(tf, db, addon)         end
         if tab.key == "reminder"   then finalY = BuildReminder(tf, db, addon)         end
         if tab.key == "qol"        then finalY = BuildQOL(tf, db, addon)              end
+        if tab.key == "mythictimer" then finalY = BuildMythicTimer(tf, db, addon)   end
         if tab.key == "friendlist" then finalY = BuildFriendList(tf, db, addon)       end
         if tab.key == "merchant"   then finalY = BuildMerchant(tf, db, addon)         end
         tabHeights[tab.key] = math.abs(finalY)

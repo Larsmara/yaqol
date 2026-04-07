@@ -26,6 +26,7 @@ Modules/Teleport/Teleport.lua
 Modules/AuraReminder/AuraList.lua
 Modules/AuraReminder/AuraReminder.lua
 Modules/QOL/QOL.lua
+Modules/MythicTimer/MythicTimer.lua
 Modules/FriendList/FriendList.lua
 Modules/Merchant/Merchant.lua
 Modules/RaidTools/RaidTools.lua

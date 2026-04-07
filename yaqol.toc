@@ -4,7 +4,7 @@
 ## IconTexture: YAQOL
 ## Author: Lars
 ## Version: @project-version@
-## X-Curse-Project-ID: 1500779
+## X-Curse-Project-ID: 1502405
 ## SavedVariables: yaqolDB
 
 ## Libs

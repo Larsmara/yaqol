@@ -1,5 +1,5 @@
 package-as: yaqol
-curse-project-id: 1500779
+curse-project-id: 1502405
 
 ignore:
   - .github

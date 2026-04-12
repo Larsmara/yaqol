@@ -55,6 +55,11 @@ function yaqol:OnInitialize()
         r.food = CopyTable(ns.Defaults.profile.reminder.food)
     end
 
+    -- Migrate: ensure skyridingHUD defaults exist for old profiles
+    if not self.db.profile.skyridingHUD then
+        self.db.profile.skyridingHUD = CopyTable(ns.Defaults.profile.skyridingHUD)
+    end
+
     ns.Config.Build(self)
     self:RegisterChatCommand("yaqol", "OnSlashCommand")
     self:RegisterChatCommand("yq", "OnSlashCommand")
@@ -68,6 +73,7 @@ function yaqol:OnEnable()
     ns.FriendList.Init(self)
     ns.Merchant.Init(self)
     ns.RaidTools.Init(self)
+    ns.SkyridingHUD.Init(self)
     ns.MythicTimer.Init(self)
 end
 
@@ -79,6 +85,7 @@ function yaqol:OnProfileChanged()
     ns.FriendList.Refresh(self)
     ns.Merchant.Refresh(self)
     ns.RaidTools.Refresh(self)
+    ns.SkyridingHUD.Refresh(self)
     ns.MythicTimer.Refresh(self)
 end
 

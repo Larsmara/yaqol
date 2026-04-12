@@ -31,4 +31,5 @@ Modules/MythicTimer/MythicTimer.lua
 Modules/FriendList/FriendList.lua
 Modules/Merchant/Merchant.lua
 Modules/RaidTools/RaidTools.lua
+Modules/SkyridingHUD/SkyridingHUD.lua
 Config/Options.lua

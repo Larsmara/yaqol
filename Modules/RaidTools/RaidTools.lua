@@ -71,6 +71,7 @@ local allActionBtns = {}    -- non-secure action buttons (Ready Check, Countdown
 
 local function CheckVisibility()
     if not panel then return end
+    if InCombatLockdown() then return end  -- can't Show/Hide a secure-child frame in combat
     local db = ns.Addon:Profile().raidTools
     if db.enabled and CanAct() then
         panel:Show()
@@ -382,6 +383,7 @@ function RaidTools.Init(addon)
     local watcher = CreateFrame("Frame")
     watcher:RegisterEvent("GROUP_ROSTER_UPDATE")
     watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
+    watcher:RegisterEvent("PLAYER_REGEN_ENABLED")  -- re-check visibility after combat ends
     watcher:RegisterEvent("RAID_TARGET_UPDATE")    -- fires when world markers change
     watcher:SetScript("OnEvent", function()
         CheckVisibility()
@@ -396,7 +398,7 @@ function RaidTools.Refresh(addon)
         ApplyPos()
         CheckVisibility()
         RefreshMarkerStates()
-    else
+    elseif not InCombatLockdown() then
         panel:Hide()
     end
 end

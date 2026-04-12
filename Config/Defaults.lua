@@ -155,6 +155,12 @@ ns.Defaults = {
             point    = "CENTER", relPoint = "CENTER", x = 0, y = 200,
         },
 
+        -- Skyriding HUD
+        skyridingHUD = {
+            enabled  = true,
+            point    = "CENTER", relPoint = "CENTER", x = 0, y = -250,
+        },
+
         -- Friend List styling module (ClassColorFriends)
         friendList = {
             enable           = true,

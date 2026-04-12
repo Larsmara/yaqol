@@ -8,7 +8,17 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
-        version = "1.0.27",
+        version = "1.0.28",
+        date    = "2026-04-12",
+        changes = {
+            "|cff00d1b2New|r  Skyriding HUD — charge pips (with partial recharge fill) and Whirling Surge cooldown bar",
+            "|cff00d1b2New|r  Skyriding HUD only shows on skyriding mounts in Skyriding mode (not Steady Flight)",
+            "|cff2dc9b8Fix|r  Raid Tools: ADDON_ACTION_BLOCKED in combat — Hide/Show now guards InCombatLockdown()",
+            "|cff2dc9b8Fix|r  Pet reminder: no longer alerts 'No active pet!' while mounted",
+            "|cff2dc9b8Fix|r  Pet reminder: also alerts when pet is on Passive stance",
+        },
+    },
+    {
         date    = "2026-04-07",
         changes = {
             "|cff00d1b2New|r  Mythic+ Timer overlay — countdown, +2/+3 cutoffs, pull count, boss progress, death counter",

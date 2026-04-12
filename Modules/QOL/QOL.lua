@@ -797,14 +797,18 @@ local function CheckPetNow()
     local _, classFile = UnitClass("player")
     if not PET_CLASSES[classFile] then return end
     if InCombatLockdown() then return end
+    if IsMounted() then HidePetWarning(); return end
     local petExists = UnitExists("pet")
     local petDead = petExists and UnitIsDead("pet")
+    local petPassive = petExists and not petDead and (GetPetActionInfo(2) == "PET_ACTION_PASSIVE")
     if not petExists then
         ShowPetWarning("No active pet!", true)   -- stays until a pet is summoned
     elseif petDead then
         ShowPetWarning("Your pet is dead!", false) -- fades after 8 s
+    elseif petPassive then
+        ShowPetWarning("Pet is on Passive!", false) -- fades after 8 s
     else
-        HidePetWarning()                           -- pet is alive, dismiss warning
+        HidePetWarning()                           -- pet is alive and not passive, dismiss warning
     end
 end
 
@@ -838,6 +842,7 @@ local function OnEvent(self, event, arg1)
     elseif event == "PLAY_MOVIE"                       then OnPlayMovie()
     elseif event == "CINEMATIC_START"                   then OnCinematicStart()
     elseif event == "UNIT_PET"                          then CheckPet(arg1)
+    elseif event == "PLAYER_MOUNT_DISPLAY_CHANGED"       then CheckPet("player")
     elseif event == "PLAYER_ENTERING_WORLD"             then
         MaybeShowAffixFrame()
         CheckPet("player")
@@ -947,6 +952,7 @@ function QOL.Refresh(addonObj)
     Reg("PLAY_MOVIE",       d.autoSkipCinematic)
     Reg("CINEMATIC_START",  d.autoSkipCinematic)
     Reg("UNIT_PET",         d.petReminder)
+    Reg("PLAYER_MOUNT_DISPLAY_CHANGED", d.petReminder)
 
     ApplyFasterLooting()
 end

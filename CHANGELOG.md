@@ -1,5 +1,14 @@
 # yaqol
 
+## [v1.0.28](https://github.com/Larsmara/yaqol/tree/v1.0.28) (2026-04-12)
+[Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.0.27...v1.0.28) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
+
+- New: Skyriding HUD — charge pips (with partial recharge fill) and Whirling Surge cooldown bar
+- New: Skyriding HUD only shows on skyriding mounts in Skyriding mode (not Steady Flight)
+- Fix: Raid Tools: ADDON_ACTION_BLOCKED in combat — Hide/Show now guards InCombatLockdown()
+- Fix: Pet reminder: no longer alerts "No active pet!" while mounted
+- Fix: Pet reminder: also alerts when pet is on Passive stance
+
 ## [v1.0.27](https://github.com/Larsmara/yaqol/tree/v1.0.27) (2026-04-07)
 [Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.0.26...v1.0.27) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
 

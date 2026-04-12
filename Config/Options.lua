@@ -1337,15 +1337,63 @@ local function BuildMythicTimer(content, db, addon)
     return y - 20
 end
 
+local function BuildSkyriding(content, db, addon)
+    local d   = db.skyridingHUD
+    local y   = -T.PAD
+    local _, dh
+
+    local h1 = Label(content, "SKYRIDING HUD", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    h1:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    _, dh = MakeToggle(content, "Enable Skyriding HUD",
+        function() return d.enabled end,
+        function(v) d.enabled = v; ns.SkyridingHUD.Refresh(addon) end, y)
+    y = y - dh - 4
+
+    local note = Label(content,
+        "Auto-shows while mounted on a Skyriding mount. Displays shared Surge Forward / "
+        .. "Skyward Ascent charges (6 max, 15 s recharge each), "
+        .. "current speed as a filled bar, and a recharge countdown when charges aren't full. "
+        .. "Drag to reposition.",
+        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+    note:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
+    note:SetWidth(T.PANEL_W - T.PAD*2 - 48)
+    note:SetJustifyH("LEFT")
+    y = y - 52
+
+    y = y - 8
+
+    local h2 = Label(content, "DISPLAY", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    h2:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    local info = Label(content,
+        "The HUD shows:|n"
+        .. "|cff2dc9b8•|r  Charge pips — up to 6 squares, shared between Surge Forward & Skyward Ascent|n"
+        .. "|cff2dc9b8•|r  Speed bar — 0–3000%% of base run speed as a fill bar|n"
+        .. "|cff2dc9b8•|r  Next charge countdown — green bar + time, hidden when all charges are full",
+        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+    info:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
+    info:SetWidth(T.PANEL_W - T.PAD*2 - 16)
+    info:SetJustifyH("LEFT")
+    y = y - 72
+
+    return y - 20
+end
+
 -- [ MAIN PANEL ] --------------------------------------------------------------
 local panel
 local TABS = {
-    { key="general",    label="General"       },
-    { key="teleport",   label="Teleport"      },
-    { key="reminder",   label="Buff Reminder" },
-    { key="qol",        label="QOL"           },
-    { key="mythictimer",label="M+ Timer"      },
-    { key="friendlist", label="Friend List"   },
+    { key="general",      label="General"       },
+    { key="teleport",     label="Teleport"      },
+    { key="reminder",     label="Buff Reminder" },
+    { key="qol",          label="QOL"           },
+    { key="mythictimer",  label="M+ Timer"      },
+    { key="skyriding",    label="Skyriding"     },
+    { key="friendlist",   label="Friend List"   },
 }
 
 local function BuildPanel(addon)
@@ -1527,8 +1575,9 @@ local function BuildPanel(addon)
         if tab.key == "teleport"   then finalY = BuildTeleport(tf, db, addon)         end
         if tab.key == "reminder"   then finalY = BuildReminder(tf, db, addon)         end
         if tab.key == "qol"        then finalY = BuildQOL(tf, db, addon)              end
-        if tab.key == "mythictimer" then finalY = BuildMythicTimer(tf, db, addon)   end
-        if tab.key == "friendlist" then finalY = BuildFriendList(tf, db, addon)       end
+        if tab.key == "mythictimer"  then finalY = BuildMythicTimer(tf, db, addon)    end
+        if tab.key == "skyriding"    then finalY = BuildSkyriding(tf, db, addon)      end
+        if tab.key == "friendlist"   then finalY = BuildFriendList(tf, db, addon)     end
         if tab.key == "merchant"   then finalY = BuildMerchant(tf, db, addon)         end
         tabHeights[tab.key] = math.abs(finalY)
     end

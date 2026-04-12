@@ -709,24 +709,43 @@ end
 -- ============================================================================
 local function OnPlayMovie()
     if not cfg().autoSkipCinematic then return end
-    C_Timer.After(0.1, function()
-        if cfg().autoSkipCinematic and MovieFrame and MovieFrame:IsShown() then
-            GameMovieFinished()
+    C_Timer.After(0.5, function()
+        if not cfg().autoSkipCinematic then return end
+        if MovieFrame and MovieFrame:IsShown() then
+            -- GameMovieFinished() was removed in 12.0; use the internal stop function
+            MovieFrame_StopMovie(MovieFrame)
         end
     end)
 end
 
 local function OnCinematicStart()
     if not cfg().autoSkipCinematic then return end
-    C_Timer.After(0.1, function()
-        if cfg().autoSkipCinematic and CinematicFrame and CinematicFrame:IsShown() then
+    C_Timer.After(0.5, function()
+        if not cfg().autoSkipCinematic then return end
+        -- CinematicFrame_CancelCinematic checks isRealCinematic before calling StopCinematic
+        if CinematicFrame_CancelCinematic then
+            CinematicFrame_CancelCinematic()
+        elseif CinematicFrame and CinematicFrame:IsShown() then
             StopCinematic()
         end
     end)
 end
 
 -- ============================================================================
--- PET REMINDER  (forward declarations; full setup is after Init)
+-- AUTO-CONFIRM ITEM DELETION
+--   DELETE_ITEM_CONFIRM fires when Blizzard shows the delete-confirmation
+--   popup. We just hide the editbox and enable Button1 directly.
+-- ============================================================================
+local function OnDeleteItemConfirm()
+    if not cfg().autoConfirmDelete then return end
+    if StaticPopup1EditBox and StaticPopup1EditBox:IsShown() then
+        StaticPopup1EditBox:Hide()
+        if StaticPopup1Button1 then StaticPopup1Button1:Enable() end
+    end
+end
+
+
+
 -- ============================================================================
 local PET_CLASSES = { HUNTER = true, WARLOCK = true }
 local petFrame
@@ -841,6 +860,7 @@ local function OnEvent(self, event, arg1)
     elseif event == "LOOT_OPENED"                     then OnLootOpened()
     elseif event == "PLAY_MOVIE"                       then OnPlayMovie()
     elseif event == "CINEMATIC_START"                   then OnCinematicStart()
+    elseif event == "DELETE_ITEM_CONFIRM"                then OnDeleteItemConfirm()
     elseif event == "UNIT_PET"                          then CheckPet(arg1)
     elseif event == "PLAYER_MOUNT_DISPLAY_CHANGED"       then CheckPet("player")
     elseif event == "PLAYER_ENTERING_WORLD"             then
@@ -951,6 +971,7 @@ function QOL.Refresh(addonObj)
     Reg("LOOT_OPENED",   d.fasterLooting)
     Reg("PLAY_MOVIE",       d.autoSkipCinematic)
     Reg("CINEMATIC_START",  d.autoSkipCinematic)
+    Reg("DELETE_ITEM_CONFIRM", d.autoConfirmDelete)
     Reg("UNIT_PET",         d.petReminder)
     Reg("PLAYER_MOUNT_DISPLAY_CHANGED", d.petReminder)
 

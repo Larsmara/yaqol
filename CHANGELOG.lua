@@ -8,6 +8,15 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.0.31",
+        date    = "2026-04-12",
+        changes = {
+            "|cff00d1b2New|r  Auto-fill the DELETE confirmation when destroying items (QOL toggle)",
+            "|cff2dc9b8Fix|r  Auto-skip cinematics: GameMovieFinished() replaced with MovieFrame_StopMovie() (removed in 12.0)",
+            "|cff2dc9b8Fix|r  Auto-skip cinematics: in-world cinematics now use CinematicFrame_CancelCinematic()",
+        },
+    },
+    {
         version = "1.0.30",
         date    = "2026-04-12",
         changes = {

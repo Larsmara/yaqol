@@ -18,6 +18,7 @@ ns.Defaults = {
             holdModifier   = "ANY",  -- which modifier: "ANY", "ALT", "SHIFT", "CTRL"
             questSkipModifier = "SHIFT", -- hold this key to skip auto-quest actions
             autoSkipCinematic = false, -- auto-skip cinematics and cutscenes
+            autoConfirmDelete = false, -- auto-fill the "DELETE" confirmation when destroying an item
             fasterLooting  = false,  -- enable faster auto-looting
             lootingDelay   = 0.2,    -- seconds between loot calls (0.2 is reliable; lower = faster but may miss items)
             sellJunk       = false,  -- sell grey items when visiting a vendor

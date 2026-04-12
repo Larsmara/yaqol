@@ -96,7 +96,12 @@ local function PlayerHasAuraByName(name)
         local ok, data = pcall(C_UnitAuras.GetAuraDataByIndex, "player", i, "HELPFUL")
         if not ok or not data then break end
         local nameOk, auraName = pcall(function() return data.name end)
-        if nameOk and auraName == name then return true end
+        if nameOk then
+            -- Wrap the comparison itself: auraName may be a secret value in 12.0,
+            -- which would throw if compared directly outside a pcall.
+            local cmpOk, matches = pcall(function() return auraName == name end)
+            if cmpOk and matches then return true end
+        end
         i = i + 1
     end
     return false
@@ -337,6 +342,30 @@ local function GetMissingPartyBuffs(db)
     return missing
 end
 
+-- Returns true when the player has any food/Well Fed buff active.
+-- Checks both the canonical Midnight Well Fed spell IDs and all configured
+-- food spell IDs, then falls back to a name scan for "Well Fed" /
+-- "Hearty Well Fed" to handle foods not in the configured list.
+local WELL_FED_IDS = { 455369, 462187 }  -- Midnight primary Well Fed spell IDs
+local WELL_FED_NAMES = { "Well Fed", "Hearty Well Fed" }
+local function HasFoodBuff(foodList)
+    -- 1. Primary Midnight Well Fed spell IDs (fast path)
+    for _, id in ipairs(WELL_FED_IDS) do
+        if PlayerHasAura(id) then return true end
+    end
+    -- 2. Configured spell IDs (user's food list)
+    if foodList then
+        for _, entry in ipairs(foodList) do
+            if PlayerHasAura(entry.spellID) then return true end
+        end
+    end
+    -- 3. Name scan fallback: catches secret IDs and unconfigured foods
+    for _, name in ipairs(WELL_FED_NAMES) do
+        if PlayerHasAuraByName(name) then return true end
+    end
+    return false
+end
+
 -- [ CLASS BUFF CHECKER ] ------------------------------------------------------
 -- Returns missing class buff entries for the player's class.
 -- Skips entries disabled in db.reminder.classBuffs (key = castSpell or label).
@@ -414,18 +443,39 @@ function AuraList.GetMissing(db)
     if atMaxLevel then
         for _, cat in ipairs(AuraList.Categories) do
             local list = db[cat.key]
-            if list and #list > 0 then
+            -- Food uses HasFoodBuff() which works even with an empty/absent list.
+            if cat.key == "food" and db.food ~= nil then
+                if not HasFoodBuff(list) then
+                    local itemCount = 0
+                    if list then
+                        for _, entry in ipairs(list) do
+                            if entry.itemIDs then
+                                for _, itemID in ipairs(entry.itemIDs) do
+                                    itemCount = itemCount + (GetItemCount(itemID, true) or 0)
+                                end
+                            end
+                        end
+                    end
+                    local icon = 133971  -- default food icon
+                    if list then
+                        for _, entry in ipairs(list) do
+                            local tex = SpellIcon(entry.spellID)
+                            if tex then icon = tex; break end
+                        end
+                    end
+                    missing[#missing + 1] = {
+                        label     = cat.label,
+                        spellID   = (list and list[1] and list[1].spellID) or WELL_FED_IDS[1],
+                        icon      = icon,
+                        required  = cat.required,
+                        itemCount = itemCount,
+                    }
+                end
+            elseif list and #list > 0 then
                 local found = false
                 for _, entry in ipairs(list) do
                     if PlayerHasAura(entry.spellID) then
                         found = true; break
-                    end
-                end
-                -- Extra fallback for food: "Well Fed" may be ContextuallySecret in Midnight
-                -- and not readable via GetPlayerAuraBySpellID. Check by aura name instead.
-                if not found and cat.key == "food" then
-                    if PlayerHasAuraByName("Well Fed") then
-                        found = true
                     end
                 end
                 if not found then

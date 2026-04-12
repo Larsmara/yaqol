@@ -134,10 +134,7 @@ local function GetOrMakeFrame()
     mark2:SetColorTexture(1.0, 1.0, 0.3, 0.7)
     f.mark2 = mark2
 
-    -- Bar percentage label
-    local barLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    barLabel:SetPoint("CENTER", barBg, "CENTER", 0, 0)
-    f.barLabel = barLabel
+    -- Bar percentage label  (removed — bar is now pull-count progress, label rendered inline)
 
     -- Death count (skull icon + text)
     local deathIcon = f:CreateTexture(nil, "OVERLAY")
@@ -153,10 +150,10 @@ local function GetOrMakeFrame()
     deathText:SetJustifyH("LEFT")
     f.deathText = deathText
 
-    -- Pull count
+    -- Pull count label (centered on the bar)
     local pullText = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    pullText:SetPoint("TOPRIGHT", f, "TOPRIGHT", -10, -78)
-    pullText:SetJustifyH("RIGHT")
+    pullText:SetPoint("CENTER", barBg, "CENTER", 0, 0)
+    pullText:SetJustifyH("CENTER")
     f.pullText = pullText
 
     -- Boss progress area (dynamic icons/text)
@@ -286,18 +283,27 @@ local function UpdateDisplay()
         f.plus2:SetText("|cff666666+2  —|r")
     end
 
-    -- Progress bar (time based)
-    local pct = math.min(elapsed / timeLimit, 1.5)
-    local fillW = math.min(pct, 1.0) * BAR_W
-    f.barFill:SetWidth(math.max(fillW, 1))
-    if remaining > 0 then
-        f.barFill:SetColorTexture(0.18, 0.78, 0.72, 1)
+    -- Progress bar — pull count (enemy forces %)
+    if pullTotal > 0 then
+        local pullPct = pullQty / pullTotal
+        local fillW = math.min(pullPct, 1.0) * BAR_W
+        f.barFill:SetWidth(math.max(fillW, 1))
+        if pullQty >= pullTotal then
+            f.barFill:SetColorTexture(0.18, 0.78, 0.72, 1)  -- teal: full
+        else
+            f.barFill:SetColorTexture(0.55, 0.72, 0.18, 1)  -- yellow-green: filling
+        end
+        local pullPctFloor = floor(pullPct * 100)
+        f.pullText:SetText(format("|cff%s%d%%|r  (%d/%d)",
+            (pullQty >= pullTotal) and "2dc9b8" or "aacc44",
+            pullPctFloor, pullQty, pullTotal))
     else
-        f.barFill:SetColorTexture(0.88, 0.22, 0.22, 1)
+        f.barFill:SetWidth(1)
+        f.barFill:SetColorTexture(0.15, 0.16, 0.19, 1)
+        f.pullText:SetText("|cff666666Pull %|r")
     end
-    f.barLabel:SetText(FormatTime(elapsed) .. " / " .. FormatTime(timeLimit))
 
-    -- +3 / +2 markers on bar
+    -- +3 / +2 markers on bar (still mark time thresholds — kept as reference)
     local mark3X = PLUS_3_FRACTION * BAR_W
     f.mark3:ClearAllPoints()
     f.mark3:SetPoint("TOPLEFT", f.barBg, "TOPLEFT", mark3X, 0)
@@ -311,19 +317,11 @@ local function UpdateDisplay()
     -- Death count
     if deathCount > 0 then
         f.deathIcon:Show()
-        f.deathText:SetText(format("|cffee2222%d|r  |cff999999(-%s)|r", deathCount, FormatTime(timeLost)))
+        f.deathText:SetText(format("|cffee2222%d death%s|r  |cff999999(-%s)|r",
+            deathCount, deathCount == 1 and "" or "s", FormatTime(timeLost)))
     else
         f.deathIcon:Hide()
         f.deathText:SetText("")
-    end
-
-    -- Pull count (enemy forces)
-    if pullTotal > 0 then
-        local pullPct = floor(pullQty / pullTotal * 100)
-        local pullColour = pullQty >= pullTotal and "|cff44ee44" or "|cffcccccc"
-        f.pullText:SetText(format("%s%d%%|r  (%d/%d)", pullColour, pullPct, pullQty, pullTotal))
-    else
-        f.pullText:SetText("")
     end
 
     -- Boss progress
@@ -386,6 +384,7 @@ end
 local function DeactivateTimer()
     isActive = false
     timerID = nil
+    RestoreObjectiveTracker()
     local f = timerFrame
     if f then
         f:SetScript("OnUpdate", nil)
@@ -416,8 +415,10 @@ end
 local function OnEvent(self, event, ...)
     if event == "CHALLENGE_MODE_START" then
         CheckTimers(GetWorldElapsedTimers())
+        HideObjectiveTracker()
 
     elseif event == "CHALLENGE_MODE_COMPLETED" then
+        RestoreObjectiveTracker()
         -- Keep display visible for a few seconds showing final time
         if timerFrame then
             timerFrame:SetScript("OnUpdate", nil)
@@ -448,43 +449,85 @@ local function OnEvent(self, event, ...)
         -- On login/reload, check if we're already in a M+ dungeon
         if C_ChallengeMode.IsChallengeModeActive() then
             CheckTimers(GetWorldElapsedTimers())
+            HideObjectiveTracker()
         else
             DeactivateTimer()
+            RestoreObjectiveTracker()
         end
     end
+end
+
+-- [ OBJECTIVE TRACKER MANAGEMENT ] -------------------------------------------
+-- When hideBlizzard is on we also hide the entire ObjectiveTrackerFrame while
+-- inside a Mythic+ dungeon (quest objectives are noise during a key), then
+-- restore it when the key ends or the player leaves.
+local objTrackerHidden = false
+
+local function HideObjectiveTracker()
+    if objTrackerHidden then return end
+    if not cfg().enabled or not cfg().hideBlizzard then return end
+    if not ObjectiveTrackerFrame then return end
+    if InCombatLockdown() then return end
+    ObjectiveTrackerFrame:Hide()
+    objTrackerHidden = true
+end
+
+local function RestoreObjectiveTracker()
+    if not objTrackerHidden then return end
+    objTrackerHidden = false
+    if not ObjectiveTrackerFrame then return end
+    if InCombatLockdown() then return end
+    ObjectiveTrackerFrame:Show()
 end
 
 -- [ BLIZZARD BLOCK MANAGEMENT ] -----------------------------------------------
 -- Optionally hide the default Blizzard Challenge Mode block in the objective
 -- tracker so it doesn't duplicate our display.
 local blizzBlockHooked = false
+
+-- Immediately apply the current hideBlizzard setting to any already-visible block.
+local function ApplyBlizzardBlockVisibility()
+    if not ScenarioObjectiveTracker or not ScenarioObjectiveTracker.ChallengeModeBlock then return end
+    local block = ScenarioObjectiveTracker.ChallengeModeBlock
+    if cfg().enabled and cfg().hideBlizzard then
+        if block:IsShown() then block:Hide() end
+        -- Also hide the full objective tracker if we're in an active key
+        if C_ChallengeMode.IsChallengeModeActive() then
+            HideObjectiveTracker()
+        end
+    else
+        -- Restore: let Blizzard re-layout the tracker naturally.
+        RestoreObjectiveTracker()
+        ScenarioObjectiveTracker:MarkDirty()
+    end
+end
+
 local function HookBlizzardBlock()
     if blizzBlockHooked then return end
     blizzBlockHooked = true
-    -- ScenarioObjectiveTracker.ChallengeModeBlock may not exist yet; hook via
-    -- the ADDON_LOADED path for Blizzard_ObjectiveTracker.
+
+    local function AttachHook()
+        if not ScenarioObjectiveTracker or not ScenarioObjectiveTracker.ChallengeModeBlock then return false end
+        hooksecurefunc(ScenarioObjectiveTracker.ChallengeModeBlock, "Show", function(block)
+            if cfg().enabled and cfg().hideBlizzard then
+                block:Hide()
+            end
+        end)
+        -- Hide immediately in case the block is already shown (e.g. /reload inside a key).
+        ApplyBlizzardBlockVisibility()
+        return true
+    end
+
+    if AttachHook() then return end
+
+    -- Blizzard_ObjectiveTracker not loaded yet — wait for it.
     local hookFrame = CreateFrame("Frame")
     hookFrame:RegisterEvent("ADDON_LOADED")
     hookFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
     hookFrame:SetScript("OnEvent", function(_, ev, name)
         if ev == "ADDON_LOADED" and name ~= "Blizzard_ObjectiveTracker" then return end
-        if not ScenarioObjectiveTracker or not ScenarioObjectiveTracker.ChallengeModeBlock then return end
-        hooksecurefunc(ScenarioObjectiveTracker.ChallengeModeBlock, "Show", function(block)
-            if cfg().enabled and cfg().hideBlizzard then
-                block:Hide()
-            end
-        end)
-        hookFrame:UnregisterAllEvents()
+        if AttachHook() then hookFrame:UnregisterAllEvents() end
     end)
-    -- Already loaded?
-    if ScenarioObjectiveTracker and ScenarioObjectiveTracker.ChallengeModeBlock then
-        hooksecurefunc(ScenarioObjectiveTracker.ChallengeModeBlock, "Show", function(block)
-            if cfg().enabled and cfg().hideBlizzard then
-                block:Hide()
-            end
-        end)
-        hookFrame:UnregisterAllEvents()
-    end
 end
 
 -- [ PUBLIC API ] --------------------------------------------------------------
@@ -523,6 +566,9 @@ function MT.Refresh(addonObj)
     if not d.enabled and isActive then
         DeactivateTimer()
     end
+
+    -- Apply hideBlizzard immediately (handles toggle from options and /reload inside a key)
+    ApplyBlizzardBlockVisibility()
 
     -- If enabled and already in a key, activate
     if d.enabled and C_ChallengeMode.IsChallengeModeActive() then

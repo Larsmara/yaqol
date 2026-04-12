@@ -56,14 +56,6 @@ local function ShouldShow()
     return ok and isUsable == true
 end
 
-local function ShowHUD()
-    if not panel or not cfg().enabled then return end
-    isVisible = true
-    panel:Show()
-    UpdateCharges()
-    UpdateWhirlingSurge()
-end
-
 local function HideHUD()
     if not panel then return end
     isVisible = false
@@ -120,6 +112,14 @@ local function UpdateWhirlingSurge()
     local frac = remaining / info.duration
     surgeFill:SetWidth(math.max(1, frac * HUD_W))
     surgeLabel:SetText(string.format("%.1fs", remaining))
+end
+
+local function ShowHUD()
+    if not panel or not cfg().enabled then return end
+    isVisible = true
+    panel:Show()
+    UpdateCharges()
+    UpdateWhirlingSurge()
 end
 
 -- [ PANEL CONSTRUCTION ] ------------------------------------------------------

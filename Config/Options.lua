@@ -803,6 +803,11 @@ local function BuildQOL(content, db, addon)
     _, dh = MakeToggle(content, "Auto-skip cinematics and cutscenes",
         function() return q.autoSkipCinematic end,
         function(v) q.autoSkipCinematic = v; ns.QOL.Refresh(addon) end, y)
+    y = y - dh - 2
+
+    _, dh = MakeToggle(content, "Auto-fill the DELETE confirmation when destroying items",
+        function() return q.autoConfirmDelete end,
+        function(v) q.autoConfirmDelete = v; ns.QOL.Refresh(addon) end, y)
     y = y - dh - 14
 
     -- ── SOCIAL / GROUP ────────────────────────────────────────────────────
@@ -1237,14 +1242,14 @@ local function BuildMythicTimer(content, db, addon)
     note1:SetJustifyH("LEFT")
     y = y - 38
 
-    _, dh = MakeToggle(content, "Hide default Blizzard M+ block (objective tracker)",
+    _, dh = MakeToggle(content, "Hide default Blizzard M+ block & quest tracker",
         function() return mt.hideBlizzard end,
         function(v) mt.hideBlizzard = v end, y)
     y = y - dh - 4
 
     local note2 = Label(content,
-        "Hides the built-in Challenge Mode block from the objective tracker "
-        .. "to avoid duplicate timers.",
+        "Hides the built-in Challenge Mode timer block and the entire objective "
+        .. "tracker (quest list) while inside a Mythic+ key — restores on completion.",
         "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
     note2:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
     note2:SetWidth(T.PANEL_W - T.PAD*2 - 48)

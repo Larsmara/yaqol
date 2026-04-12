@@ -23,6 +23,7 @@ function yaqol:OnInitialize()
     local q = self.db.profile.qol
     if q.questSkipModifier == nil then q.questSkipModifier = "SHIFT" end
     if q.autoSkipCinematic == nil then q.autoSkipCinematic = false end
+    if q.autoConfirmDelete == nil then q.autoConfirmDelete = false end
     if q.autoSlotKeystone == nil then q.autoSlotKeystone = false end
     if q.petReminder == nil then q.petReminder = false end
     -- Migrate: move pet reminder from below-center to above-center

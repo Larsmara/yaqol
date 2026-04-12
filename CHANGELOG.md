@@ -1,5 +1,15 @@
 # yaqol
 
+## [v1.0.31](https://github.com/Larsmara/yaqol/tree/v1.0.31) (2026-04-12)
+[Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.0.30...v1.0.31) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
+
+**New:**
+- Auto-fill the DELETE confirmation when destroying items (QOL toggle)
+
+**Fixes:**
+- Auto-skip cinematics: `GameMovieFinished()` replaced with `MovieFrame_StopMovie()` (removed in 12.0)
+- Auto-skip cinematics: in-world cinematics now use `CinematicFrame_CancelCinematic()`
+
 ## [v1.0.30](https://github.com/Larsmara/yaqol/tree/v1.0.30) (2026-04-12)
 [Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.0.29...v1.0.30) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
 

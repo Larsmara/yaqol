@@ -8,7 +8,7 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
-        version = "1.0.28",
+        version = "1.0.30",
         date    = "2026-04-12",
         changes = {
             "|cff00d1b2New|r  Skyriding HUD — charge pips (with partial recharge fill) and Whirling Surge cooldown bar",

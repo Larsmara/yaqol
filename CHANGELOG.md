@@ -1,7 +1,7 @@
 # yaqol
 
-## [v1.0.28](https://github.com/Larsmara/yaqol/tree/v1.0.28) (2026-04-12)
-[Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.0.27...v1.0.28) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
+## [v1.0.30](https://github.com/Larsmara/yaqol/tree/v1.0.30) (2026-04-12)
+[Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.0.29...v1.0.30) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
 
 - New: Skyriding HUD — charge pips (with partial recharge fill) and Whirling Surge cooldown bar
 - New: Skyriding HUD only shows on skyriding mounts in Skyriding mode (not Steady Flight)

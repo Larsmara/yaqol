@@ -8,6 +8,14 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.0.33",
+        date    = "2026-04-13",
+        changes = {
+            "|cff2dc9b8Fix|r  M+ Timer: pull count now shows two decimal places (e.g. 14.67%)",
+            "|cff2dc9b8Fix|r  M+ Timer: frame stays visible after key ends until player zones out",
+        },
+    },
+    {
         version = "1.0.32",
         date    = "2026-04-13",
         changes = {

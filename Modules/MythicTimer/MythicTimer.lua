@@ -296,10 +296,9 @@ local function UpdateDisplay()
         else
             f.barFill:SetColorTexture(0.55, 0.72, 0.18, 1)  -- yellow-green: filling
         end
-        local pullPctFloor = floor(pullPct * 100)
-        f.pullText:SetText(format("|cff%s%d%%|r",
+        f.pullText:SetText(format("|cff%s%.2f%%|r",
             (pullQty >= pullTotal) and "2dc9b8" or "aacc44",
-            pullPctFloor))
+            pullPct * 100))
     else
         f.barFill:SetWidth(1)
         f.barFill:SetColorTexture(0.15, 0.16, 0.19, 1)
@@ -441,8 +440,9 @@ local function OnEvent(self, event, ...)
 
     elseif event == "WORLD_STATE_TIMER_STOP" then
         local timerId = ...
-        if timerID and timerID == timerId and not dungeonCompleted then
-            DeactivateTimer()  -- only deactivate if run wasn't completed (e.g. timer ran out)
+        if timerID and timerID == timerId then
+            -- freeze the display but keep it visible; PLAYER_ENTERING_WORLD cleans up on zone-out
+            if timerFrame then timerFrame:SetScript("OnUpdate", nil) end
         end
 
     elseif event == "PLAYER_ENTERING_WORLD" then

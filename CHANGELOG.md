@@ -1,5 +1,12 @@
 # yaqol
 
+## [v1.0.33](https://github.com/Larsmara/yaqol/tree/v1.0.33) (2026-04-13)
+[Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.0.32...v1.0.33) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
+
+**Fixes:**
+- M+ Timer: pull count now shows two decimal places (e.g. `14.67%`)
+- M+ Timer: frame now correctly stays visible after the key ends until the player zones out
+
 ## [v1.0.32](https://github.com/Larsmara/yaqol/tree/v1.0.32) (2026-04-13)
 [Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.0.31...v1.0.32) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
 

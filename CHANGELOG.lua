@@ -8,6 +8,15 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.0.32",
+        date    = "2026-04-13",
+        changes = {
+            "|cff2dc9b8Fix|r  M+ Timer: mob count percentage was showing ~16% instead of ~90%",
+            "|cff2dc9b8Fix|r  M+ Timer: frame now stays visible after dungeon completion until player leaves",
+            "|cff2dc9b8Fix|r  Skyriding HUD: re-checks visibility after zone change and on delayed load",
+        },
+    },
+    {
         version = "1.0.31",
         date    = "2026-04-12",
         changes = {

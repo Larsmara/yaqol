@@ -22,6 +22,7 @@ local startTime       -- GetTime() snapshot when key started
 local elapsedBase     -- elapsed seconds at last sync
 local elapsedAccum    -- running accumulator since last sync
 local deathCount, timeLost = 0, 0
+local dungeonCompleted = false  -- true after CHALLENGE_MODE_COMPLETED, cleared on deactivate
 local keystoneLevel = 0
 local dungeonName = ""
 local affixIDs = {}
@@ -29,6 +30,8 @@ local criteriaData = {}  -- { [i] = { desc, qty, total, completed } }
 local numBosses = 0
 local bossesKilled = 0
 local pullQty, pullTotal = 0, 0
+local HideObjectiveTracker
+local RestoreObjectiveTracker
 
 -- [ HELPERS ] -----------------------------------------------------------------
 local function cfg() return addon.db.profile.mythicTimer end
@@ -229,9 +232,9 @@ local function GatherCriteriaData()
                 isWeighted = info.isWeightedProgress,
             }
             if info.isWeightedProgress then
-                -- This is the pull count (enemy forces)
+                -- quantity is a 0-100 percentage value for weighted-progress criteria
                 pullQty   = info.quantity
-                pullTotal = info.totalQuantity
+                pullTotal = 100
             else
                 -- This is a boss
                 numBosses = numBosses + 1
@@ -294,9 +297,9 @@ local function UpdateDisplay()
             f.barFill:SetColorTexture(0.55, 0.72, 0.18, 1)  -- yellow-green: filling
         end
         local pullPctFloor = floor(pullPct * 100)
-        f.pullText:SetText(format("|cff%s%d%%|r  (%d/%d)",
+        f.pullText:SetText(format("|cff%s%d%%|r",
             (pullQty >= pullTotal) and "2dc9b8" or "aacc44",
-            pullPctFloor, pullQty, pullTotal))
+            pullPctFloor))
     else
         f.barFill:SetWidth(1)
         f.barFill:SetColorTexture(0.15, 0.16, 0.19, 1)
@@ -360,6 +363,7 @@ end
 -- [ ACTIVATION / DEACTIVATION ] -----------------------------------------------
 local function ActivateTimer(worldTimerID, worldElapsed, limit)
     isActive = true
+    dungeonCompleted = false
     timerID = worldTimerID
     timeLimit = limit
     elapsedBase = worldElapsed
@@ -383,6 +387,7 @@ end
 
 local function DeactivateTimer()
     isActive = false
+    dungeonCompleted = false
     timerID = nil
     RestoreObjectiveTracker()
     local f = timerFrame
@@ -419,15 +424,10 @@ local function OnEvent(self, event, ...)
 
     elseif event == "CHALLENGE_MODE_COMPLETED" then
         RestoreObjectiveTracker()
-        -- Keep display visible for a few seconds showing final time
+        dungeonCompleted = true  -- keep frame alive until player leaves the dungeon
         if timerFrame then
-            timerFrame:SetScript("OnUpdate", nil)
+            timerFrame:SetScript("OnUpdate", nil)  -- freeze display at final time
         end
-        C_Timer.After(10, function()
-            if not C_ChallengeMode.IsChallengeModeActive() then
-                DeactivateTimer()
-            end
-        end)
 
     elseif event == "CHALLENGE_MODE_DEATH_COUNT_UPDATED" then
         UpdateDeathCount()
@@ -441,8 +441,8 @@ local function OnEvent(self, event, ...)
 
     elseif event == "WORLD_STATE_TIMER_STOP" then
         local timerId = ...
-        if timerID and timerID == timerId then
-            DeactivateTimer()
+        if timerID and timerID == timerId and not dungeonCompleted then
+            DeactivateTimer()  -- only deactivate if run wasn't completed (e.g. timer ran out)
         end
 
     elseif event == "PLAYER_ENTERING_WORLD" then
@@ -463,7 +463,7 @@ end
 -- restore it when the key ends or the player leaves.
 local objTrackerHidden = false
 
-local function HideObjectiveTracker()
+HideObjectiveTracker = function()
     if objTrackerHidden then return end
     if not cfg().enabled or not cfg().hideBlizzard then return end
     if not ObjectiveTrackerFrame then return end
@@ -472,7 +472,7 @@ local function HideObjectiveTracker()
     objTrackerHidden = true
 end
 
-local function RestoreObjectiveTracker()
+RestoreObjectiveTracker = function()
     if not objTrackerHidden then return end
     objTrackerHidden = false
     if not ObjectiveTrackerFrame then return end

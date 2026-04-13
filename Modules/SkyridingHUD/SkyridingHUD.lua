@@ -236,14 +236,23 @@ end
 function SkyridingHUD.Init(addon)
     panel = BuildPanel()
 
+    local function CheckVisibility()
+        if ShouldShow() then ShowHUD() else HideHUD() end
+    end
+
     local watcher = CreateFrame("Frame")
     watcher:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
     watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
+    watcher:RegisterEvent("ZONE_CHANGED_NEW_AREA")
     watcher:RegisterEvent("SPELL_UPDATE_CHARGES")
     watcher:RegisterEvent("SPELL_UPDATE_COOLDOWN")
     watcher:SetScript("OnEvent", function(_, event)
-        if event == "PLAYER_MOUNT_DISPLAY_CHANGED" or event == "PLAYER_ENTERING_WORLD" then
-            if ShouldShow() then ShowHUD() else HideHUD() end
+        if event == "PLAYER_MOUNT_DISPLAY_CHANGED" or event == "ZONE_CHANGED_NEW_AREA" then
+            CheckVisibility()
+        elseif event == "PLAYER_ENTERING_WORLD" then
+            -- Spell usability may not be ready immediately after a load; re-check after a short delay.
+            CheckVisibility()
+            C_Timer.After(0.5, CheckVisibility)
         elseif event == "SPELL_UPDATE_CHARGES" then
             if isVisible then UpdateCharges() end
         elseif event == "SPELL_UPDATE_COOLDOWN" then

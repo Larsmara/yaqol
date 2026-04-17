@@ -8,6 +8,17 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.0.34",
+        date    = "2026-04-17",
+        changes = {
+            "|cff4fc3f7New|r  Combat Ress Timer: draggable icon shows available combat rez charges in raids & M+",
+            "|cff2dc9b8Fix|r  Buff Reminder: Shaman shields merged into one entry (only one active at a time)",
+            "|cff2dc9b8Fix|r  Buff Reminder: Earthliving Weapon now detected as a weapon enchant",
+            "|cff2dc9b8Fix|r  QOL: Hold to Release now requires holding SHIFT for a configurable duration",
+            "|cff2dc9b8Fix|r  Options: sliders no longer overflow panel bounds; value label now visible",
+        },
+    },
+    {
         version = "1.0.33",
         date    = "2026-04-13",
         changes = {

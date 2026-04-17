@@ -14,8 +14,9 @@ ns.Defaults = {
             autoSummon     = false,  -- auto-accept summoning stone (5 s delay)
             autoRez        = false,  -- auto-accept resurrection offers
             autoRezInCombat = false, -- allow auto-rez even if the caster is in combat
-            holdToRelease  = false,  -- require a modifier key to release spirit
-            holdModifier   = "ANY",  -- which modifier: "ANY", "ALT", "SHIFT", "CTRL"
+            holdToRelease  = false,  -- require holding SHIFT to release spirit
+            holdDuration   = 3,      -- seconds to hold before button enables
+            holdAutoRelease = false, -- auto-release when countdown completes
             questSkipModifier = "SHIFT", -- hold this key to skip auto-quest actions
             autoSkipCinematic = false, -- auto-skip cinematics and cutscenes
             autoConfirmDelete = false, -- auto-fill the "DELETE" confirmation when destroying an item
@@ -154,6 +155,13 @@ ns.Defaults = {
         raidTools = {
             enabled  = true,
             point    = "CENTER", relPoint = "CENTER", x = 0, y = 200,
+        },
+
+        -- Combat Resurrection tracker
+        combatRess = {
+            enabled = true,
+            scale   = 1.0,
+            point = "CENTER", relPoint = "CENTER", x = 250, y = 0,
         },
 
         -- Skyriding HUD

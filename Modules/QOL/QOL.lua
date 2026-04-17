@@ -174,42 +174,85 @@ local function OnResurrectRequest(raisingUnit)
 end
 
 -- ============================================================================
--- HOLD-TO-RELEASE  (modifier key required to release spirit)
---   We hook the StaticPopup "DEATH" button to require ALT, SHIFT, or CTRL before
---   the click goes through.  This prevents accidental spirit release.
+-- HOLD-TO-RELEASE  (require holding SHIFT for N seconds before button enables)
+--   1. Dialog appears: button grayed, shows "Hold SHIFT to release"
+--   2. Player holds SHIFT: countdown shown, button stays grayed
+--   3. Countdown completes: button ENABLES, shows "Release" — player clicks to release
+--      (or auto-releases if holdAutoRelease is true)
+--   4. Releasing SHIFT before countdown: resets to step 1
 -- ============================================================================
-local holdHooked = false
+local holdHooked    = false
+local holdStartTime = nil   -- when the player started holding; nil = not holding
+local holdReady     = false -- true once countdown completed; allows OnButton1 through
+
+local function HoldModifierIsDown()
+    return IsShiftKeyDown()
+end
 
 local function HookHoldToRelease()
     if holdHooked then return end
     holdHooked = true
 
-    -- We hook RepopMe — the function the "Release Spirit" button calls.
-    -- hooksecurefunc fires BEFORE the original, so we can suppress the release
-    -- by checking for a modifier key.  When no modifier is held we immediately
-    -- re-open the DEATH popup on the next frame to undo any visual flicker.
-    --
-    -- StaticPopup_OnClick is the wrong hook point: it fires after the action
-    -- has already been dispatched, so re-showing the popup there doesn't help.
-    hooksecurefunc("RepopMe", function()
-        if not cfg().holdToRelease then return end
-        -- Only intercept when the player is actually dead/ghost via the UI popup
-        if not StaticPopup_Visible("DEATH") then return end
-        local mod = cfg().holdModifier or "ANY"
-        local held = (mod == "ANY"   and (IsAltKeyDown() or IsShiftKeyDown() or IsControlKeyDown())) or
-                     (mod == "ALT"   and IsAltKeyDown()) or
-                     (mod == "SHIFT" and IsShiftKeyDown()) or
-                     (mod == "CTRL"  and IsControlKeyDown())
-        if held then return end
-        -- No modifier: cancel the release by re-queuing the popup next frame.
-        -- RepopMe has already been called by the time our hook fires, so we
-        -- re-show the dialog and let the player try again with a modifier.
-        C_Timer.After(0, function()
-            if UnitIsDeadOrGhost("player") then
-                StaticPopup_Show("DEATH")
-            end
-        end)
+    hooksecurefunc("StaticPopup_Show", function(which)
+        if which == "DEATH" then
+            holdStartTime = nil
+            holdReady     = false
+        end
     end)
+
+    local dialog = StaticPopupDialogs["DEATH"]
+    if not dialog then return end
+    if not dialog.OnButton1 then return end
+
+    local origOnButton1 = dialog.OnButton1
+
+    local origOnUpdate = dialog.OnUpdate
+    dialog.OnUpdate = function(self, elapsed)
+        if origOnUpdate then origOnUpdate(self, elapsed) end
+        if not cfg().holdToRelease then return end
+        local btn = self.GetButton1 and self:GetButton1()
+        if not btn then return end
+        local duration = cfg().holdDuration or 3
+
+        if holdReady then
+            -- Countdown already completed — show enabled "Release" button.
+            btn:Enable()
+            btn:SetText("Release")
+        elseif HoldModifierIsDown() then
+            if not holdStartTime then holdStartTime = GetTime() end
+            local held      = GetTime() - holdStartTime
+            local remaining = duration - held
+            if remaining > 0 then
+                btn:Disable()
+                btn:SetText("Releasing in " .. math.ceil(remaining) .. "s…")
+            else
+                -- Countdown complete.
+                holdReady     = true
+                holdStartTime = nil
+                if cfg().holdAutoRelease then
+                    -- Auto-release: fire immediately.
+                    origOnButton1(self, self.data)
+                    holdReady = false
+                else
+                    btn:Enable()
+                    btn:SetText("Release")
+                end
+            end
+        else
+            -- SHIFT not held (or released early) — reset.
+            holdStartTime = nil
+            holdReady     = false
+            btn:Disable()
+            btn:SetText("Hold SHIFT to release")
+        end
+    end
+
+    -- OnButton1: only pass through when countdown completed (holdReady) or feature off.
+    dialog.OnButton1 = function(self, data)
+        if cfg().holdToRelease and not holdReady then return true end
+        holdReady = false
+        return origOnButton1(self, data)
+    end
 end
 
 -- ============================================================================

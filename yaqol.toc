@@ -32,4 +32,5 @@ Modules/FriendList/FriendList.lua
 Modules/Merchant/Merchant.lua
 Modules/RaidTools/RaidTools.lua
 Modules/SkyridingHUD/SkyridingHUD.lua
+Modules/CombatRess/CombatRess.lua
 Config/Options.lua

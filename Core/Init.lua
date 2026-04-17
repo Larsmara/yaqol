@@ -26,6 +26,10 @@ function yaqol:OnInitialize()
     if q.autoConfirmDelete == nil then q.autoConfirmDelete = false end
     if q.autoSlotKeystone == nil then q.autoSlotKeystone = false end
     if q.petReminder == nil then q.petReminder = false end
+    -- Migrate: holdModifier removed; add new hold-to-release fields
+    q.holdModifier = nil
+    if q.holdDuration == nil then q.holdDuration = 3 end
+    if q.holdAutoRelease == nil then q.holdAutoRelease = false end
     -- Migrate: move pet reminder from below-center to above-center
     if q.petY and q.petY == -240 then q.petY = 100 end
     -- Migrate: ensure mythicTimer defaults exist for old profiles
@@ -56,6 +60,11 @@ function yaqol:OnInitialize()
         r.food = CopyTable(ns.Defaults.profile.reminder.food)
     end
 
+    -- Migrate: ensure combatRess defaults exist for old profiles
+    if not self.db.profile.combatRess then
+        self.db.profile.combatRess = CopyTable(ns.Defaults.profile.combatRess)
+    end
+
     -- Migrate: ensure skyridingHUD defaults exist for old profiles
     if not self.db.profile.skyridingHUD then
         self.db.profile.skyridingHUD = CopyTable(ns.Defaults.profile.skyridingHUD)
@@ -75,6 +84,7 @@ function yaqol:OnEnable()
     ns.Merchant.Init(self)
     ns.RaidTools.Init(self)
     ns.SkyridingHUD.Init(self)
+    ns.CombatRess.Init(self)
     ns.MythicTimer.Init(self)
 end
 
@@ -87,6 +97,7 @@ function yaqol:OnProfileChanged()
     ns.Merchant.Refresh(self)
     ns.RaidTools.Refresh(self)
     ns.SkyridingHUD.Refresh(self)
+    ns.CombatRess.Refresh(self)
     ns.MythicTimer.Refresh(self)
 end
 

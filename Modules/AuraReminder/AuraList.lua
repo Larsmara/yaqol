@@ -200,13 +200,12 @@ local CLASS_BUFFS = {
         { label = "Windfury Weapon",    required = false, castSpell = 33757,
           buffIDs = { 319773 } },
         { label = "Earthliving Weapon", required = false, castSpell = 382021,
-          buffIDs = { 382021, 382022 } },
+          buffIDs = { 382021, 382022, 457481, 457496 }, isWeaponEnchant = true },
         { label = "Thunderstrike Ward", required = false, castSpell = 462757,
           buffIDs = { 462757, 462742 } },
-        { label = "Lightning Shield",   required = false, castSpell = 192106,
-          buffIDs = { 192106 } },
-        { label = "Water Shield",       required = false, castSpell = 52127,
-          buffIDs = { 52127 } },
+        -- Only one shield can be active at a time; either satisfies the check.
+        { label = "Shield",             required = false, castSpell = 192106,
+          buffIDs = { 192106, 52127 } },
     },
     -- WARRIOR -------------------------------------------------------------
     WARRIOR = {
@@ -407,6 +406,18 @@ local function GetMissingClassBuffs(db)
                         found = true; break
                     end
                 end
+            end
+            -- Fallback: scan auras by name when spell-ID lookup fails.
+            -- Handles cases where Midnight uses a different buff ID than expected.
+            if not found and def.buffName then
+                found = PlayerHasAuraByName(def.buffName)
+            end
+            -- Weapon-enchant fallback: some imbues (e.g. Earthliving Weapon in Midnight)
+            -- appear as a temporary weapon enchant rather than a player aura.
+            -- Check both main-hand and off-hand slots.
+            if not found and def.isWeaponEnchant then
+                local hasMH, _, _, _, hasOH = GetWeaponEnchantInfo()
+                found = hasMH == true or hasOH == true
             end
             if not found then
                 missing[#missing + 1] = {

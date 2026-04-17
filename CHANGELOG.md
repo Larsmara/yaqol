@@ -1,5 +1,17 @@
 # yaqol
 
+## [v1.0.34](https://github.com/Larsmara/yaqol/tree/v1.0.34) (2026-04-17)
+[Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.0.33...v1.0.34) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
+
+**New:**
+- Combat Ress Timer: draggable icon showing available combat resurrection charges (visible in raids and M+)
+
+**Fixes:**
+- Buff Reminder: Shaman shields (Lightning Shield / Water Shield) now merged into one entry — only one can be active at a time
+- Buff Reminder: Shaman Earthliving Weapon now correctly detected as a temporary weapon enchant
+- QOL: Hold to Release now grays out the release button on death, requires holding SHIFT for a configurable duration before enabling it
+- Options: all sliders now render correctly and no longer overflow the panel bounds; value label now visible
+
 ## [v1.0.33](https://github.com/Larsmara/yaqol/tree/v1.0.33) (2026-04-13)
 [Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.0.32...v1.0.33) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
 

@@ -1,8 +1,6 @@
 # Bugs
-- M+ mob count is completely wrong. TEsting with warpdeplete side by side, ours was showing 16% when warpdeplete was showing 90%. Something is wrong with Yaqol m+ timer.
-- The m+ timer should stay on screen until the player leaves the dungeon, not right away as the dungeon is completed
 
 # Improvements
-
-
-# Features
+- Design: More blizzard like? They black + blue is harsh
+- Make class color for keys more distuingishuable. It's kinda hard to see right now which class has which key. Especially if two or more has the same key
+- M+ timer is hard to read. Improve font and readability.

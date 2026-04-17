@@ -21,6 +21,7 @@ local T = {
     HEADER_H    = 46,
     ROW_H       = 28,
     PAD         = 14,
+    CONTENT_W   = 544,  -- PANEL_W - SIDEBAR_W(140) - scrollbar area(16)
 }
 
 -- [ PRIMITIVES ] --------------------------------------------------------------
@@ -48,7 +49,7 @@ end
 -- [ TOGGLE WIDGET ] -----------------------------------------------------------
 local function MakeToggle(parent, label, getValue, setValue, yOff)
     local row = CreateFrame("Frame", nil, parent)
-    row:SetSize(T.PANEL_W - T.PAD*2, T.ROW_H)
+    row:SetSize(T.CONTENT_W - T.PAD*2, T.ROW_H)
     row:SetPoint("TOPLEFT", parent, "TOPLEFT", T.PAD, yOff)
 
     local pill = CreateFrame("Button", nil, row)
@@ -82,9 +83,9 @@ end
 
 -- [ SLIDER WIDGET ] -----------------------------------------------------------
 local function MakeSlider(parent, label, min, max, step, getValue, setValue, yOff, fmtFn)
-    local SLIDER_W = T.PANEL_W - T.PAD*2 - 80
+    local SLIDER_W = T.CONTENT_W - T.PAD*2 - 80
     local row = CreateFrame("Frame", nil, parent)
-    row:SetSize(T.PANEL_W - T.PAD*2, T.ROW_H + 14)
+    row:SetSize(T.CONTENT_W - T.PAD*2, T.ROW_H + 14)
     row:SetPoint("TOPLEFT", parent, "TOPLEFT", T.PAD, yOff)
 
     local lbl = Label(row, label, "GameFontNormalSmall")
@@ -92,6 +93,8 @@ local function MakeSlider(parent, label, min, max, step, getValue, setValue, yOf
 
     local val = Label(row, "", "GameFontNormalSmall", T.accentDim[1], T.accentDim[2], T.accentDim[3])
     val:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, 0)
+    val:SetWidth(80)
+    val:SetJustifyH("RIGHT")
 
     local trackBg = row:CreateTexture(nil, "BACKGROUND")
     trackBg:SetSize(SLIDER_W, 4); trackBg:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, 4)
@@ -186,7 +189,7 @@ local spellRebuildFns = {}
 
 local function MakeSpellList(parent, db, key, startY)
     if not db[key] then db[key] = {} end
-    local CONTENT_W = T.PANEL_W - T.PAD * 2
+    local CONTENT_W = T.CONTENT_W - T.PAD * 2
     local y = startY
 
     local addInput = MakeInput(parent, "Add Spell ID…", function(val)
@@ -487,7 +490,7 @@ local function BuildGeneral(content, db, addon)
 
     local infoBtn = CreateFrame("Button", nil, content)
     infoBtn:SetSize(16, 16)
-    infoBtn:SetPoint("LEFT", h10, "RIGHT", 6, 0)
+    infoBtn:SetPoint("LEFT", hPerf, "RIGHT", 6, 0)
     local infoLbl = infoBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     infoLbl:SetPoint("CENTER")
     infoLbl:SetText("[?]")
@@ -729,6 +732,19 @@ local function BuildQOL(content, db, addon)
     rtNote:SetJustifyH("LEFT")
     y = y - 30
 
+    _, dh = MakeToggle(content, "Show Combat Rez Charge Tracker",
+        function() return db.combatRess.enabled end,
+        function(v) db.combatRess.enabled = v; ns.CombatRess.Refresh(addon) end, y)
+    y = y - dh - 4
+
+    local crNote = Label(content,
+        "Shows available combat resurrection charges and recharge timer. Only visible in raids and M+. Use /yaqol layout to position it.",
+        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+    crNote:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
+    crNote:SetWidth(T.PANEL_W - T.PAD*2 - 48)
+    crNote:SetJustifyH("LEFT")
+    y = y - 30
+
     y = y - 8
 
     -- ── QUESTS & DIALOGUE ─────────────────────────────────────────────────
@@ -847,61 +863,37 @@ local function BuildQOL(content, db, addon)
         function(v) q.autoRezInCombat = v end, y)
     y = y - dh - 10
 
-    _, dh = MakeToggle(content, "Hold modifier key to release spirit",
+    _, dh = MakeToggle(content, "Hold SHIFT to release spirit",
         function() return q.holdToRelease end,
         function(v) q.holdToRelease = v end, y)
     y = y - dh - 2
 
     local noteR = Label(content,
-        "Prevents accidental spirit release mid-progression.",
+        "Prevents accidental spirit release. Hold SHIFT for the required time, then click Release.",
         "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
     noteR:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
     noteR:SetWidth(T.PANEL_W - T.PAD*2 - 48)
     noteR:SetJustifyH("LEFT")
-    y = y - 20
+    y = y - 24
 
-    -- Modifier selector dropdown
-    local modLabel = Label(content, "  Required modifier:", "GameFontNormalSmall",
-        T.textDim[1], T.textDim[2], T.textDim[3])
-    modLabel:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
-    local MODS = { "ANY", "ALT", "SHIFT", "CTRL" }
-    local modBtns = {}
-    local btnX = T.PAD + 44 + modLabel:GetStringWidth() + 10
-    for _, mod in ipairs(MODS) do
-        local mb = CreateFrame("Button", nil, content)
-        mb:SetSize(52, 18)
-        mb:SetPoint("LEFT", content, "TOPLEFT", btnX, y + 9)
-        btnX = btnX + 56
-        local mbBg = mb:CreateTexture(nil, "BACKGROUND"); mbBg:SetAllPoints()
-        local mbLbl = mb:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        mbLbl:SetPoint("CENTER"); mbLbl:SetText(mod)
-        modBtns[mod] = { btn = mb, bg = mbBg, lbl = mbLbl }
-        local function RefreshMod()
-            local cur = q.holdModifier or "ANY"
-            if cur == mod then
-                mbBg:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.35)
-                mbLbl:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
-            else
-                mbBg:SetColorTexture(T.bgRow[1], T.bgRow[2], T.bgRow[3], 1)
-                mbLbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
-            end
-        end
-        RefreshMod()
-        mb:SetScript("OnClick", function()
-            q.holdModifier = mod
-            for _, v in pairs(modBtns) do
-                local cur = q.holdModifier or "ANY"
-                if cur == v.lbl:GetText() then
-                    v.bg:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.35)
-                    v.lbl:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
-                else
-                    v.bg:SetColorTexture(T.bgRow[1], T.bgRow[2], T.bgRow[3], 1)
-                    v.lbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
-                end
-            end
-        end)
-    end
-    y = y - 28
+    _, dh = MakeSlider(content, "Hold duration (seconds)", 1, 10, 1,
+        function() return q.holdDuration or 3 end,
+        function(v) q.holdDuration = v end, y,
+        function(v) return v .. "s" end)
+    y = y - dh - 4
+
+    _, dh = MakeToggle(content, "Auto-release when countdown completes",
+        function() return q.holdAutoRelease end,
+        function(v) q.holdAutoRelease = v end, y)
+    y = y - dh - 2
+
+    local noteAR = Label(content,
+        "When enabled, releasing fires automatically — no click needed.",
+        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+    noteAR:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
+    noteAR:SetWidth(T.PANEL_W - T.PAD*2 - 48)
+    noteAR:SetJustifyH("LEFT")
+    y = y - 20
 
     y = y - 8
 

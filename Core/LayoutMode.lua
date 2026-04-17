@@ -205,6 +205,14 @@ local function GetDescriptors()
                 end
             end,
         },
+        {
+            getFrame = function() return ns.CombatRess and ns.CombatRess.GetFrame and ns.CombatRess.GetFrame() end,
+            label    = "Combat Rez",
+            show     = function()
+                local f = ns.CombatRess and ns.CombatRess.GetFrame and ns.CombatRess.GetFrame()
+                if f and not InCombatLockdown() then f:Show() end
+            end,
+        },
     }
 end
 
@@ -270,6 +278,8 @@ function LayoutMode.Exit()
             if mf then mf:Hide() end
         end
     end
+    -- Combat Rez: restore real visibility (only shows in raid/M+)
+    if ns.CombatRess then ns.CombatRess.Refresh(ns.Addon) end
 
     doneFrame:Hide()
 

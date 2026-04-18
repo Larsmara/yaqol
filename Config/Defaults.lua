@@ -203,6 +203,30 @@ ns.Defaults = {
             factionTintAlpha = 0.14,      -- 0..0.30
         },
 
+        -- Group Finder companion filter panel
+        groupFilter = {
+            enabled    = true,
+            -- Require section
+            needTank   = false,
+            needHealer = false,
+            needDps    = false,
+            needMyClass = false,
+            hasTank    = false,
+            hasHealer  = false,
+            -- Difficulty section
+            difficultyNormal     = false,
+            difficultyHeroic     = false,
+            difficultyMythic     = false,
+            difficultyMythicPlus = false,
+            -- Playstyle section
+            playstyle1 = false,
+            playstyle2 = false,
+            playstyle3 = false,
+            playstyle4 = false,
+            -- Min Rating
+            minRating  = 0,
+        },
+
         -- Mouse Tracker ring + crosshair
         mouseTracker = {
             enabled   = false,

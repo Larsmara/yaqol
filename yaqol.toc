@@ -37,4 +37,5 @@ Modules/CombatRess/CombatRess.lua
 Modules/VaultTracker/VaultTracker.lua
 Modules/RunHistory/RunHistory.lua
 Modules/MouseTracker/MouseTracker.lua
+Modules/GroupFilter/GroupFilter.lua
 Config/Options.lua

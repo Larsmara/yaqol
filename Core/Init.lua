@@ -93,6 +93,25 @@ function yaqol:OnInitialize()
         self.db.profile.mouseTracker = CopyTable(ns.Defaults.profile.mouseTracker)
     end
 
+    -- Migrate: ensure groupFilter defaults exist for old profiles
+    if not self.db.profile.groupFilter then
+        self.db.profile.groupFilter = CopyTable(ns.Defaults.profile.groupFilter)
+    end
+    local gf = self.db.profile.groupFilter
+    if gf.enabled             == nil then gf.enabled             = true  end
+    if gf.needMyClass         == nil then gf.needMyClass         = false end
+    if gf.hasTank             == nil then gf.hasTank             = false end
+    if gf.hasHealer           == nil then gf.hasHealer           = false end
+    if gf.difficultyNormal    == nil then gf.difficultyNormal    = false end
+    if gf.difficultyHeroic    == nil then gf.difficultyHeroic    = false end
+    if gf.difficultyMythic    == nil then gf.difficultyMythic    = false end
+    if gf.difficultyMythicPlus == nil then gf.difficultyMythicPlus = false end
+    if gf.playstyle1          == nil then gf.playstyle1          = false end
+    if gf.playstyle2          == nil then gf.playstyle2          = false end
+    if gf.playstyle3          == nil then gf.playstyle3          = false end
+    if gf.playstyle4          == nil then gf.playstyle4          = false end
+    if gf.minRating           == nil then gf.minRating           = 0    end
+
     ns.Config.Build(self)
     self:RegisterChatCommand("yaqol", "OnSlashCommand")
     self:RegisterChatCommand("yq", "OnSlashCommand")
@@ -112,6 +131,7 @@ function yaqol:OnEnable()
     ns.VaultTracker.Init(self)
     ns.RunHistory.Init(self)
     ns.MouseTracker.Init(self)
+    ns.GroupFilter.Init(self)
 end
 
 function yaqol:OnProfileChanged()
@@ -128,6 +148,7 @@ function yaqol:OnProfileChanged()
     ns.VaultTracker.Refresh(self)
     ns.RunHistory.Refresh(self)
     ns.MouseTracker.Refresh(self)
+    ns.GroupFilter.Refresh(self)
 end
 
 function yaqol:OnSlashCommand(input)

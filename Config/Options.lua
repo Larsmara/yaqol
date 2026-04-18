@@ -1839,6 +1839,61 @@ local function BuildMouseTracker(content, db, addon)
     return y - 20
 end
 
+-- [ GROUP FILTER ] ------------------------------------------------------------
+local function BuildGroupFilter(content, db, addon)
+    local d  = db.groupFilter
+    local y  = -T.PAD
+    local _, dh
+
+    local h1 = Label(content, "GROUP FILTER", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    h1:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    _, dh = MakeToggle(content, "Enable Group Filter panel",
+        function() return d.enabled end,
+        function(v) d.enabled = v; ns.GroupFilter.Refresh(addon) end, y)
+    y = y - dh - 4
+
+    local note = Label(content,
+        "Attaches a companion panel to the right of the Group Finder with all filters "
+        .. "permanently visible — Require, Dungeons, Min Rating, Difficulty, and Playstyle. "
+        .. "Role/difficulty/dungeon filters apply on the Dungeons tab only.",
+        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+    note:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
+    note:SetWidth(T.PANEL_W - T.PAD*2 - 48)
+    note:SetJustifyH("LEFT")
+    y = y - 50
+
+    local h2 = Label(content, "DEFAULT REQUIRE FILTERS", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    h2:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    local note2 = Label(content, "Applied when the Group Finder opens. Toggled live in the panel.",
+        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+    note2:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
+    note2:SetWidth(T.PANEL_W - T.PAD*2); note2:SetJustifyH("LEFT")
+    y = y - 28
+
+    _, dh = MakeToggle(content, "Needs Tank",
+        function() return d.needTank end,
+        function(v) d.needTank = v; ns.GroupFilter.Refresh(addon) end, y)
+    y = y - dh - 4
+
+    _, dh = MakeToggle(content, "Needs Healer",
+        function() return d.needHealer end,
+        function(v) d.needHealer = v; ns.GroupFilter.Refresh(addon) end, y)
+    y = y - dh - 4
+
+    _, dh = MakeToggle(content, "Needs DPS",
+        function() return d.needDps end,
+        function(v) d.needDps = v; ns.GroupFilter.Refresh(addon) end, y)
+    y = y - dh - 8
+
+    return y - 20
+end
+
 -- [ MAIN PANEL ] --------------------------------------------------------------
 local panel
 local TABS = {
@@ -1850,7 +1905,8 @@ local TABS = {
     { key="skyriding",    label="Skyriding"     },
     { key="friendlist",   label="Friend List"   },
     { key="vaulttracker", label="Vault Tracker"  },
-    { key="mousetracker", label="Mouse Tracker"  },
+    { key="mousetracker",  label="Mouse Tracker"  },
+    { key="groupfilter",   label="Group Filter"   },
 }
 
 local function BuildPanel(addon)
@@ -2044,6 +2100,7 @@ local function BuildPanel(addon)
         if tab.key == "merchant"   then finalY = BuildMerchant(tf, db, addon)         end
         if tab.key == "vaulttracker" then finalY = BuildVaultTracker(tf, db, addon)   end
         if tab.key == "mousetracker" then finalY = BuildMouseTracker(tf, db, addon)   end
+        if tab.key == "groupfilter"  then finalY = BuildGroupFilter(tf, db, addon)    end
         tabHeights[tab.key] = math.abs(finalY)
     end
 

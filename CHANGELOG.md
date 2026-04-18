@@ -1,5 +1,22 @@
 # yaqol
 
+## [v1.0.35](https://github.com/Larsmara/yaqol/tree/v1.0.35) (2026-04-18)
+[Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.0.34...v1.0.35) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
+
+**New:**
+- M+ Timer: full visual redesign — textured DiamondMetal header, NineSlice border, cleaner layout
+- M+ Timer: boss kill times displayed as coloured tiles per boss
+- M+ Timer: pace line shows projected finish times for +3 / +2 / +1 upgrade thresholds
+- M+ Timer: current week's affix icons shown in the timer header, with tooltips on hover
+- M+ Timer: timed/completed banner on key finish — shows upgrade level (+1/+2/+3) and time remaining or overtime
+- M+ Timer: Options demo now loops automatically; affix icons and banner are shown during the demo
+- Buff Reminder: "Always Show All Tracked Buffs" toggle — present buffs shown dimmed, missing buffs still blink
+- Options: switching to a module tab shows a live preview of its frame
+- Options: closing the config panel now stops the M+ Timer demo
+
+**Fixes:**
+- Raid Tools: collapse state now persists across reloads
+
 ## [v1.0.34](https://github.com/Larsmara/yaqol/tree/v1.0.34) (2026-04-17)
 [Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.0.33...v1.0.34) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
 

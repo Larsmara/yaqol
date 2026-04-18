@@ -2,20 +2,14 @@ local ADDON_NAME, ns = ...
 ns.ChangelogUI = {}
 local ChangelogUI = ns.ChangelogUI
 
--- [ THEME (mirrors Options.lua) ] ---------------------------------------------
-local T = {
-    bg          = { 0.13, 0.14, 0.16, 0.97 },
-    bgRow       = { 0.18, 0.20, 0.23, 1.00 },
-    accent      = { 0.18, 0.78, 0.72, 1.00 },
-    border      = { 0.18, 0.70, 0.65, 0.55 },
-    text        = { 1.00, 1.00, 1.00, 1.00 },
-    textDim     = { 0.68, 0.72, 0.74, 1.00 },
-    textHeader  = { 0.22, 0.85, 0.78, 1.00 },
-    W           = 520,
-    H           = 480,
-    PAD         = 14,
-    HEADER_H    = 46,
-}
+-- [ THEME ] ------------------------------------------------------------------
+-- Layout constants stay in T; color tokens fall through to ns.Theme.
+local T = setmetatable({
+    W        = 520,
+    H        = 480,
+    PAD      = 14,
+    HEADER_H = 46,
+}, { __index = function(_, k) return ns.Theme[k] end })
 
 -- [ FRAME ] -------------------------------------------------------------------
 local frame
@@ -38,9 +32,8 @@ local function BuildFrame()
     f:Hide()
 
     -- background (fully opaque so it sits cleanly over the config panel)
-    local bg = f:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetColorTexture(T.bg[1], T.bg[2], T.bg[3], 1.0)
+    ns.Theme:ApplyBg(f)
+    ns.Theme:ApplyBorder(f)
 
     -- left accent stripe
     local stripe = f:CreateTexture(nil, "BORDER")
@@ -52,18 +45,11 @@ local function BuildFrame()
     local header = CreateFrame("Frame", nil, f)
     header:SetSize(W, T.HEADER_H)
     header:SetPoint("TOPLEFT")
-    local hbg = header:CreateTexture(nil, "BACKGROUND")
-    hbg:SetAllPoints()
-    hbg:SetColorTexture(T.accent[1]*0.10, T.accent[2]*0.10, T.accent[3]*0.10, 1)
-    local hline = header:CreateTexture(nil, "OVERLAY")
-    hline:SetHeight(1)
-    hline:SetPoint("BOTTOMLEFT",  header, "BOTTOMLEFT")
-    hline:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT")
-    hline:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.7)
+    ns.Theme:ApplyHeader(header)
 
     local titleLbl = header:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     titleLbl:SetPoint("LEFT", header, "LEFT", T.PAD, 0)
-    titleLbl:SetText("|cff2dc9b8What's New|r")
+    titleLbl:SetText(ns.Theme.EscapeColor("accent") .. "What's New|r")
     titleLbl:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
 
     local closeBtn = CreateFrame("Button", nil, header, "UIPanelCloseButton")
@@ -112,7 +98,8 @@ local function BuildFrame()
 
     for _, entry in ipairs(ns.Changelog or {}) do
         -- version + date heading
-        local versionStr = string.format("|cff2dc9b8v%s|r  |cff%s%s|r",
+        local versionStr = string.format("%sv%s|r  |cff%s%s|r",
+            ns.Theme.EscapeColor("accent"),
             entry.version,
             "aaaaaa", entry.date)
         local vLbl = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")

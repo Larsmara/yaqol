@@ -20,6 +20,7 @@ Libs/AceDB-3.0/AceDB-3.0.xml
 CHANGELOG.lua
 Config/Defaults.lua
 Core/Init.lua
+Core/Theme.lua
 Core/Changelog.lua
 Core/MinimapButton.lua
 Core/LayoutMode.lua

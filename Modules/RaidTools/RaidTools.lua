@@ -38,6 +38,7 @@ local ACT_H     = 20
 local ACT_W_CD  = 34   -- countdown button width
 local ACT_W_RC  = 80   -- ready check button width
 local ACT_W_CLR = 36   -- clear all button width
+local T = ns.Theme  -- populated by Theme.Init() before MakePanel runs
 
 -- [ STATE ] -------------------------------------------------------------------
 local panel
@@ -100,7 +101,7 @@ local function RefreshMarkerStates()
 end
 
 local function MakePanel()
-    local minimized = false   -- collapse state (resets on reload)
+    local minimized = false   -- actual value set in the collapse logic block below from SavedVariables
     -- ── dimensions ────────────────────────────────────────────────────────
     local markerW    = 8 * BTN_SZ + 7 * BTN_GAP
     local sep1W      = SEP_W + SEP_GAP * 2
@@ -132,22 +133,22 @@ local function MakePanel()
 
     local tabBg = tab:CreateTexture(nil, "BACKGROUND")
     tabBg:SetAllPoints()
-    tabBg:SetColorTexture(0.10, 0.11, 0.13, 1)
+    tabBg:SetColorTexture(T.bg[1], T.bg[2], T.bg[3], 1)
 
     local tabHl = tab:CreateTexture(nil, "HIGHLIGHT")
     tabHl:SetAllPoints()
-    tabHl:SetColorTexture(0.18, 0.78, 0.72, 0.18)
+    tabHl:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.18)
 
     -- right-edge accent line on the tab
     local tabLine = tab:CreateTexture(nil, "ARTWORK")
     tabLine:SetWidth(1)
     tabLine:SetPoint("TOPRIGHT",    tab, "TOPRIGHT",    0,  0)
     tabLine:SetPoint("BOTTOMRIGHT", tab, "BOTTOMRIGHT", 0,  0)
-    tabLine:SetColorTexture(0.18, 0.70, 0.65, 0.45)
+    tabLine:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.45)
 
     local tabLbl = tab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     tabLbl:SetPoint("CENTER")
-    tabLbl:SetTextColor(0.55, 0.60, 0.62, 1)
+    tabLbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
     tabLbl:SetText("<")
 
     -- ── content panel (hides on collapse) ─────────────────────────────────
@@ -155,20 +156,15 @@ local function MakePanel()
     content:SetSize(contentW, barH)
     content:SetPoint("TOPLEFT", f, "TOPLEFT", TAB_W, 0)
 
-    local contentBg = content:CreateTexture(nil, "BACKGROUND")
-    contentBg:SetAllPoints()
-    contentBg:SetColorTexture(0.05, 0.06, 0.07, 0.88)
-
-    -- Border around the content area only
-    local border = CreateFrame("Frame", nil, content, "BackdropTemplate")
-    border:SetPoint("TOPLEFT",     content, "TOPLEFT",     0,  0)
-    border:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", 0,  0)
-    border:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
-    border:SetBackdropBorderColor(0.18, 0.70, 0.65, 0.35)
+    ns.Theme:ApplyBg(content)
+    ns.Theme:ApplyBorder(content)
 
     -- ── collapse logic ────────────────────────────────────────────────────
-    tab:SetScript("OnClick", function()
-        minimized = not minimized
+    local db = ns.Addon:Profile().raidTools
+    local minimized = db.minimized or false  -- restored from SavedVariables
+
+    -- Apply saved state immediately (before any user interaction)
+    local function ApplyCollapse()
         if minimized then
             content:Hide()
             f:SetWidth(TAB_W)
@@ -178,12 +174,19 @@ local function MakePanel()
             f:SetWidth(totalW)
             tabLbl:SetText("<")
         end
+    end
+    ApplyCollapse()
+
+    tab:SetScript("OnClick", function()
+        minimized = not minimized
+        db.minimized = minimized
+        ApplyCollapse()
     end)
     tab:SetScript("OnEnter", function()
-        tabLbl:SetTextColor(0.18, 0.78, 0.72, 1)
+        tabLbl:SetTextColor(T.accent[1], T.accent[2], T.accent[3], 1)
     end)
     tab:SetScript("OnLeave", function()
-        tabLbl:SetTextColor(0.55, 0.60, 0.62, 1)
+        tabLbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
     end)
 
     -- ── layout cursor (within content, x relative to content left) ────────
@@ -196,7 +199,7 @@ local function MakePanel()
         s:SetWidth(SEP_W)
         s:SetHeight(barH - PAD * 2)
         s:SetPoint("TOPLEFT", content, "TOPLEFT", x, -PAD)
-        s:SetColorTexture(0.18, 0.70, 0.65, 0.25)
+        s:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.25)
         return s
     end
 
@@ -209,17 +212,17 @@ local function MakePanel()
 
         local bbg = btn:CreateTexture(nil, "BACKGROUND")
         bbg:SetAllPoints()
-        bbg:SetColorTexture(0.15, 0.17, 0.20, 1)
+        bbg:SetColorTexture(T.bgRow[1], T.bgRow[2], T.bgRow[3], T.bgRow[4])
 
         local bhl = btn:CreateTexture(nil, "HIGHLIGHT")
         bhl:SetAllPoints()
-        bhl:SetColorTexture(0.18, 0.78, 0.72, 0.18)
+        bhl:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.18)
 
         local line = btn:CreateTexture(nil, "ARTWORK")
         line:SetHeight(1)
         line:SetPoint("BOTTOMLEFT",  btn, "BOTTOMLEFT",  0, 0)
         line:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 0, 0)
-        line:SetColorTexture(0.14, 0.62, 0.58, 0.5)
+        line:SetColorTexture(T.accentDim[1], T.accentDim[2], T.accentDim[3], 0.5)
 
         local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         lbl:SetPoint("CENTER")
@@ -262,11 +265,11 @@ local function MakePanel()
 
         local bbg = btn:CreateTexture(nil, "BACKGROUND")
         bbg:SetAllPoints()
-        bbg:SetColorTexture(0.12, 0.13, 0.15, 1)
+        bbg:SetColorTexture(T.bg[1], T.bg[2], T.bg[3], 1)
 
         local activeBg = btn:CreateTexture(nil, "BACKGROUND", nil, 1)
         activeBg:SetAllPoints()
-        activeBg:SetColorTexture(0.18, 0.78, 0.72, 0.22)
+        activeBg:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.22)
         activeBg:Hide()
 
         local bhl = btn:CreateTexture(nil, "HIGHLIGHT")
@@ -311,17 +314,17 @@ local function MakePanel()
 
         local bbg = btn:CreateTexture(nil, "BACKGROUND")
         bbg:SetAllPoints()
-        bbg:SetColorTexture(0.15, 0.17, 0.20, 1)
+        bbg:SetColorTexture(T.bgRow[1], T.bgRow[2], T.bgRow[3], T.bgRow[4])
 
         local bhl = btn:CreateTexture(nil, "HIGHLIGHT")
         bhl:SetAllPoints()
-        bhl:SetColorTexture(0.18, 0.78, 0.72, 0.18)
+        bhl:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.18)
 
         local line = btn:CreateTexture(nil, "ARTWORK")
         line:SetHeight(1)
         line:SetPoint("BOTTOMLEFT",  btn, "BOTTOMLEFT",  0, 0)
         line:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 0, 0)
-        line:SetColorTexture(0.14, 0.62, 0.58, 0.5)
+        line:SetColorTexture(T.accentDim[1], T.accentDim[2], T.accentDim[3], 0.5)
 
         local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         lbl:SetPoint("CENTER")

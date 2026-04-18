@@ -3,26 +3,20 @@ ns.Config = {}
 local Config = ns.Config
 
 -- [ THEME ] -------------------------------------------------------------------
-local T = {
-    bg          = { 0.13, 0.14, 0.16, 0.97 },
-    bgRow       = { 0.18, 0.20, 0.23, 1.00 },
-    bgInput     = { 0.10, 0.11, 0.13, 1.00 },
-    accent      = { 0.18, 0.78, 0.72, 1.00 },
-    accentDim   = { 0.14, 0.62, 0.58, 1.00 },
-    border      = { 0.18, 0.70, 0.65, 0.55 },
-    text        = { 1.00, 1.00, 1.00, 1.00 },
-    textDim     = { 0.68, 0.72, 0.74, 1.00 },
-    textHeader  = { 0.22, 0.85, 0.78, 1.00 },
-    toggleOn    = { 0.18, 0.78, 0.72, 1.00 },
-    toggleOff   = { 0.28, 0.30, 0.34, 1.00 },
+-- Layout constants stay in T; color token lookups fall through to ns.Theme
+-- via __index, so all T.accent, T.bg, etc. automatically use the active theme.
+local T = setmetatable({
     PANEL_W     = 700,
     PANEL_H     = 550,
     TAB_H       = 34,
-    HEADER_H    = 46,
+    HEADER_H    = 39,   -- matches DiamondMetal art height so content centres in the art band
     ROW_H       = 28,
     PAD         = 14,
     CONTENT_W   = 544,  -- PANEL_W - SIDEBAR_W(140) - scrollbar area(16)
-}
+}, { __index = function(_, k) return ns.Theme[k] end })
+
+-- Shorthand: returns |cffRRGGBB for the active accent color (called at frame-build time).
+local function Accent() return ns.Theme.EscapeColor("accent") end
 
 -- [ PRIMITIVES ] --------------------------------------------------------------
 local function Bg(parent, r, g, b, a)
@@ -151,12 +145,7 @@ local function MakeButton(parent, label, onClick, w, h)
     w, h = w or 120, h or 22
     local btn = CreateFrame("Button", nil, parent)
     btn:SetSize(w, h)
-    Bg(btn, T.bgRow[1], T.bgRow[2], T.bgRow[3], T.bgRow[4])
-    local hl = btn:CreateTexture(nil, "HIGHLIGHT")
-    hl:SetAllPoints(); hl:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.15)
-    local accentLine = btn:CreateTexture(nil, "OVERLAY")
-    accentLine:SetSize(w, 1); accentLine:SetPoint("BOTTOM")
-    accentLine:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.8)
+    ns.Theme:StyleButton(btn, w, h)
     local lbl = Label(btn, label, "GameFontNormalSmall"); lbl:SetPoint("CENTER")
     btn:SetScript("OnClick", onClick)
     return btn
@@ -338,7 +327,7 @@ local function RestoreFPSSettings(db)
         else fail_n = fail_n + 1 end
     end
     db.fpsBackup = nil
-    print("|cff2dc9b8yaqol:|r Restored " .. ok_n .. " settings.")
+    print(ns.Theme.EscapeColor("accent") .. "yaqol:|r Restored " .. ok_n .. " settings.")
     if fail_n > 0 then
         print("|cffff6b6byaqol:|r " .. fail_n .. " settings could not be restored.")
     end
@@ -352,7 +341,7 @@ local function ApplyFPSSettings(db)
         if pcall(C_CVar.SetCVar, cvar, val) then ok_n = ok_n + 1
         else fail_n = fail_n + 1 end
     end
-    print("|cff2dc9b8yaqol:|r Applied " .. ok_n .. " performance settings. Use 'Restore' to undo.")
+    print(ns.Theme.EscapeColor("accent") .. "yaqol:|r Applied " .. ok_n .. " performance settings. Use 'Restore' to undo.")
     if fail_n > 0 then
         print("|cffff6b6byaqol:|r " .. fail_n .. " settings could not be applied (may need restart).")
     end
@@ -360,12 +349,128 @@ end
 
 -- [ TAB CONTENT BUILDERS ] ----------------------------------------------------
 local tabRebuildFns = {}
+local tabPreviewFns = {}  -- key → { show=fn, hide=fn } for live frame preview on tab switch
 local BuildSpells, BuildClassBuffs
 
 local function BuildGeneral(content, db, addon)
     local y = -T.PAD
     local _, dh
-    
+
+    -- ── THEME ─────────────────────────────────────────────────────────────
+    local THEMES_LIST = {
+        { key = "mellow",   label = "Mellow",   desc = "Soft steel-blue on dark-grey"  },
+        { key = "blizzard", label = "Blizzard",  desc = "Gold accents on warm marble"   },
+    }
+    local TILE_H, TILE_GAP = 48, 8
+    -- Each tile takes an equal share of the usable content width (50% when there are 2 themes).
+    local TILE_W = math.floor((T.CONTENT_W - T.PAD * 2 - (# THEMES_LIST - 1) * TILE_GAP) / #THEMES_LIST)
+
+    local hTheme = Label(content, "THEME", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    hTheme:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 12
+
+    local reloadRow  -- forward-declare; shown when selection changes
+    local themeTiles = {}
+
+    local function RefreshTiles()
+        local active = ns.Addon.db.global.theme or "mellow"
+        for _, tile in ipairs(themeTiles) do
+            if tile.key == active then
+                tile.bg:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.30)
+                tile.checkmark:Show()
+                tile.lbl:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
+            else
+                tile.bg:SetColorTexture(T.bgRow[1], T.bgRow[2], T.bgRow[3], 1)
+                tile.checkmark:Hide()
+                tile.lbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
+            end
+        end
+    end
+
+    for i, theme in ipairs(THEMES_LIST) do
+        local tx = T.PAD + (i - 1) * (TILE_W + TILE_GAP)
+        local btn = CreateFrame("Button", nil, content)
+        btn:SetSize(TILE_W, TILE_H)
+        btn:SetPoint("TOPLEFT", content, "TOPLEFT", tx, y)
+
+        local tileBg = btn:CreateTexture(nil, "BACKGROUND")
+        tileBg:SetAllPoints()
+        tileBg:SetColorTexture(T.bgRow[1], T.bgRow[2], T.bgRow[3], 1)
+
+        local tileHl = btn:CreateTexture(nil, "HIGHLIGHT")
+        tileHl:SetAllPoints()
+        tileHl:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.12)
+
+        -- Active checkmark (top-right corner)
+        local check = btn:CreateTexture(nil, "OVERLAY")
+        check:SetSize(12, 12)
+        check:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -4, -4)
+        check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
+        check:SetVertexColor(T.accent[1], T.accent[2], T.accent[3], 1)
+        check:Hide()
+
+        -- Colour swatch (left strip)
+        local swatch = btn:CreateTexture(nil, "BORDER")
+        swatch:SetWidth(5)
+        swatch:SetPoint("TOPLEFT",    btn, "TOPLEFT",    0, 0)
+        swatch:SetPoint("BOTTOMLEFT", btn, "BOTTOMLEFT", 0, 0)
+        if theme.key == "mellow" then
+            swatch:SetColorTexture(0.42, 0.62, 0.88, 1)  -- steel blue
+        else
+            swatch:SetColorTexture(0.84, 0.68, 0.28, 1)  -- gold
+        end
+
+        local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        lbl:SetPoint("TOPLEFT", btn, "TOPLEFT", 12, -10)
+        lbl:SetText(theme.label)
+
+        local desc = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        desc:SetPoint("TOPLEFT", btn, "TOPLEFT", 12, -26)
+        desc:SetText(theme.desc)
+        desc:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
+
+        themeTiles[i] = { key = theme.key, bg = tileBg, checkmark = check, lbl = lbl }
+
+        btn:SetScript("OnClick", function()
+            if ns.Addon.db.global.theme == theme.key then return end
+            ns.Addon.db.global.theme = theme.key
+            RefreshTiles()
+            reloadRow:Show()
+        end)
+    end
+    y = y - TILE_H - 12
+
+    -- Reload prompt row (hidden until a tile is clicked)
+    reloadRow = CreateFrame("Frame", nil, content)
+    reloadRow:SetSize(T.CONTENT_W - T.PAD*2, T.ROW_H)
+    reloadRow:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
+    reloadRow:Hide()
+
+    local reloadMsg = reloadRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    reloadMsg:SetPoint("LEFT", reloadRow, "LEFT", 0, 0)
+    reloadMsg:SetText("Reload the UI to apply the new theme.")
+    reloadMsg:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
+
+    local reloadBtn = CreateFrame("Button", nil, reloadRow)
+    reloadBtn:SetSize(100, 22)
+    reloadBtn:SetPoint("RIGHT", reloadRow, "RIGHT", 0, 0)
+    local rbBg = reloadBtn:CreateTexture(nil, "BACKGROUND")
+    rbBg:SetAllPoints()
+    rbBg:SetColorTexture(T.accent[1]*0.20, T.accent[2]*0.20, T.accent[3]*0.20, 1)
+    local rbHl = reloadBtn:CreateTexture(nil, "HIGHLIGHT")
+    rbHl:SetAllPoints()
+    rbHl:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.18)
+    local rbLbl = reloadBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    rbLbl:SetPoint("CENTER")
+    rbLbl:SetText("Reload Now")
+    rbLbl:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
+    reloadBtn:SetScript("OnClick", function() ReloadUI() end)
+
+    y = y - T.ROW_H - 14
+
+    RefreshTiles()
+
     local h0 = Label(content, "GENERAL", "GameFontNormalSmall",
         T.textHeader[1], T.textHeader[2], T.textHeader[3])
     h0:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
@@ -683,6 +788,9 @@ local function BuildReminder(content, db, addon)
             if db.reminder.showTooltip == nil then db.reminder.showTooltip = true end
             return db.reminder.showTooltip
         end, function(v) db.reminder.showTooltip = v end },
+        { "Always Show All Tracked Buffs  |cff888888(present = dimmed, missing = blinking)|r",
+          function() return db.reminder.showAllBuffs or false end,
+          function(v) db.reminder.showAllBuffs = v; ns.AuraReminder.Refresh(addon) end },
     }
     for _, t in ipairs(toggles) do
         _, dh = MakeToggle(content, t[1], t[2], t[3], y); y = y - dh - 2
@@ -1258,12 +1366,12 @@ local function BuildMythicTimer(content, db, addon)
 
     local info = Label(content,
         "The overlay shows:|n"
-        .. "|cff2dc9b8•|r  Remaining time (colour-coded by pace)|n"
-        .. "|cff2dc9b8•|r  +2 and +3 time cutoffs|n"
-        .. "|cff2dc9b8•|r  Time progress bar with +2 / +3 markers|n"
-        .. "|cff2dc9b8•|r  Death count with time penalty|n"
-        .. "|cff2dc9b8•|r  Enemy forces (pull count) percentage|n"
-        .. "|cff2dc9b8•|r  Boss kill progress with checkmarks",
+        .. Accent() .. "•|r  Remaining time (colour-coded by pace)|n"
+        .. Accent() .. "•|r  +2 and +3 time cutoffs|n"
+        .. Accent() .. "•|r  Time progress bar with +2 / +3 markers|n"
+        .. Accent() .. "•|r  Death count with time penalty|n"
+        .. Accent() .. "•|r  Enemy forces (pull count) percentage|n"
+        .. Accent() .. "•|r  Boss kill progress with checkmarks",
         "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
     info:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
     info:SetWidth(T.PANEL_W - T.PAD*2)
@@ -1308,27 +1416,37 @@ local function BuildMythicTimer(content, db, addon)
 
     local demoNote = Label(content,
         "Run a simulated dungeon to preview the timer. "
-        .. "The demo takes about 38 seconds and plays a scripted +12 key at 30× speed.",
+        .. "Plays a scripted +12 key at 30× speed and loops continuously until stopped.",
         "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
     demoNote:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
     demoNote:SetWidth(T.PANEL_W - T.PAD*2)
     demoNote:SetJustifyH("LEFT")
     y = y - 34
 
-    local stopBtn
-    local startBtn = MakeButton(content, "Start Demo", function()
-        if ns.MythicTimer.IsDemoActive() then
-            ns.MythicTimer.StopDemo()
-        else
-            ns.MythicTimer.StartDemo()
-        end
+    -- Forward-declare so RefreshDemoBtns can close over them before assignment
+    local startBtn, stopBtn
+
+    -- Grays out whichever button is not applicable for the current demo state.
+    -- Disable/Enable hooks in each skin's StyleButton handle the visual appearance;
+    -- no extra SetAlpha needed.
+    local function RefreshDemoBtns()
+        local active = ns.MythicTimer.IsDemoActive()
+        if active then startBtn:Disable() else startBtn:Enable() end
+        if active then stopBtn:Enable()   else stopBtn:Disable()  end
+    end
+
+    startBtn = MakeButton(content, "Start Demo", function()
+        ns.MythicTimer.StartDemo()
+        RefreshDemoBtns()
     end, 130, 22)
     startBtn:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
 
     stopBtn = MakeButton(content, "Stop Demo", function()
         ns.MythicTimer.StopDemo()
+        RefreshDemoBtns()
     end, 130, 22)
     stopBtn:SetPoint("LEFT", startBtn, "RIGHT", 10, 0)
+    RefreshDemoBtns()
     y = y - 34
 
     return y - 20
@@ -1369,9 +1487,9 @@ local function BuildSkyriding(content, db, addon)
 
     local info = Label(content,
         "The HUD shows:|n"
-        .. "|cff2dc9b8•|r  Charge pips — up to 6 squares, shared between Surge Forward & Skyward Ascent|n"
-        .. "|cff2dc9b8•|r  Speed bar — 0–3000%% of base run speed as a fill bar|n"
-        .. "|cff2dc9b8•|r  Next charge countdown — green bar + time, hidden when all charges are full",
+        .. Accent() .. "•|r  Charge pips — up to 6 squares, shared between Surge Forward & Skyward Ascent|n"
+        .. Accent() .. "•|r  Speed bar — 0–3000%% of base run speed as a fill bar|n"
+        .. Accent() .. "•|r  Next charge countdown — green bar + time, hidden when all charges are full",
         "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
     info:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
     info:SetWidth(T.PANEL_W - T.PAD*2 - 16)
@@ -1406,7 +1524,8 @@ local function BuildPanel(addon)
     f:SetScript("OnDragStart", f.StartMoving)
     f:SetScript("OnDragStop",  f.StopMovingOrSizing)
     f:SetClampedToScreen(true); f:Hide()
-    Bg(f, T.bg[1], T.bg[2], T.bg[3], T.bg[4])
+    ns.Theme:ApplyBg(f)
+    ns.Theme:ApplyBorder(f)
 
     -- left teal stripe
     local stripe = f:CreateTexture(nil, "BORDER")
@@ -1416,22 +1535,18 @@ local function BuildPanel(addon)
     -- header
     local header = CreateFrame("Frame", nil, f)
     header:SetSize(W, T.HEADER_H); header:SetPoint("TOPLEFT")
-    Bg(header, T.accent[1]*0.10, T.accent[2]*0.10, T.accent[3]*0.10, 1)
-    -- single bottom border on header
-    local headerLine = header:CreateTexture(nil, "OVERLAY")
-    headerLine:SetHeight(1)
-    headerLine:SetPoint("BOTTOMLEFT",  header, "BOTTOMLEFT")
-    headerLine:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT")
-    headerLine:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.7)
+    ns.Theme:ApplyHeader(header)
 
     local titleLbl = header:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     titleLbl:SetPoint("LEFT", header, "LEFT", 14, 0)
-    titleLbl:SetText("|cff2dc9b8ya|rqol")
+    titleLbl:SetText(Accent() .. "ya|rqol")
     titleLbl:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
 
     local verLbl = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     verLbl:SetPoint("LEFT", titleLbl, "RIGHT", 8, -1)
-    verLbl:SetText("v" .. (C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version") or "1.0"))
+    local _ver = C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version") or "dev"
+    if _ver:match("^@") then _ver = "dev" end  -- strip @project-version@ CurseForge placeholder
+    verLbl:SetText("v" .. _ver)
     verLbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
 
     local closeBtn = CreateFrame("Button", nil, header, "UIPanelCloseButton")
@@ -1439,58 +1554,42 @@ local function BuildPanel(addon)
     closeBtn:SetPoint("RIGHT", header, "RIGHT", -10, 0)
     closeBtn:SetScript("OnClick", function() f:Hide() end)
 
-    -- "What's New" changelog button — sits left of the close button
+    -- "What's New" changelog button — styled via active theme (gold art for Blizzard, flat for Mellow)
     local changelogBtn = CreateFrame("Button", nil, header)
     changelogBtn:SetSize(90, 22)
     changelogBtn:SetPoint("RIGHT", closeBtn, "LEFT", -6, 0)
-    local clBg = changelogBtn:CreateTexture(nil, "BACKGROUND")
-    clBg:SetAllPoints()
-    clBg:SetColorTexture(T.accent[1]*0.15, T.accent[2]*0.15, T.accent[3]*0.15, 1)
-    local clHl = changelogBtn:CreateTexture(nil, "HIGHLIGHT")
-    clHl:SetAllPoints()
-    clHl:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.15)
+    ns.Theme:StyleButton(changelogBtn, 90, 22)
     local clLbl = changelogBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     clLbl:SetPoint("CENTER")
-    clLbl:SetText("|cff2dc9b8What's New|r")
+    clLbl:SetText(Accent() .. "What's New|r")
     changelogBtn:SetScript("OnEnter", function()
-        clBg:SetColorTexture(T.accent[1]*0.30, T.accent[2]*0.30, T.accent[3]*0.30, 1)
         GameTooltip:SetOwner(changelogBtn, "ANCHOR_BOTTOM")
         GameTooltip:AddLine("Changelog", 1, 1, 1)
         GameTooltip:AddLine("See what changed in each version.", 0.68, 0.72, 0.74, true)
         GameTooltip:Show()
     end)
-    changelogBtn:SetScript("OnLeave", function()
-        clBg:SetColorTexture(T.accent[1]*0.15, T.accent[2]*0.15, T.accent[3]*0.15, 1)
-        GameTooltip:Hide()
-    end)
+    changelogBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     changelogBtn:SetScript("OnClick", function() ns.ChangelogUI.Toggle() end)
 
-    -- Layout mode button — sits left of the changelog button
+    -- Layout / Arrange button — same theme styling; icon sits inside on ARTWORK layer
     local layoutBtn = CreateFrame("Button", nil, header)
     layoutBtn:SetSize(100, 22)
     layoutBtn:SetPoint("RIGHT", changelogBtn, "LEFT", -6, 0)
-    local layoutBg = layoutBtn:CreateTexture(nil, "BACKGROUND")
-    layoutBg:SetAllPoints()
-    layoutBg:SetColorTexture(T.accent[1]*0.15, T.accent[2]*0.15, T.accent[3]*0.15, 1)
-    -- Icon: move/arrange cursor
+    ns.Theme:StyleButton(layoutBtn, 100, 22)
     local layoutIcon = layoutBtn:CreateTexture(nil, "ARTWORK")
     layoutIcon:SetSize(14, 14)
     layoutIcon:SetPoint("LEFT", layoutBtn, "LEFT", 6, 0)
     layoutIcon:SetTexture("Interface\\Cursor\\Move")
     local layoutLbl = layoutBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     layoutLbl:SetPoint("LEFT", layoutIcon, "RIGHT", 4, 0)
-    layoutLbl:SetText("|cff2dc9b8Arrange|r")
+    layoutLbl:SetText(Accent() .. "Arrange|r")
     layoutBtn:SetScript("OnEnter", function()
-        layoutBg:SetColorTexture(T.accent[1]*0.30, T.accent[2]*0.30, T.accent[3]*0.30, 1)
         GameTooltip:SetOwner(layoutBtn, "ANCHOR_BOTTOM")
         GameTooltip:AddLine("Arrange Frames", 1, 1, 1)
         GameTooltip:AddLine("Show all movable frames and drag\nthem into position.", 0.68, 0.72, 0.74, true)
         GameTooltip:Show()
     end)
-    layoutBtn:SetScript("OnLeave", function()
-        layoutBg:SetColorTexture(T.accent[1]*0.15, T.accent[2]*0.15, T.accent[3]*0.15, 1)
-        GameTooltip:Hide()
-    end)
+    layoutBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     layoutBtn:SetScript("OnClick", function() ns.LayoutMode.Enter() end)
 
     -- tab bar
@@ -1507,6 +1606,7 @@ local function BuildPanel(addon)
     local indicator = tabBar:CreateTexture(nil, "OVERLAY")
     indicator:SetSize(3, T.TAB_H); indicator:SetPoint("TOPRIGHT", tabBar, "TOPRIGHT")
     indicator:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 1)
+    ns.Theme:InitTabBar(indicator)
 
     -- scrollable content
     local CONTENT_Y = T.HEADER_H
@@ -1546,6 +1646,7 @@ local function BuildPanel(addon)
         local maxVal = select(2, scrollBar:GetMinMaxValues())
         scrollBar:SetValue(math.max(0, math.min(cur - delta * 40, maxVal)))
     end)
+    ns.Theme:ApplyInset(scrollFrame)
 
     -- build tab frames
     local tabFrames, tabBtns = {}, {}
@@ -1556,11 +1657,10 @@ local function BuildPanel(addon)
         local btn = CreateFrame("Button", nil, tabBar)
         btn:SetSize(totalTabW, T.TAB_H)
         btn:SetPoint("TOPLEFT", tabBar, "TOPLEFT", 0, -(i-1)*T.TAB_H)
-        local hl = btn:CreateTexture(nil, "HIGHLIGHT")
-        hl:SetAllPoints(); hl:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.08)
         local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         lbl:SetPoint("LEFT", btn, "LEFT", 12, 0); lbl:SetText(tab.label)
         btn.lbl = lbl; btn.tabH = T.TAB_H; btn.tabY = -(i-1)*T.TAB_H
+        ns.Theme:StyleTab(btn)
         tabBtns[tab.key] = btn
 
         local tf = CreateFrame("Frame", nil, content)
@@ -1579,6 +1679,48 @@ local function BuildPanel(addon)
         tabHeights[tab.key] = math.abs(finalY)
     end
 
+    -- [ LIVE PREVIEW ] Wire up per-tab frame preview shown when the tab is active.
+    -- Frames are shown with placeholder data so the user can see the module
+    -- without entering a dungeon / in-combat.
+    tabPreviewFns["reminder"] = {
+        show = function()
+            if ns.AuraReminder and ns.AuraReminder.ShowForLayout then
+                ns.AuraReminder.ShowForLayout()
+            end
+        end,
+        hide = function()
+            if ns.AuraReminder and ns.AuraReminder.Hide then
+                ns.AuraReminder.Hide()
+            end
+        end,
+    }
+    tabPreviewFns["mythictimer"] = {
+        show = function()
+            -- Only show layout stub if demo is not already running
+            if ns.MythicTimer and ns.MythicTimer.GetFrame and not ns.MythicTimer.IsDemoActive() then
+                local f = ns.MythicTimer.GetFrame()
+                if f then
+                    f.title:SetText(ns.Theme.EscapeColor("accent") .. "[+12]|r The Stonevault")
+                    f.timerText:SetText("|cff44ee4422:15|r")
+                    if f.paceText then f.paceText:SetText("|cff44ee44+3 18:30|r       |cffeeee44+2 24:40|r") end
+                    if f.deathIcon then f.deathIcon:Show() end
+                    if f.deathText then f.deathText:SetText("|cffee22222|r  |cff999999(-0:10)|r") end
+                    if f.pullText  then f.pullText:SetText("|cffcccccc85%|r  (272/320)") end
+                    f:SetAlpha(1)
+                    f:Show()
+                end
+            end
+        end,
+        hide = function()
+            -- Only hide if demo isn't active (demo manages its own lifecycle)
+            if ns.MythicTimer and ns.MythicTimer.GetFrame and not ns.MythicTimer.IsDemoActive() then
+                local f = ns.MythicTimer.GetFrame()
+                if f then f:Hide() end
+            end
+        end,
+    }
+
+    local activePreviewKey = nil
     local function SetTab(key)
         for _, tf in pairs(tabFrames) do tf:Hide() end
         if tabFrames[key] then 
@@ -1595,23 +1737,41 @@ local function BuildPanel(addon)
             scrollBar:SetValue(0) 
         end
         for k, btn in pairs(tabBtns) do
+            ns.Theme:SetTabActive(btn, k == key)
             if k == key then
-                btn.lbl:SetTextColor(T.accent[1], T.accent[2], T.accent[3], 1)
                 indicator:SetSize(3, btn.tabH)
                 indicator:ClearAllPoints()
                 indicator:SetPoint("TOPRIGHT", tabBar, "TOPRIGHT", 0, btn.tabY)
-            else
-                btn.lbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
             end
         end
         if tabRebuildFns[key] then tabRebuildFns[key]() end
         if tabRebuildFns[key.."_fps"] then tabRebuildFns[key.."_fps"]() end
+        -- Live preview: hide previous tab's frame, show new tab's frame
+        if activePreviewKey and activePreviewKey ~= key then
+            local prev = tabPreviewFns[activePreviewKey]
+            if prev and prev.hide then prev.hide() end
+        end
+        activePreviewKey = key
+        local cur = tabPreviewFns[key]
+        if cur and cur.show then cur.show() end
     end
 
     for _, tab in ipairs(TABS) do
         tabBtns[tab.key]:SetScript("OnClick", function() SetTab(tab.key) end)
     end
     SetTab("general")
+
+    -- Clean up when the config panel is closed
+    f:SetScript("OnHide", function()
+        if activePreviewKey then
+            local prev = tabPreviewFns[activePreviewKey]
+            if prev and prev.hide then prev.hide() end
+        end
+        if ns.MythicTimer and ns.MythicTimer.IsDemoActive and ns.MythicTimer.IsDemoActive() then
+            ns.MythicTimer.StopDemo()
+        end
+    end)
+
     return f
 end
 

@@ -24,9 +24,8 @@ local ROW_GAP             = 5
 local MAX_PIPS            = 6
 
 -- Colours
-local R, G, B              = 0.18, 0.78, 0.72
-local R_DIM, G_DIM, B_DIM  = 0.06, 0.26, 0.24
-local WS_R, WS_G, WS_B     = 0.85, 0.50, 0.18  -- orange for Whirling Surge CD
+local WS_R, WS_G, WS_B     = 0.85, 0.50, 0.18  -- orange for Whirling Surge CD (not themed)
+local T = ns.Theme  -- populated by Theme.Init() before BuildPanel runs
 
 -- [ STATE ] -------------------------------------------------------------------
 local panel
@@ -86,11 +85,11 @@ local function UpdateCharges()
             end
             pip.fill:SetWidth(math.max(1, frac * pip.trackW))
             if frac >= 1 then
-                pip.fill:SetColorTexture(R, G, B, 1)
+                pip.fill:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 1)
             elseif frac > 0 then
-                pip.fill:SetColorTexture(R * 0.55, G * 0.55, B * 0.55, 1)
+                pip.fill:SetColorTexture(T.accentDim[1], T.accentDim[2], T.accentDim[3], 1)
             else
-                pip.fill:SetColorTexture(R_DIM, G_DIM, B_DIM, 1)
+                pip.fill:SetColorTexture(T.barBg[1], T.barBg[2], T.barBg[3], 1)
             end
         end
     end
@@ -146,15 +145,8 @@ local function BuildPanel()
         p.point, _, p.relPoint, p.x, p.y = self:GetPoint()
     end)
 
-    local bg = f:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetColorTexture(0.05, 0.06, 0.07, 0.82)
-
-    local border = CreateFrame("Frame", nil, f, "BackdropTemplate")
-    border:SetPoint("TOPLEFT",     f, "TOPLEFT",     0, 0)
-    border:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
-    border:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
-    border:SetBackdropBorderColor(R, G, B, 0.30)
+    ns.Theme:ApplyBg(f, "bg")
+    ns.Theme:ApplyBorder(f)
 
     local y = -6
 
@@ -162,7 +154,7 @@ local function BuildPanel()
     local chargeLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     chargeLbl:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
     chargeLbl:SetText("Charges")
-    chargeLbl:SetTextColor(R, G, B, 0.8)
+    chargeLbl:SetTextColor(T.accent[1], T.accent[2], T.accent[3], 0.8)
     y = y - LABEL_H - 2
 
     local trackW = math.floor((HUD_W - (MAX_PIPS - 1) * PIP_GAP) / MAX_PIPS)
@@ -173,13 +165,13 @@ local function BuildPanel()
 
         local track = pip:CreateTexture(nil, "BACKGROUND")
         track:SetAllPoints()
-        track:SetColorTexture(R_DIM, G_DIM, B_DIM, 1)
+        track:SetColorTexture(T.barBg[1], T.barBg[2], T.barBg[3], 1)
 
         local fill = pip:CreateTexture(nil, "BORDER")
         fill:SetPoint("LEFT", pip, "LEFT", 0, 0)
         fill:SetHeight(PIP_H)
         fill:SetWidth(1)
-        fill:SetColorTexture(R, G, B, 1)
+        fill:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 1)
 
         pip.fill   = fill
         pip.trackW = trackW
@@ -205,7 +197,7 @@ local function BuildPanel()
     local wsTrack = surgeRow:CreateTexture(nil, "BACKGROUND")
     wsTrack:SetSize(HUD_W, BAR_H)
     wsTrack:SetPoint("TOPLEFT", surgeRow, "TOPLEFT", PAD, -(LABEL_H + 2))
-    wsTrack:SetColorTexture(0.30, 0.15, 0.05, 1)
+    wsTrack:SetColorTexture(T.barBg[1], T.barBg[2], T.barBg[3], 1)
 
     surgeFill = surgeRow:CreateTexture(nil, "BORDER")
     surgeFill:SetPoint("LEFT", wsTrack, "LEFT", 0, 0)

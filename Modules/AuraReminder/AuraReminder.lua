@@ -6,6 +6,7 @@ local AuraReminder = ns.AuraReminder
 local ICON_SIZE    = 36
 local ICON_PAD     = 4
 local PANEL_PAD    = 6
+local T = ns.Theme  -- populated by Theme.Init() before any frame is built
 
 -- [ STATE ] -------------------------------------------------------------------
 local frame, rows
@@ -45,7 +46,7 @@ local function GetOrMakeRow(idx)
 
     local bg = row:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
-    bg:SetColorTexture(0, 0, 0, 1)
+    bg:SetColorTexture(T.bg[1], T.bg[2], T.bg[3], 1)
 
     local icon = row:CreateTexture(nil, "ARTWORK")
     icon:SetPoint("TOPLEFT", row, "TOPLEFT", 1, -1)
@@ -174,13 +175,13 @@ end
 -- [ BLINK ] -------------------------------------------------------------------
 local function StartBlink()
     for _, row in ipairs(frame.rows) do
-        if row:IsShown() and row.required then
+        if row:IsShown() and row.required and not row.present then
             row.iconBorder:SetAlpha(0)
             row.ag:Play()
         else
             row.ag:Stop()
             row.iconBorder:SetAlpha(0)
-            row.icon:SetAlpha(1)
+            if not row.present then row.icon:SetAlpha(1) end
         end
     end
 end
@@ -227,6 +228,7 @@ local function ShowMissing(missing)
         row.partyTotalCount   = m.partyTotalCount or 0
         row.itemCount = m.itemCount or 0
         row.missingFromGroup = m.missingFromGroup or false
+        row.present = m.present or false
         -- Item count badge (bottom-right)
         if m.itemCount and m.itemCount > 0 then
             row.countText:SetText(m.itemCount)
@@ -252,6 +254,13 @@ local function ShowMissing(missing)
             row.groupBadge.bg:Hide()
         end
         row:Show()
+        -- Dim icons that are already present (show-all mode)
+        if m.present then
+            row.icon:SetAlpha(0.35)
+            row.iconBorder:SetAlpha(0)
+        else
+            row.icon:SetAlpha(1)
+        end
         xOff = xOff + ICON_SIZE + ICON_PAD
     end
 
@@ -302,8 +311,11 @@ local function CheckAndShow()
     -- GetMissing() has its own CanReadAuras() guard, but bail here too so we
     -- don't hide the frame mid-combat if it was already showing valid data.
     if InCombatLockdown() then return end
-    local missing = ns.AuraList.GetMissing(db)
-    ShowMissing(missing)
+    local db = ns.Addon:Profile().reminder
+    local items = db.showAllBuffs and ns.AuraList.GetAll(db) or ns.AuraList.GetMissing(db)
+    -- In normal mode only show if something is missing; in show-all mode always show
+    if not db.showAllBuffs and #items == 0 then AuraReminder.Hide(); return end
+    ShowMissing(items)
 end
 
 -- [ PUBLIC API ] --------------------------------------------------------------
@@ -354,9 +366,9 @@ function AuraReminder.Init(addon)
             if isActive and not InCombatLockdown() then
                 local rdb = ns.Addon:Profile().reminder
                 if not rdb.onlyOutOfCombat or not InCombatLockdown() then
-                    local missing = ns.AuraList.GetMissing(rdb)
-                    if #missing > 0 then
-                        ShowMissing(missing)
+                    local items = rdb.showAllBuffs and ns.AuraList.GetAll(rdb) or ns.AuraList.GetMissing(rdb)
+                    if rdb.showAllBuffs or #items > 0 then
+                        ShowMissing(items)
                     elseif frame:IsShown() then
                         AuraReminder.Hide()
                     end
@@ -392,9 +404,9 @@ function AuraReminder.Init(addon)
             if not isActive or InCombatLockdown() then return end
             local wdb = ns.Addon:Profile().reminder
             if wdb.onlyOutOfCombat and InCombatLockdown() then return end
-            local missing = ns.AuraList.GetMissing(wdb)
-            if #missing > 0 then
-                ShowMissing(missing)
+            local items = wdb.showAllBuffs and ns.AuraList.GetAll(wdb) or ns.AuraList.GetMissing(wdb)
+            if wdb.showAllBuffs or #items > 0 then
+                ShowMissing(items)
             elseif frame:IsShown() then
                 AuraReminder.Hide()
             end

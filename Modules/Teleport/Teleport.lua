@@ -31,13 +31,16 @@ local challengeMapToDungeon = {
 
 local BTN_W, BTN_H = 180, 22
 local BTN_PAD = 1
+local MAX_PILLS = 3    -- max per-owner keystone pills shown per button
+local PILL_W    = 24   -- pill chip width in pixels
 local PANEL_PAD = 8 -- Increased for a slightly larger drag target
-local HEADER_H = 16  -- thin strip at top for the close button
+local HEADER_H = 26  -- header strip containing title + controls
 local FRAME_W = BTN_W + PANEL_PAD * 2
 
 local DISABLED_ALPHA = 0.3
 local LEARNED_COLOR = { 0.9, 0.9, 0.9 }
 local UNKNOWN_COLOR = { 0.5, 0.5, 0.5 }
+local T = ns.Theme  -- populated by Theme.Init() before BuildPanel runs
 
 -- [ KEYSTONE DATA VIA LIBKEYSTONE ] -----------------------------------------
 -- LibKeystone is compatible with BigWigs, DBM, and any addon using the same
@@ -182,83 +185,68 @@ local function CheckVisibility()
 end
 
 local function MakePanel()
-    local totalH = (#DUNGEONS * (BTN_H + BTN_PAD)) + PANEL_PAD * 2 - BTN_PAD
+    local totalH = (#DUNGEONS * (BTN_H + BTN_PAD)) + PANEL_PAD * 2 - BTN_PAD + HEADER_H
     local f = CreateFrame("Frame", "yaqolTeleportPanel", UIParent)
     f:SetSize(FRAME_W, totalH)
     f:SetFrameStrata("MEDIUM")
     f.restingAlpha = 0.8
-    
-    -- Hidden background and header as requested
-    local bg = f:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetColorTexture(0, 0, 0, 0)
-    
-    local div = f:CreateTexture(nil, "ARTWORK")
-    div:SetHeight(1)
-    div:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, -HEADER_H)
-    div:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -HEADER_H)
-    div:SetColorTexture(0, 0, 0, 0)
 
-    -- Close button (-) sitting clearly atop the panel
-    local closeBtn = CreateFrame("Button", nil, f)
-    closeBtn:SetSize(18, 18)
-    closeBtn:SetPoint("BOTTOMRIGHT", f, "TOPRIGHT", -PANEL_PAD, 2)
-    
-    local cBorder = closeBtn:CreateTexture(nil, "BACKGROUND")
-    cBorder:SetAllPoints()
-    cBorder:SetColorTexture(0, 0, 0, 1)
+    ns.Theme:ApplyBg(f)
+    ns.Theme:ApplyBorderCompact(f)
 
-    local cBg = closeBtn:CreateTexture(nil, "BORDER")
-    cBg:SetPoint("TOPLEFT", closeBtn, "TOPLEFT", 1, -1)
-    cBg:SetPoint("BOTTOMRIGHT", closeBtn, "BOTTOMRIGHT", -1, 1)
-    cBg:SetColorTexture(0.1, 0.1, 0.1, 0.8)
-    
-    local closeLbl = closeBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    closeLbl:SetPoint("CENTER", closeBtn, "CENTER", 0, 0)
-    closeLbl:SetShadowColor(0, 0, 0, 1)
-    closeLbl:SetShadowOffset(1, -1)
-    closeLbl:SetText("-")  -- Crisp minus icon
-    
-    closeBtn:SetScript("OnEnter", function(self)
+    -- Header strip
+    local header = CreateFrame("Frame", nil, f)
+    header:SetSize(FRAME_W, HEADER_H)
+    header:SetPoint("TOPLEFT")
+    local hbg = header:CreateTexture(nil, "BACKGROUND")
+    hbg:SetAllPoints()
+    hbg:SetColorTexture(T.accent[1]*0.08, T.accent[2]*0.08, T.accent[3]*0.08, 1)
+    local hdiv = header:CreateTexture(nil, "OVERLAY")
+    hdiv:SetHeight(1)
+    hdiv:SetPoint("BOTTOMLEFT"); hdiv:SetPoint("BOTTOMRIGHT")
+    hdiv:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.45)
+    local titleLbl = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    titleLbl:SetPoint("LEFT", header, "LEFT", PANEL_PAD, 0)
+    titleLbl:SetText("DUNGEONS")
+    titleLbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
+
+    -- Close button (inside header) — uses WoW minimize button texture (always renders)
+    local closeBtn = CreateFrame("Button", nil, header)
+    closeBtn:SetSize(22, HEADER_H)
+    closeBtn:SetPoint("RIGHT", header, "RIGHT", 0, 0)
+    local cHl = closeBtn:CreateTexture(nil, "HIGHLIGHT")
+    cHl:SetAllPoints(); cHl:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.20)
+    local closeIcon = closeBtn:CreateTexture(nil, "ARTWORK")
+    closeIcon:SetSize(14, 14)
+    closeIcon:SetPoint("CENTER")
+    closeIcon:SetTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Up")
+    closeIcon:SetVertexColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
+    closeBtn:SetScript("OnEnter", function()
         f:SetAlpha(1)
-        cBg:SetColorTexture(0.2, 0.2, 0.2, 1)
-        closeLbl:SetTextColor(1, 1, 1, 1)
+        closeIcon:SetVertexColor(1, 1, 1, 1)
     end)
-    closeBtn:SetScript("OnLeave", function(self)
+    closeBtn:SetScript("OnLeave", function()
         f:SetAlpha(f.restingAlpha)
-        cBg:SetColorTexture(0.1, 0.1, 0.1, 0.8)
-        closeLbl:SetTextColor(0.8, 0.8, 0.8, 1)
+        closeIcon:SetVertexColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
     end)
     closeBtn:SetScript("OnClick", function()
         userClosed = true
         f:Hide()
     end)
 
-    -- Refresh (⟳) button — re-requests keystones from party/raid members.
-    -- Useful when joining a group whose members already broadcast before we loaded.
-    local refreshBtn = CreateFrame("Button", nil, f)
-    refreshBtn:SetSize(18, 18)
-    refreshBtn:SetPoint("BOTTOMRIGHT", closeBtn, "BOTTOMLEFT", -2, 0)
-
-    local rBorder = refreshBtn:CreateTexture(nil, "BACKGROUND")
-    rBorder:SetAllPoints()
-    rBorder:SetColorTexture(0, 0, 0, 1)
-
-    local rBg = refreshBtn:CreateTexture(nil, "BORDER")
-    rBg:SetPoint("TOPLEFT",     refreshBtn, "TOPLEFT",     1, -1)
-    rBg:SetPoint("BOTTOMRIGHT", refreshBtn, "BOTTOMRIGHT", -1, 1)
-    rBg:SetColorTexture(0.1, 0.1, 0.1, 0.8)
-
+    -- Refresh button (inside header, left of close)
+    local refreshBtn = CreateFrame("Button", nil, header)
+    refreshBtn:SetSize(22, HEADER_H)
+    refreshBtn:SetPoint("RIGHT", closeBtn, "LEFT", 0, 0)
+    local rHl = refreshBtn:CreateTexture(nil, "HIGHLIGHT")
+    rHl:SetAllPoints(); rHl:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.20)
     local rIcon = refreshBtn:CreateTexture(nil, "OVERLAY")
-    rIcon:SetPoint("CENTER", refreshBtn, "CENTER", 0, 0)
-    rIcon:SetSize(12, 12)
+    rIcon:SetPoint("CENTER"); rIcon:SetSize(12, 12)
     rIcon:SetTexture("Interface\\Buttons\\UI-RefreshButton")
-    rIcon:SetVertexColor(0.8, 0.8, 0.8, 1)
-
+    rIcon:SetVertexColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
     refreshBtn:SetScript("OnEnter", function()
         f:SetAlpha(1)
-        rBg:SetColorTexture(0.2, 0.2, 0.2, 1)
-        rIcon:SetVertexColor(0.18, 0.78, 0.72, 1)
+        rIcon:SetVertexColor(T.accent[1], T.accent[2], T.accent[3], 1)
         GameTooltip:SetOwner(refreshBtn, "ANCHOR_TOP")
         GameTooltip:SetText("Refresh keystones", 1, 1, 1, 1, true)
         GameTooltip:AddLine("Re-request keystone data from party members.", 0.8, 0.8, 0.8, true)
@@ -266,8 +254,7 @@ local function MakePanel()
     end)
     refreshBtn:SetScript("OnLeave", function()
         f:SetAlpha(f.restingAlpha)
-        rBg:SetColorTexture(0.1, 0.1, 0.1, 0.8)
-        rIcon:SetVertexColor(0.8, 0.8, 0.8, 1)
+        rIcon:SetVertexColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
         GameTooltip:Hide()
     end)
     refreshBtn:SetScript("OnClick", function()
@@ -292,7 +279,7 @@ local function MakePanel()
 end
 
 local function MakeButton(parent, dungeon, idx)
-    local yOff = -(PANEL_PAD + (idx - 1) * (BTN_H + BTN_PAD))
+    local yOff = -(HEADER_H + PANEL_PAD + (idx - 1) * (BTN_H + BTN_PAD))
     local btn = CreateFrame("Button", nil, parent, "InsecureActionButtonTemplate")
     btn:SetSize(BTN_W, BTN_H)
     btn:SetPoint("TOPLEFT", parent, "TOPLEFT", PANEL_PAD, yOff)
@@ -303,12 +290,11 @@ local function MakeButton(parent, dungeon, idx)
     btn:SetAttribute("type", "spell")
     btn:SetAttribute("spell", dungeon.spellID)
 
-    -- 1px border using OVERLAY sublayer 7 (highest) so they render above
+    -- 1px neutral border using OVERLAY sublayer 7 so they render above
     -- InsecureActionButtonTemplate's own overlay textures.
-    -- Thickness is set dynamically in RefreshButtons (1px default, 2px when key present).
     local function MakeEdge()
         local t = btn:CreateTexture(nil, "OVERLAY", nil, 7)
-        t:SetColorTexture(0, 0, 0, 1)
+        t:SetColorTexture(T.border[1], T.border[2], T.border[3], 0.6)
         return t
     end
     local edgeT = MakeEdge(); edgeT:SetPoint("TOPLEFT",btn,"TOPLEFT",0,0);      edgeT:SetPoint("TOPRIGHT",btn,"TOPRIGHT",0,0);    edgeT:SetHeight(1)
@@ -320,7 +306,7 @@ local function MakeButton(parent, dungeon, idx)
     local bg = btn:CreateTexture(nil, "BORDER")
     bg:SetPoint("TOPLEFT", btn, "TOPLEFT", 1, -1)
     bg:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -1, 1)
-    bg:SetColorTexture(0.1, 0.1, 0.1, 0.8)
+    bg:SetColorTexture(T.bgRow[1], T.bgRow[2], T.bgRow[3], T.bgRow[4])
     btn.bg = bg
 
     -- Spell icon
@@ -340,17 +326,52 @@ local function MakeButton(parent, dungeon, idx)
     label:SetText(dungeon.name)
     btn.label = label
 
+    -- Left accent bar: class color of primary keystone owner; hidden when no keys.
+    local accentBar = btn:CreateTexture(nil, "OVERLAY", nil, 5)
+    accentBar:SetWidth(3)
+    accentBar:SetPoint("TOPLEFT",    btn, "TOPLEFT",    1, 0)
+    accentBar:SetPoint("BOTTOMLEFT", btn, "BOTTOMLEFT", 1, 0)
+    accentBar:Hide()
+    btn.accentBar = accentBar
+
+    -- Pre-created owner pills (shown in RefreshButtons when party has this key).
+    -- pills[1] is rightmost; pills[MAX_PILLS] is leftmost when all are showing.
+    btn.pills = {}
+    for p = 1, MAX_PILLS do
+        local pill = CreateFrame("Frame", nil, btn)
+        pill:SetSize(PILL_W, BTN_H - 2)
+        if p == 1 then
+            pill:SetPoint("RIGHT", btn, "RIGHT", -2, 0)
+        else
+            pill:SetPoint("RIGHT", btn.pills[p - 1].frame, "LEFT", -2, 0)
+        end
+        pill:Hide()
+        local pillBg = pill:CreateTexture(nil, "BACKGROUND")
+        pillBg:SetAllPoints()
+        local pillBar = pill:CreateTexture(nil, "BORDER")
+        pillBar:SetWidth(2)
+        pillBar:SetPoint("TOPLEFT",    pill, "TOPLEFT",    0, 0)
+        pillBar:SetPoint("BOTTOMLEFT", pill, "BOTTOMLEFT", 0, 0)
+        local pillText = pill:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        pillText:SetPoint("CENTER", pill, "CENTER", 1, 0)
+        pillText:SetShadowColor(0, 0, 0, 1)
+        pillText:SetShadowOffset(1, -1)
+        btn.pills[p] = { frame = pill, bg = pillBg, bar = pillBar, text = pillText }
+    end
+
     -- Hover highlight + tooltip
     btn:SetScript("OnEnter", function(self)
         parent:SetAlpha(1)
-        if self.learned then self.bg:SetColorTexture(0.2, 0.2, 0.2, 0.8) end
+        if self.learned then
+            self.bg:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.15)
+        end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetSpellByID(dungeon.spellID)
         GameTooltip:Show()
     end)
     btn:SetScript("OnLeave", function(self)
         parent:SetAlpha(parent.restingAlpha)
-        self.bg:SetColorTexture(0.1, 0.1, 0.1, 0.8)
+        self.bg:SetColorTexture(T.bgRow[1], T.bgRow[2], T.bgRow[3], T.bgRow[4])
         GameTooltip:Hide()
     end)
 
@@ -399,70 +420,46 @@ local function RefreshButtons()
         else
             btn:Show()
             visibleCount = visibleCount + 1
-            btn:SetPoint("TOPLEFT", panel, "TOPLEFT", PANEL_PAD, -(PANEL_PAD + (visibleCount - 1) * (BTN_H + BTN_PAD)))
+            btn:SetPoint("TOPLEFT", panel, "TOPLEFT", PANEL_PAD, -(HEADER_H + PANEL_PAD + (visibleCount - 1) * (BTN_H + BTN_PAD)))
         end
 
         if owners and #owners > 0 then
-            -- Sort so "player" is always first (gets the top/left border)
+            -- Sort: player first (primary), then alphabetical
             table.sort(owners, function(a, b)
                 if a.unit == "player" then return true end
                 if b.unit == "player" then return false end
                 return (a.name or "") < (b.name or "")
             end)
 
-            local c1 = owners[1]
-            local c2 = owners[2]  -- may be nil
+            -- Left accent bar: primary owner's class color
+            local o1 = owners[1]
+            btn.accentBar:SetColorTexture(o1.r, o1.g, o1.b, 1)
+            btn.accentBar:Show()
 
-            -- Boost class colour slightly so 2px border is vivid against the dark bg
-            local function boost(v) return math.min(1, v * 1.25 + 0.1) end
-            local r1b, g1b, b1b = boost(c1.r), boost(c1.g), boost(c1.b)
-            local r2b, g2b, b2b = c2 and boost(c2.r) or r1b, c2 and boost(c2.g) or g1b, c2 and boost(c2.b) or b1b
-
-            -- 2px thick colored border
-            btn.edgeT:SetHeight(2); btn.edgeT:SetColorTexture(r1b, g1b, b1b, 1)
-            btn.edgeL:SetWidth(2);  btn.edgeL:SetColorTexture(r1b, g1b, b1b, 1)
-            btn.edgeB:SetHeight(2); btn.edgeB:SetColorTexture(r2b, g2b, b2b, 1)
-            btn.edgeR:SetWidth(2);  btn.edgeR:SetColorTexture(r2b, g2b, b2b, 1)
-
-            -- Badge: show highest level key among owners (likely the player's)
-            local highestLevel = 0
-            for _, o in ipairs(owners) do
-                if o.level > highestLevel then highestLevel = o.level end
+            -- One pill per owner (rightmost = owners[1], leftmost = owners[nPills])
+            local nPills = math.min(#owners, MAX_PILLS)
+            for p = 1, MAX_PILLS do
+                local pill = btn.pills[p]
+                if p <= nPills then
+                    local o = owners[p]
+                    pill.frame:Show()
+                    pill.bg:SetColorTexture(o.r, o.g, o.b, 0.28)
+                    pill.bar:SetColorTexture(o.r, o.g, o.b, 0.90)
+                    pill.text:SetText("+" .. o.level)
+                    pill.text:SetTextColor(1, 1, 1, 1)
+                else
+                    pill.frame:Hide()
+                end
             end
 
-            if not btn.keyBadge then
-                local keyIcon = btn:CreateTexture(nil, "OVERLAY")
-                keyIcon:SetSize(12, 12)
-                keyIcon:SetPoint("RIGHT", btn, "RIGHT", -4, 0)
-                keyIcon:SetTexture("Interface\\Icons\\INV_Misc_Key_14")
-                keyIcon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-                btn.keyIcon = keyIcon
-
-                local badge = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-                badge:SetPoint("RIGHT", keyIcon, "LEFT", -2, 0)
-                badge:SetShadowColor(0, 0, 0, 1)
-                badge:SetShadowOffset(1, -1)
-                btn.keyBadge = badge
-            end
-
-            -- Colour badge text to match first owner's class colour
-            btn.keyBadge:SetTextColor(c1.r, c1.g, c1.b, 1)
-            btn.keyBadge:SetText("+" .. highestLevel)
-            btn.keyBadge:Show()
-            btn.keyIcon:Show()
+            -- Label shrinks right to accommodate the leftmost visible pill
             btn.label:ClearAllPoints()
             btn.label:SetPoint("LEFT", btn.icon, "RIGHT", 6, 0)
-            btn.label:SetPoint("RIGHT", btn.keyBadge, "LEFT", -4, 0)
+            btn.label:SetPoint("RIGHT", btn.pills[nPills].frame, "LEFT", -3, 0)
         else
-            -- Reset to 1px black border
-            btn.edgeT:SetHeight(1); btn.edgeT:SetColorTexture(0, 0, 0, 1)
-            btn.edgeB:SetHeight(1); btn.edgeB:SetColorTexture(0, 0, 0, 1)
-            btn.edgeL:SetWidth(1);  btn.edgeL:SetColorTexture(0, 0, 0, 1)
-            btn.edgeR:SetWidth(1);  btn.edgeR:SetColorTexture(0, 0, 0, 1)
-            if btn.keyBadge then
-                btn.keyBadge:Hide()
-                btn.keyIcon:Hide()
-            end
+            -- No keystones: full-width label, no accent bar, no pills
+            btn.accentBar:Hide()
+            for p = 1, MAX_PILLS do btn.pills[p].frame:Hide() end
             btn.label:ClearAllPoints()
             btn.label:SetPoint("LEFT", btn.icon, "RIGHT", 6, 0)
             btn.label:SetPoint("RIGHT", btn, "RIGHT", -4, 0)
@@ -470,7 +467,7 @@ local function RefreshButtons()
     end
     
     -- Dynamically shrink the main panel if spells are hidden
-    local dynamicH = visibleCount > 0 and (visibleCount * (BTN_H + BTN_PAD)) + PANEL_PAD * 2 - BTN_PAD or PANEL_PAD * 2
+    local dynamicH = HEADER_H + (visibleCount > 0 and (visibleCount * (BTN_H + BTN_PAD)) + PANEL_PAD * 2 - BTN_PAD or PANEL_PAD * 2)
     panel:SetHeight(dynamicH)
 end
 

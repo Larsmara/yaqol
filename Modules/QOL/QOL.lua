@@ -12,7 +12,7 @@ local function cfg() return addon.db.profile.qol end
 
 -- Print a short coloured notice to chat
 local function Notify(msg)
-    print("|cff2dc9b8yaqol:|r " .. msg)
+    print(ns.Theme.EscapeColor("accent") .. "yaqol:|r " .. msg)
 end
 
 -- ============================================================================
@@ -402,7 +402,7 @@ local function GetOrMakeDurFrame()
 
     local db = addon.db.profile.qol
     local f = CreateFrame("Frame", "yaqolDurabilityFrame", UIParent)
-    f:SetSize(260, 44)
+    f:SetSize(280, 44)
     f:SetMovable(true); f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
     f:SetClampedToScreen(true)
@@ -413,9 +413,17 @@ local function GetOrMakeDurFrame()
         d.durPoint, _, d.durRelPoint, d.durX, d.durY = self:GetPoint()
     end)
 
+    -- Warning icon (WoW built-in alert icon — no Unicode needed)
+    local warnIcon = f:CreateTexture(nil, "ARTWORK")
+    warnIcon:SetSize(24, 24)
+    warnIcon:SetPoint("LEFT", f, "LEFT", 8, 0)
+    warnIcon:SetTexture("Interface\\DialogFrame\\UI-Dialog-Icon-AlertOther")
+    f.warnIcon = warnIcon
+
     local txt = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    txt:SetPoint("CENTER")
-    txt:SetJustifyH("CENTER")
+    txt:SetPoint("LEFT", warnIcon, "RIGHT", 8, 0)
+    txt:SetPoint("RIGHT", f, "RIGHT", -8, 0)
+    txt:SetJustifyH("LEFT")
     f.txt = txt
 
     -- Restore saved position, falling back to sensible default
@@ -436,7 +444,7 @@ end
 local function ShowDurWarning(pct)
     local f = GetOrMakeDurFrame()
     local r, g = 1, pct <= 10 and 0 or 0.45
-    f.txt:SetText(string.format("|cff%02x%02x00⚠ Low Durability: %.0f%%|r", math.floor(r*255), math.floor(g*255), pct))
+    f.txt:SetText(string.format("|cff%02x%02x00Low Durability: %.0f%%|r", math.floor(r*255), math.floor(g*255), pct))
     f:SetAlpha(1)
     f:Show()
     if durFadeTimer then durFadeTimer:Cancel(); durFadeTimer = nil end
@@ -488,15 +496,8 @@ end
 -- Adjust these if Blizzard changes the season milestone levels.
 local AFFIX_MILESTONES = { 2, 4, 7 }
 
--- Theme colours (match the Options panel palette)
-local AT = {
-    bg      = { 0.10, 0.11, 0.13, 0.96 },
-    header  = { 0.13, 0.14, 0.16, 0.97 },
-    accent  = { 0.18, 0.78, 0.72, 1.00 },
-    text    = { 1.00, 1.00, 1.00, 1.00 },
-    textDim = { 0.68, 0.72, 0.74, 1.00 },
-    border  = { 0.18, 0.70, 0.65, 0.55 },
-}
+-- Theme colours — fall through to ns.Theme for color tokens
+local AT = ns.Theme
 
 local affixFrame   -- the popup frame, built once
 local affixShownThisSession = false
@@ -517,9 +518,9 @@ local function BuildAffixFrame()
     f:SetClampedToScreen(true)
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 100)
 
-    -- Background
-    local bg = f:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints(); bg:SetColorTexture(AT.bg[1], AT.bg[2], AT.bg[3], AT.bg[4])
+    -- Background + border
+    ns.Theme:ApplyBg(f)
+    ns.Theme:ApplyBorder(f)
 
     -- Border stripe (left)
     local stripe = f:CreateTexture(nil, "BORDER")
@@ -538,7 +539,7 @@ local function BuildAffixFrame()
 
     local title = header:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("LEFT", header, "LEFT", PAD, 0)
-    title:SetText("|cff2dc9b8M+|r Affixes This Week")
+    title:SetText(ns.Theme.EscapeColor("accent") .. "M+|r Affixes This Week")
     title:SetTextColor(AT.text[1], AT.text[2], AT.text[3], 1)
 
     -- Close button

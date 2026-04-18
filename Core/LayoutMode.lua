@@ -14,15 +14,7 @@ local LayoutMode = ns.LayoutMode
 --
 -- Usage:  /lqol layout   OR   Options → General → "Arrange Frames" button.
 
--- Theme colours (same palette as the rest of the addon)
-local T = {
-    accent  = { 0.18, 0.78, 0.72, 1.00 },
-    bg      = { 0.08, 0.09, 0.11, 0.82 },
-    text    = { 1.00, 1.00, 1.00, 1.00 },
-    textDim = { 0.68, 0.72, 0.74, 1.00 },
-    overlay = { 0.18, 0.78, 0.72, 0.18 },  -- translucent teal fill
-    border  = { 0.18, 0.78, 0.72, 0.70 },
-}
+local T = ns.Theme  -- populated by Theme.Init() before any frame is built
 
 local active = false
 
@@ -46,14 +38,14 @@ local function MakeOverlay(targetFrame, label)
     -- Translucent fill
     local fill = ov:CreateTexture(nil, "BACKGROUND")
     fill:SetAllPoints()
-    fill:SetColorTexture(T.overlay[1], T.overlay[2], T.overlay[3], T.overlay[4])
+    fill:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.18)
 
     -- Border (all four edges via a single 1-px inset box)
     local function AddEdge(p1, p2, isH)
         local e = ov:CreateTexture(nil, "OVERLAY")
         if isH then e:SetHeight(1) else e:SetWidth(1) end
         e:SetPoint(p1); e:SetPoint(p2)
-        e:SetColorTexture(T.border[1], T.border[2], T.border[3], T.border[4])
+        e:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.70)
     end
     AddEdge("TOPLEFT",    "TOPRIGHT",    true)
     AddEdge("BOTTOMLEFT", "BOTTOMRIGHT", true)
@@ -168,7 +160,7 @@ local function GetDescriptors()
                 -- Show a placeholder so the frame has visible content to drag
                 local f = ns.QOL.GetDurabilityFrame()
                 if f then
-                    f.txt:SetText("|cffff6b00⚠ Low Durability: 15%|r")
+                    f.txt:SetText("|cffff6b00Low Durability: 15%|r")
                     f:SetAlpha(1)
                     f:Show()
                 end
@@ -192,10 +184,9 @@ local function GetDescriptors()
             show     = function()
                 local f = ns.MythicTimer and ns.MythicTimer.GetFrame and ns.MythicTimer.GetFrame()
                 if f then
-                    f.title:SetText("|cff2dc9b8[+12]|r The Stonevault")
+                    f.title:SetText(ns.Theme.EscapeColor("accent") .. "[+12]|r The Stonevault")
                     f.timerText:SetText("|cff44ee4422:15|r")
-                    f.plus3:SetText("|cff44ee44+3  18:30|r")
-                    f.plus2:SetText("|cffeeee44+2  24:40|r")
+                    f.paceText:SetText("|cff44ee44+3 18:30|r       |cffeeee44+2 24:40|r")
                     f.deathIcon:Show()
                     f.deathText:SetText("|cffee22222|r  |cff999999(-0:10)|r")
                     f.pullText:SetText("|cffcccccc85%|r  (272/320)")
@@ -247,7 +238,7 @@ function LayoutMode.Enter()
     doneFrame:SetPoint("TOP", UIParent, "TOP", 0, -60)
     doneFrame:Show()
 
-    print("|cff2dc9b8yaqol:|r Layout mode |cffffcc00ON|r — drag frames to reposition, then click Done.")
+    print(ns.Theme.EscapeColor("accent") .. "yaqol:|r Layout mode |cffffcc00ON|r — drag frames to reposition, then click Done.")
 end
 
 function LayoutMode.Exit()
@@ -283,7 +274,7 @@ function LayoutMode.Exit()
 
     doneFrame:Hide()
 
-    print("|cff2dc9b8yaqol:|r Layout mode |cff999999OFF|r — positions saved.")
+    print(ns.Theme.EscapeColor("accent") .. "yaqol:|r Layout mode |cff999999OFF|r — positions saved.")
 end
 
 function LayoutMode.IsActive()

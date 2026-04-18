@@ -66,6 +66,7 @@ ns.Defaults = {
             enterDelay = 2,
             dismissAfter = 0,    -- 0 = never auto-dismiss
             buffMinRemaining = 60, -- seconds; 0 = just check presence
+            showAllBuffs = false,  -- show all tracked buffs (present = dimmed, missing = blinking)
             point = "TOP", relPoint = "TOP", x = 0, y = -150,
 
             -- spellID lists per category; user-extensible
@@ -153,7 +154,8 @@ ns.Defaults = {
 
         -- Raid Tools bar
         raidTools = {
-            enabled  = true,
+            enabled   = true,
+            minimized = false,
             point    = "CENTER", relPoint = "CENTER", x = 0, y = 200,
         },
 
@@ -185,5 +187,8 @@ ns.Defaults = {
             factionTint      = true,
             factionTintAlpha = 0.14,      -- 0..0.30
         },
+    },
+    global = {
+        theme = "mellow",  -- "mellow" | "blizzard"
     },
 }

@@ -8,6 +8,22 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.0.35",
+        date    = "2026-04-18",
+        changes = {
+            "|cff4fc3f7New|r  M+ Timer: full visual redesign — textured DiamondMetal header, NineSlice border, cleaner layout",
+            "|cff4fc3f7New|r  M+ Timer: boss kill times displayed as coloured tiles for each boss",
+            "|cff4fc3f7New|r  M+ Timer: pace line shows projected finish times for +3 / +2 / +1 upgrade thresholds",
+            "|cff4fc3f7New|r  M+ Timer: current week's affix icons shown in the header (with tooltips)",
+            "|cff4fc3f7New|r  M+ Timer: timed/completed banner on key finish showing upgrade level and time delta",
+            "|cff4fc3f7New|r  M+ Timer: Options demo now loops automatically; affix icons and banner shown during demo",
+            "|cff4fc3f7New|r  Buff Reminder: \"Always Show All Tracked Buffs\" mode — present buffs shown dimmed, missing buffs blink",
+            "|cff4fc3f7New|r  Options: switching to a module tab shows a live preview of its frame",
+            "|cff4fc3f7New|r  Options: closing the panel stops the M+ Timer demo",
+            "|cff2dc9b8Fix|r  Raid Tools: collapse state now persists across reloads",
+        },
+    },
+    {
         version = "1.0.34",
         date    = "2026-04-17",
         changes = {

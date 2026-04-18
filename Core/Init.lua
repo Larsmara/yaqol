@@ -7,6 +7,7 @@ _G.yaqol = yaqol
 
 function yaqol:OnInitialize()
     self.db = LibStub("AceDB-3.0"):New("yaqolDB", ns.Defaults, true)
+    ns.Theme.Init()
     self.db.RegisterCallback(self, "OnProfileChanged", "OnProfileChanged")
     self.db.RegisterCallback(self, "OnProfileCopied", "OnProfileChanged")
     self.db.RegisterCallback(self, "OnProfileReset", "OnProfileChanged")

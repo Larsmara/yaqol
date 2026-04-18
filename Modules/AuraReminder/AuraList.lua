@@ -549,6 +549,100 @@ function AuraList.GetMissing(db)
     return missing
 end
 
+-- [ GET ALL ] -----------------------------------------------------------------
+-- Like GetMissing, but also includes tracked buffs that ARE present, marked
+-- with present = true so the UI can show them dimmed instead of blinking.
+-- Used when db.showAllBuffs is true.
+function AuraList.GetAll(db)
+    if not CanReadAuras() then return AuraList.GetMissing(db) end
+
+    -- Start with missing entries
+    local missing = AuraList.GetMissing(db)
+    -- Build a set of labels already in missing so we don't double-add
+    local inMissing = {}
+    for _, m in ipairs(missing) do inMissing[m.label] = true end
+
+    scanMinRemaining = (db.buffMinRemaining ~= nil) and db.buffMinRemaining or 60
+    local atMaxLevel = UnitLevel("player") >= GetMaxPlayerLevel()
+    local all = {}
+
+    -- Consumable / custom categories
+    if atMaxLevel then
+        for _, cat in ipairs(AuraList.Categories) do
+            local list = db[cat.key]
+            if cat.key == "food" and db.food ~= nil then
+                if not inMissing[cat.label] then
+                    local icon = 133971
+                    if list then
+                        for _, entry in ipairs(list) do
+                            local tex = SpellIcon(entry.spellID)
+                            if tex then icon = tex; break end
+                        end
+                    end
+                    all[#all+1] = {
+                        label    = cat.label,
+                        spellID  = (list and list[1] and list[1].spellID) or WELL_FED_IDS[1],
+                        icon     = icon,
+                        required = cat.required,
+                        present  = true,
+                    }
+                end
+            elseif list and #list > 0 then
+                if not inMissing[cat.label] then
+                    local icon = nil
+                    for _, entry in ipairs(list) do
+                        local tex = SpellIcon(entry.spellID)
+                        if tex then icon = tex; break end
+                    end
+                    all[#all+1] = {
+                        label    = cat.label,
+                        spellID  = list[1].spellID,
+                        icon     = icon,
+                        required = cat.required,
+                        present  = true,
+                    }
+                end
+            end
+        end
+
+        if db.weaponOil and not inMissing["Weapon Oil"] then
+            all[#all+1] = {
+                label    = "Weapon Oil",
+                spellID  = 0,
+                icon     = 134096,
+                required = false,
+                present  = true,
+            }
+        end
+    end
+
+    -- Class buffs
+    if db.enableClassBuffs ~= false then
+        local _, playerClass = UnitClass("player")
+        local defs = playerClass and CLASS_BUFFS[playerClass] or {}
+        local cfg = db.classBuffs or {}
+        for _, def in ipairs(defs) do
+            local cfgKey = def.castSpell and tostring(def.castSpell) or def.label
+            if cfg[cfgKey] ~= false and not inMissing[def.label] then
+                if def.isRuneforge then
+                    -- present (has runeforge)
+                    all[#all+1] = { label=def.label, spellID=0, icon=135957,
+                        required=def.required, present=true }
+                elseif def.castSpell and Known(def.castSpell) then
+                    all[#all+1] = { label=def.label, spellID=def.castSpell,
+                        icon=SpellIcon(def.castSpell), required=def.required, present=true }
+                end
+            end
+        end
+    end
+
+    -- Merge: missing first, then present
+    local result = {}
+    for _, m in ipairs(missing) do result[#result+1] = m end
+    for _, m in ipairs(all)     do result[#result+1] = m end
+    return result
+end
+
 -- [ CLASS BUFF INFO ] ---------------------------------------------------------
 -- Returns the CLASS_BUFFS table for external use (Options GUI).
 function AuraList.GetClassBuffDefs()

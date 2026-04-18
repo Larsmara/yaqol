@@ -36,6 +36,7 @@ local bossesKilled = 0
 local pullQty, pullTotal = 0, 0
 local HideObjectiveTracker
 local RestoreObjectiveTracker
+local ApplyBlizzardBlockVisibility
 
 -- [ HELPERS ] -----------------------------------------------------------------
 local function cfg() return addon.db.profile.mythicTimer end
@@ -656,6 +657,7 @@ local function OnEvent(self, event, ...)
     if event == "CHALLENGE_MODE_START" then
         CheckTimers(GetWorldElapsedTimers())
         HideObjectiveTracker()
+        ApplyBlizzardBlockVisibility()
 
     elseif event == "CHALLENGE_MODE_COMPLETED" then
         RestoreObjectiveTracker()
@@ -666,6 +668,31 @@ local function OnEvent(self, event, ...)
         -- Show completion banner now that we have the final elapsed
         local elapsed = elapsedBase + elapsedAccum
         ShowTimedBanner(elapsed, timeLimit)
+        -- Optional party chat announcement
+        local d = cfg()
+        if d.completionMsg and d.completionMsgText and d.completionMsgText ~= "" then
+            local remaining = timeLimit - elapsed
+            local upgrades = 0
+            if     elapsed <= timeLimit * PLUS_3_FRACTION then upgrades = 3
+            elseif elapsed <= timeLimit * PLUS_2_FRACTION then upgrades = 2
+            elseif elapsed <= timeLimit                   then upgrades = 1
+            end
+            local overtime = remaining < 0
+            local diff = math.abs(remaining)
+            local timeStr = FormatTime(diff)
+            local upgradeStr = upgrades > 0 and ("+" .. upgrades) or "FAILED"
+            local msg = d.completionMsgText
+            msg = msg:gsub("{dungeon}",  dungeonName or "Mythic+")
+            msg = msg:gsub("{level}",    tostring(keystoneLevel))
+            msg = msg:gsub("{time}",     timeStr)
+            msg = msg:gsub("{overtime}", overtime and timeStr or "on time")
+            msg = msg:gsub("{deaths}",   tostring(deathCount))
+            msg = msg:gsub("{upgrades}", upgradeStr)
+            local channel = d.completionMsgChannel or "PARTY"
+            -- Only send if in a group for PARTY; fall back to SAY otherwise
+            if channel == "PARTY" and not IsInGroup() then channel = "SAY" end
+            SendChatMessage(msg, channel)
+        end
 
     elseif event == "CHALLENGE_MODE_DEATH_COUNT_UPDATED" then
         UpdateDeathCount()
@@ -697,47 +724,76 @@ local function OnEvent(self, event, ...)
 end
 
 -- [ OBJECTIVE TRACKER MANAGEMENT ] -------------------------------------------
--- When hideBlizzard is on we also hide the entire ObjectiveTrackerFrame while
--- inside a Mythic+ dungeon (quest objectives are noise during a key), then
--- restore it when the key ends or the player leaves.
+-- When hideBlizzard is on: hide the entire ObjectiveTrackerFrame for the
+-- duration of the key so quest objectives, mob count, and all other tracker
+-- elements stay off-screen. A secure hook on ObjectiveTrackerFrame:Show keeps
+-- it suppressed even when Blizzard's code tries to re-show it (e.g. on every
+-- SCENARIO_CRITERIA_UPDATE / mob kill).
 local objTrackerHidden = false
+local objTrackerHooked = false
+
+local function HookObjectiveTrackerShow()
+    if objTrackerHooked then return end
+    if not ObjectiveTrackerFrame then return end
+    objTrackerHooked = true
+    hooksecurefunc(ObjectiveTrackerFrame, "Show", function(self)
+        if objTrackerHidden then
+            self:Hide()
+        end
+    end)
+end
 
 HideObjectiveTracker = function()
     if objTrackerHidden then return end
     if not cfg().enabled or not cfg().hideBlizzard then return end
     if not ObjectiveTrackerFrame then return end
-    if InCombatLockdown() then return end
-    ObjectiveTrackerFrame:Hide()
+    HookObjectiveTrackerShow()
     objTrackerHidden = true
+    ObjectiveTrackerFrame:Hide()
 end
 
 RestoreObjectiveTracker = function()
     if not objTrackerHidden then return end
     objTrackerHidden = false
     if not ObjectiveTrackerFrame then return end
-    if InCombatLockdown() then return end
     ObjectiveTrackerFrame:Show()
 end
 
 -- [ BLIZZARD BLOCK MANAGEMENT ] -----------------------------------------------
 -- Optionally hide the default Blizzard Challenge Mode block in the objective
 -- tracker so it doesn't duplicate our display.
+-- Targets three distinct Blizzard frames:
+--   1. ScenarioObjectiveTracker.ChallengeModeBlock — timer + affixes
+--   2. ScenarioObjectiveTracker.ObjectivesBlock    — boss kills + mob count criteria
+--   3. ScenarioTimerFrame                          — standalone HUD timer bar
 local blizzBlockHooked = false
 
 -- Immediately apply the current hideBlizzard setting to any already-visible block.
 local function ApplyBlizzardBlockVisibility()
-    if not ScenarioObjectiveTracker or not ScenarioObjectiveTracker.ChallengeModeBlock then return end
-    local block = ScenarioObjectiveTracker.ChallengeModeBlock
-    if cfg().enabled and cfg().hideBlizzard then
-        if block:IsShown() then block:Hide() end
-        -- Also hide the full objective tracker if we're in an active key
-        if C_ChallengeMode.IsChallengeModeActive() then
-            HideObjectiveTracker()
+    local enabled = cfg().enabled and cfg().hideBlizzard
+    if ScenarioObjectiveTracker then
+        local challengeBlock = ScenarioObjectiveTracker.ChallengeModeBlock
+        if challengeBlock then
+            if enabled and challengeBlock:IsShown() then challengeBlock:Hide() end
         end
-    else
-        -- Restore: let Blizzard re-layout the tracker naturally.
+        local objectivesBlock = ScenarioObjectiveTracker.ObjectivesBlock
+        if objectivesBlock then
+            if enabled and objectivesBlock:IsShown() then objectivesBlock:Hide() end
+        end
+        if not enabled then
+            ScenarioObjectiveTracker:MarkDirty()
+        end
+    end
+    if ScenarioTimerFrame then
+        if enabled then
+            ScenarioTimerFrame:Hide()
+        end
+    end
+    -- Also hide the full objective tracker sidebar while key is active
+    if enabled and C_ChallengeMode.IsChallengeModeActive() then
+        HideObjectiveTracker()
+    elseif not enabled then
         RestoreObjectiveTracker()
-        ScenarioObjectiveTracker:MarkDirty()
     end
 end
 
@@ -746,13 +802,25 @@ local function HookBlizzardBlock()
     blizzBlockHooked = true
 
     local function AttachHook()
-        if not ScenarioObjectiveTracker or not ScenarioObjectiveTracker.ChallengeModeBlock then return false end
-        hooksecurefunc(ScenarioObjectiveTracker.ChallengeModeBlock, "Show", function(block)
-            if cfg().enabled and cfg().hideBlizzard then
-                block:Hide()
-            end
+        if not ScenarioObjectiveTracker then return false end
+        local challengeBlock = ScenarioObjectiveTracker.ChallengeModeBlock
+        local objectivesBlock = ScenarioObjectiveTracker.ObjectivesBlock
+        if not challengeBlock then return false end
+
+        hooksecurefunc(challengeBlock, "Show", function(block)
+            if cfg().enabled and cfg().hideBlizzard then block:Hide() end
         end)
-        -- Hide immediately in case the block is already shown (e.g. /reload inside a key).
+        if objectivesBlock then
+            hooksecurefunc(objectivesBlock, "Show", function(block)
+                if cfg().enabled and cfg().hideBlizzard then block:Hide() end
+            end)
+        end
+        if ScenarioTimerFrame then
+            hooksecurefunc(ScenarioTimerFrame, "Show", function(f)
+                if cfg().enabled and cfg().hideBlizzard then f:Hide() end
+            end)
+        end
+        -- Hide immediately in case blocks are already shown (e.g. /reload inside a key).
         ApplyBlizzardBlockVisibility()
         return true
     end

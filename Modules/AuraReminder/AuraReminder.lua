@@ -294,7 +294,7 @@ local function ShouldActivate()
     if iType == "party" then
         if not db.enabledMythicPlus and not db.enabledDungeon then return false end
         if db.enabledMythicPlus and C_ChallengeMode.IsChallengeModeActive() then
-            local _, _, lvl = C_ChallengeMode.GetActiveKeystoneInfo()
+            local lvl = C_ChallengeMode.GetActiveKeystoneInfo()
             if (lvl or 0) >= db.minKeystoneLevel then return true end
         end
         return db.enabledDungeon

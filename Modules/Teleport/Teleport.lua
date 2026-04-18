@@ -3,24 +3,25 @@ ns.Teleport = {}
 local Teleport = ns.Teleport
 
 -- [ CONSTANTS ] ---------------------------------------------------------------
+-- searchKey: lowercase substring that will match this dungeon's name as returned
+-- by C_ChallengeMode.GetMapUIInfo() — used to build challengeMapToDungeon dynamically.
 local DUNGEONS = {
-    { name = "Academy",                  spellID = 393273  },
-    { name = "Terrace",                  spellID = 1254572 },
-    { name = "Nexuspoint",               spellID = 1254563 },
-    { name = "Spire",                    spellID = 1254400 },
-    { name = "Skyreach",                 spellID = 159898  },
-    { name = "Caverns",                  spellID = 1254559 },
-    { name = "Pit of Saron",             spellID = 1254555 },
-    { name = "Triumvirate",              spellID = 1254551 },
+    { name = "Academy",      searchKey = "academy",     spellID = 393273  },
+    { name = "Terrace",      searchKey = "terrace",     spellID = 1254572 },
+    { name = "Nexuspoint",   searchKey = "nexus",       spellID = 1254563 },
+    { name = "Spire",        searchKey = "spire",       spellID = 1254400 },
+    { name = "Skyreach",     searchKey = "skyreach",    spellID = 159898  },
+    { name = "Caverns",      searchKey = "caverns",     spellID = 1254559 },
+    { name = "Pit of Saron", searchKey = "pit of saron",spellID = 1254555 },
+    { name = "Triumvirate",  searchKey = "triumvirate", spellID = 1254551 },
 }
 
--- challengeMapID → DUNGEONS index
--- Hardcoded to match the DUNGEONS table order above; same IDs used by BigWigs.
--- DUNGEONS order: 1=Academy, 2=Terrace, 3=Nexuspoint, 4=Spire,
---                 5=Skyreach, 6=Caverns, 7=Pit of Saron, 8=Triumvirate
+-- challengeMapID → DUNGEONS index.
+-- Seeded with known-good fallback values; rebuilt at runtime via
+-- BuildChallengeMapLookup() once C_ChallengeMode data is available.
 local challengeMapToDungeon = {
     [402] = 1,  -- Algeth'ar Academy
-    [558] = 2,  -- Magister's Terrace  ("Terrace")
+    [558] = 2,  -- Magister's Terrace
     [559] = 3,  -- Nexus-Point Xenas
     [557] = 4,  -- Windrunner's Spire
     [161] = 5,  -- Skyreach
@@ -28,6 +29,27 @@ local challengeMapToDungeon = {
     [556] = 7,  -- Pit of Saron
     [583] = 8,  -- Seat of the Triumvirate
 }
+
+-- Rebuild challengeMapToDungeon by asking C_ChallengeMode for the current season's
+-- map list and name-matching against DUNGEONS[i].searchKey.
+-- Safe to call multiple times; only updates entries we can confirm.
+local function BuildChallengeMapLookup()
+    if not (C_ChallengeMode and C_ChallengeMode.GetMapTable) then return end
+    local maps = C_ChallengeMode.GetMapTable()
+    if not maps then return end
+    for _, mapID in ipairs(maps) do
+        local mapName = C_ChallengeMode.GetMapUIInfo(mapID)
+        if mapName then
+            local lowerMap = mapName:lower()
+            for i, dungeon in ipairs(DUNGEONS) do
+                if lowerMap:find(dungeon.searchKey, 1, true) then
+                    challengeMapToDungeon[mapID] = i
+                    break
+                end
+            end
+        end
+    end
+end
 
 local BTN_W, BTN_H = 180, 22
 local BTN_PAD = 1
@@ -53,7 +75,13 @@ local libKeystoneTable = {}  -- unique table used as our identifier with LibKeys
 
 local function OnLibKeystoneData(keyLevel, keyMapID, playerRating, playerName, channel)
     if channel ~= "PARTY" then return end  -- ignore GUILD broadcasts
-    if not playerName or playerName == "" then return end  -- lib captured pName before player logged in
+    -- LibKeystone captures pName at library load time (before PLAYER_LOGIN), so it
+    -- may arrive as nil. Fall back to UnitName("player") — by the time this callback
+    -- fires we are logged in and the name is available.
+    if not playerName or playerName == "" then
+        playerName = UnitName("player") or ""
+        if playerName == "" then return end
+    end
     -- Normalize: strip realm suffix so "Name-Realm" and "Name" are the same key
     local shortName = playerName:match("^([^%-]+)") or playerName
     if keyLevel and keyLevel > 0 and keyMapID and keyMapID > 0 then
@@ -119,18 +147,24 @@ local function CollectPartyKeystones()
                     end
                 end
             end
-            -- unit may still be nil if the player hasn't fully loaded; AddEntry
-            -- handles nil gracefully by falling back to the gold colour.
             AddEntry(data.mapID, data.level, unit, playerName)
         end
     end
 
-    -- Fallback: own key via direct API if LibKeystone cache didn't provide it
-    -- (e.g., library not loaded, or pName was nil at load time).
-    if not ownKeyHandled and C_MythicPlus then
+    -- Always supplement with direct C_MythicPlus read for own key.
+    -- This covers: LibKeystone not loaded, pName nil at lib load, or data not yet in cache.
+    if C_MythicPlus then
         local mapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID and C_MythicPlus.GetOwnedKeystoneChallengeMapID()
         local level = C_MythicPlus.GetOwnedKeystoneLevel and C_MythicPlus.GetOwnedKeystoneLevel()
-        AddEntry(mapID, level, "player", UnitName("player") or "player")
+        if mapID and mapID > 0 and level and level > 0 then
+            local name = UnitName("player") or "player"
+            if not ownKeyHandled then
+                -- Cache it so OnLibKeystoneData can normalise it later
+                local shortName = name:match("^([^%-]+)") or name
+                partyKeyCache[shortName] = { mapID = mapID, level = level }
+                AddEntry(mapID, level, "player", shortName)
+            end
+        end
     end
 
     return result
@@ -248,9 +282,15 @@ local function MakePanel()
     refreshBtn:SetScript("OnEnter", function()
         f:SetAlpha(1)
         rIcon:SetVertexColor(T.accent[1], T.accent[2], T.accent[3], 1)
+        -- Count how many keys are in cache
+        local keyCount = 0
+        for _ in pairs(partyKeyCache) do keyCount = keyCount + 1 end
+        local partySize = GetNumSubgroupMembers() + 1  -- +1 for self
         GameTooltip:SetOwner(refreshBtn, "ANCHOR_TOP")
         GameTooltip:SetText("Refresh keystones", 1, 1, 1, 1, true)
-        GameTooltip:AddLine("Re-request keystone data from party members.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(string.format("Keys in cache: %d / %d party members", keyCount, partySize), 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("Re-requests from party. Only works if they have BigWigs, DBM, or another LibKeystone addon.", 0.6, 0.6, 0.6, true)
+        GameTooltip:AddLine("Shift+Click to print cache to chat for debugging.", 0.5, 0.5, 0.5, true)
         GameTooltip:Show()
     end)
     refreshBtn:SetScript("OnLeave", function()
@@ -259,9 +299,28 @@ local function MakePanel()
         GameTooltip:Hide()
     end)
     refreshBtn:SetScript("OnClick", function()
-        wipe(partyKeyCache)
+        if IsShiftKeyDown() then
+            -- Debug: print cache state to chat
+            print("|cff4fc3f7yaqol TeleportKeys debug:|r")
+            local keyCount = 0
+            for name, data in pairs(partyKeyCache) do
+                local dungIdx = challengeMapToDungeon[data.mapID]
+                local dungName = dungIdx and DUNGEONS[dungIdx] and DUNGEONS[dungIdx].name or ("??mapID="..tostring(data.mapID))
+                print(string.format("  [%s] +%d %s (mapID=%d, dungIdx=%s)", name, data.level, dungName, data.mapID, tostring(dungIdx)))
+                keyCount = keyCount + 1
+            end
+            if keyCount == 0 then print("  (cache is empty)") end
+            -- Also show challengeMapToDungeon entries
+            print("  Challenge map mappings:")
+            for mapID, idx in pairs(challengeMapToDungeon) do
+                print(string.format("    mapID=%d → %s", mapID, DUNGEONS[idx] and DUNGEONS[idx].name or "?"))
+            end
+            return
+        end
+        -- Normal click: don't wipe the cache (keep what we have visible while waiting
+        -- for updated responses). Just re-request and refresh after delay.
+        RefreshButtons()
         RequestPartyKeystones()
-        -- LibKeystone throttles broadcasts at 3s; wait 4s for all members to respond
         C_Timer.After(4, RefreshButtons)
     end)
 
@@ -481,6 +540,10 @@ function Teleport.Init(addon)
     end
     panel:SetScale(addon:Profile().teleport.scale)
     ApplyPos()
+    -- Build dynamic challenge map → dungeon lookup from available season maps.
+    -- C_ChallengeMode data may not be ready at load time; we rebuild again on
+    -- MYTHIC_PLUS_CURRENT_AFFIX_UPDATE and PLAYER_ENTERING_WORLD.
+    BuildChallengeMapLookup()
     RefreshButtons()
     CheckVisibility()
 
@@ -560,11 +623,14 @@ function Teleport.Init(addon)
 
         elseif event == "BAG_UPDATE_DELAYED" then
             -- New keystone landed in bags (after key completion or weekly chest).
-            -- Re-read our own key and repaint.
+            -- Re-read our own key, update cache, and repaint.
+            RequestPartyKeystones()
             RefreshButtons()
 
         elseif event == "MYTHIC_PLUS_CURRENT_AFFIX_UPDATE" then
-            -- M+ data became available (delayed on login). Re-read own key.
+            -- M+ data became available (delayed on login). Rebuild map lookup first,
+            -- then re-read own key into cache.
+            BuildChallengeMapLookup()
             RequestPartyKeystones()  -- re-seed own key into cache
             C_Timer.After(1, RefreshButtons)
             if IsInGroup() then
@@ -579,6 +645,7 @@ function Teleport.Init(addon)
             RefreshButtons()
 
         elseif event == "PLAYER_ENTERING_WORLD" then
+            BuildChallengeMapLookup()
             if firstEnterWorld then
                 firstEnterWorld = false
                 -- First login: cache is empty anyway; request aggressively.

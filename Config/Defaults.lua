@@ -42,6 +42,10 @@ ns.Defaults = {
             enabled       = true,
             hideBlizzard  = true,   -- hide default Blizzard M+ block in objective tracker
             point = "CENTER", relPoint = "CENTER", x = 300, y = 200,
+            -- Completion message
+            completionMsg        = false,
+            completionMsgText    = "{dungeon} +{level} timed! {time} remaining — {deaths} death(s)",
+            completionMsgChannel = "PARTY",
         },
 
         -- Teleport module

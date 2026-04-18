@@ -1,6 +1,21 @@
 # yaqol
 
-## [v1.1.0](https://github.com/Larsmara/yaqol/tree/v1.1.0) (2026-04-18)
+## [v1.1.1](https://github.com/Larsmara/yaqol/tree/v1.1.1) (2026-04-18)
+[Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.1.0...v1.1.1) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
+
+**New:**
+- M+ Timer: optional completion message — sends a customisable message to party/say/yell when the key finishes; supports tokens `{dungeon}`, `{level}`, `{time}`, `{overtime}`, `{deaths}`, `{upgrades}`
+- Teleport: map ID lookup is now built dynamically from `C_ChallengeMode.GetMapTable()` — fixes keys for any dungeon whose hardcoded ID didn't match the current season
+- Teleport: Shift+Click the refresh button to print the full keystone cache and map mappings to chat for debugging
+- Teleport: refresh button no longer wipes the cache — keeps visible keys while waiting for updated responses
+
+**Fixes:**
+- M+ Timer: Blizzard mob-count / criteria block now fully hidden — `ObjectiveTrackerFrame:Show` is hooked so it stays suppressed through every mob kill during the key
+- M+ Timer: `StageBlock` and `ScenarioTimerFrame` added to the hide list; all Blizzard M+ UI elements are now covered
+- M+ Timer: `CHALLENGE_MODE_START` immediately suppresses all Blizzard blocks at key start
+- Combat Ress & Buff Reminder: keystone level comparison crash fixed — `GetActiveKeystoneInfo()` returns `level` as the first value, not the third
+- Teleport: own keystone now reliably shown — LibKeystone `pName` is `nil` at load time; callback now substitutes `UnitName("player")` when playerName is absent
+
 [Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.0.35...v1.1.0) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
 
 **New:**

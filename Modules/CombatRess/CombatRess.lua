@@ -22,7 +22,7 @@ local function ShouldShow()
     local _, iType = GetInstanceInfo()
     if iType == "raid" then return true end
     if iType == "party" and C_ChallengeMode.IsChallengeModeActive() then
-        local _, _, lvl = C_ChallengeMode.GetActiveKeystoneInfo()
+        local lvl = C_ChallengeMode.GetActiveKeystoneInfo()
         return (lvl or 0) >= 1
     end
     return false

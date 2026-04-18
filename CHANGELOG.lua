@@ -8,6 +8,19 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.1.1",
+        date    = "2026-04-18",
+        changes = {
+            "|cff4fc3f7New|r  M+ Timer: completion message — customisable chat announce with tokens {dungeon} {level} {time} {deaths} {upgrades}",
+            "|cff4fc3f7New|r  Teleport: dynamic dungeon map-ID lookup — no more hardcoded IDs that break between seasons",
+            "|cff4fc3f7New|r  Teleport: Shift+Click refresh to print keystone cache debug info to chat",
+            "|cff2dc9b8Fix|r  M+ Timer: mob count / ObjectivesBlock now fully hidden during key (Show hook added)",
+            "|cff2dc9b8Fix|r  M+ Timer: ScenarioTimerFrame and all Blizzard M+ UI elements suppressed at key start",
+            "|cff2dc9b8Fix|r  Combat Ress & Buff Reminder: crash comparing keystone level fixed (wrong return index)",
+            "|cff2dc9b8Fix|r  Teleport: own keystone always shown (LibKeystone pName nil-at-load workaround)",
+        },
+    },
+    {
         version = "1.1.0",
         date    = "2026-04-18",
         changes = {

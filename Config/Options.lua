@@ -1449,6 +1449,87 @@ local function BuildMythicTimer(content, db, addon)
     RefreshDemoBtns()
     y = y - 34
 
+    y = y - 8
+
+    -- ── COMPLETION MESSAGE ────────────────────────────────────────────────
+    local hMsg = Label(content, "COMPLETION MESSAGE", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    hMsg:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    _, dh = MakeToggle(content, "Send message when key completes",
+        function() return mt.completionMsg end,
+        function(v) mt.completionMsg = v end, y)
+    y = y - dh - 8
+
+    -- Channel selector buttons
+    local chanLbl = Label(content, "Channel:", "GameFontNormalSmall",
+        T.textDim[1], T.textDim[2], T.textDim[3])
+    chanLbl:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
+    local channels = { "PARTY", "SAY", "YELL" }
+    local chanBtns = {}
+    local bx = T.PAD + 60
+    for _, ch in ipairs(channels) do
+        local btn = CreateFrame("Button", nil, content)
+        btn:SetSize(52, 18)
+        btn:SetPoint("TOPLEFT", content, "TOPLEFT", bx, y)
+        ns.Theme:StyleButton(btn, 52, 18)
+        local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        lbl:SetAllPoints(); lbl:SetJustifyH("CENTER"); lbl:SetText(ch)
+        local function UpdateHighlight()
+            if mt.completionMsgChannel == ch then
+                lbl:SetTextColor(T.accent[1], T.accent[2], T.accent[3], 1)
+            else
+                lbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
+            end
+        end
+        UpdateHighlight()
+        btn:SetScript("OnClick", function()
+            mt.completionMsgChannel = ch
+            for _, b in ipairs(chanBtns) do b.updateHL() end
+        end)
+        btn.updateHL = UpdateHighlight
+        chanBtns[#chanBtns + 1] = btn
+        bx = bx + 56
+    end
+    y = y - 26
+
+    -- Message text EditBox
+    local ebLbl = Label(content, "Message:", "GameFontNormalSmall",
+        T.textDim[1], T.textDim[2], T.textDim[3])
+    ebLbl:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
+
+    local ebW = T.PANEL_W - T.PAD * 2
+    local eb = CreateFrame("EditBox", nil, content)
+    eb:SetSize(ebW, 22)
+    eb:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y - 20)
+    eb:SetAutoFocus(false)
+    eb:SetMaxLetters(255)
+    eb:SetFontObject("GameFontNormalSmall")
+    eb:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
+    eb:SetText(mt.completionMsgText or "")
+    Bg(eb, T.bgInput[1], T.bgInput[2], T.bgInput[3], T.bgInput[4])
+    local ebBorder = eb:CreateTexture(nil, "BORDER")
+    ebBorder:SetSize(ebW, 1); ebBorder:SetPoint("BOTTOM")
+    ebBorder:SetColorTexture(T.border[1], T.border[2], T.border[3], T.border[4])
+    eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    eb:SetScript("OnEnterPressed", function(self)
+        mt.completionMsgText = self:GetText()
+        self:ClearFocus()
+    end)
+    eb:SetScript("OnEditFocusLost", function(self)
+        mt.completionMsgText = self:GetText()
+    end)
+    y = y - 50
+
+    local tokenHelp = Label(content,
+        "Tokens: {dungeon}  {level}  {time}  {overtime}  {deaths}  {upgrades}",
+        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+    tokenHelp:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
+    tokenHelp:SetWidth(ebW)
+    tokenHelp:SetJustifyH("LEFT")
+    y = y - 20
+
     return y - 20
 end
 

@@ -3,7 +3,7 @@
 ## Notes: Yet Another Quality Of Life — M+ Teleports, Buff Reminders & QoL automation
 ## IconTexture: YAQOL
 ## Author: Lars
-## Version: 1.1.0
+## Version: 1.1.1
 ## X-Curse-Project-ID: 1502405
 ## SavedVariables: yaqolDB
 

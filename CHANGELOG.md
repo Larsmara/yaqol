@@ -1,6 +1,11 @@
 # yaqol
 
-## [v1.1.1](https://github.com/Larsmara/yaqol/tree/v1.1.1) (2026-04-18)
+## [v1.1.2](https://github.com/Larsmara/yaqol/tree/v1.1.2) (2026-04-18)
+[Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.1.1...v1.1.2) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
+
+**Fixes:**
+- M+ Timer: completion chat message now works — WoW 12.0 blocks `SendChatMessage` inside instances; message is built at key completion and queued, then sent when the player zones back to the world
+
 [Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.1.0...v1.1.1) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
 
 **New:**

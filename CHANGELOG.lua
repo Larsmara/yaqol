@@ -8,6 +8,13 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.1.2",
+        date    = "2026-04-18",
+        changes = {
+            "|cff2dc9b8Fix|r  M+ Timer: completion message now sends correctly — queued at run end, delivered after leaving the instance (WoW 12.0 blocks chat inside instances)",
+        },
+    },
+    {
         version = "1.1.1",
         date    = "2026-04-18",
         changes = {

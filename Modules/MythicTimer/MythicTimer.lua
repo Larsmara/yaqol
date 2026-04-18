@@ -26,6 +26,7 @@ local elapsedBase     -- elapsed seconds at last sync
 local elapsedAccum    -- running accumulator since last sync
 local deathCount, timeLost = 0, 0
 local dungeonCompleted = false  -- true after CHALLENGE_MODE_COMPLETED, cleared on deactivate
+local pendingChatMsg = nil      -- queued completion message, sent after leaving the instance
 local keystoneLevel = 0
 local dungeonName = ""
 local affixIDs = {}
@@ -668,7 +669,10 @@ local function OnEvent(self, event, ...)
         -- Show completion banner now that we have the final elapsed
         local elapsed = elapsedBase + elapsedAccum
         ShowTimedBanner(elapsed, timeLimit)
-        -- Optional party chat announcement
+        -- Optional party chat announcement.
+        -- SendChatMessage is blocked inside instances (12.0 restriction), so we
+        -- build the message now (while the run data is still available) and queue
+        -- it; PLAYER_ENTERING_WORLD fires it once the player is back in the world.
         local d = cfg()
         if d.completionMsg and d.completionMsgText and d.completionMsgText ~= "" then
             local remaining = timeLimit - elapsed
@@ -689,9 +693,8 @@ local function OnEvent(self, event, ...)
             msg = msg:gsub("{deaths}",   tostring(deathCount))
             msg = msg:gsub("{upgrades}", upgradeStr)
             local channel = d.completionMsgChannel or "PARTY"
-            -- Only send if in a group for PARTY; fall back to SAY otherwise
             if channel == "PARTY" and not IsInGroup() then channel = "SAY" end
-            SendChatMessage(msg, channel)
+            pendingChatMsg = { text = msg, channel = channel }
         end
 
     elseif event == "CHALLENGE_MODE_DEATH_COUNT_UPDATED" then
@@ -712,6 +715,17 @@ local function OnEvent(self, event, ...)
         end
 
     elseif event == "PLAYER_ENTERING_WORLD" then
+        -- Send queued completion message now that we're outside the instance.
+        if pendingChatMsg then
+            local m = pendingChatMsg
+            pendingChatMsg = nil
+            local _, iType = GetInstanceInfo()
+            if iType == "none" or iType == nil then
+                SendChatMessage(m.text, m.channel)
+            end
+            -- If still in an instance (e.g. stayed for loot), discard — don't
+            -- spam on every zone transition.
+        end
         -- On login/reload, check if we're already in a M+ dungeon
         if C_ChallengeMode.IsChallengeModeActive() then
             CheckTimers(GetWorldElapsedTimers())

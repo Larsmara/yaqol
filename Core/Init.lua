@@ -71,6 +71,28 @@ function yaqol:OnInitialize()
         self.db.profile.skyridingHUD = CopyTable(ns.Defaults.profile.skyridingHUD)
     end
 
+    -- Migrate: ensure global run history table exists for old profiles
+    if not self.db.global.runHistoryByChar then
+        self.db.global.runHistoryByChar = {}
+    end
+    if not self.db.global.historyPanelPos then
+        self.db.global.historyPanelPos = CopyTable(ns.Defaults.global.historyPanelPos)
+    end
+    if not self.db.profile.configPanelPos then
+        self.db.profile.configPanelPos = CopyTable(ns.Defaults.profile.configPanelPos)
+    end
+
+    -- Migrate: ensure vaultTracker defaults exist for old profiles
+    if not self.db.profile.vaultTracker then
+        self.db.profile.vaultTracker = CopyTable(ns.Defaults.profile.vaultTracker)
+    end
+    if self.db.profile.vaultTracker.showWorld == nil then
+        self.db.profile.vaultTracker.showWorld = true
+    end
+    if not self.db.profile.mouseTracker then
+        self.db.profile.mouseTracker = CopyTable(ns.Defaults.profile.mouseTracker)
+    end
+
     ns.Config.Build(self)
     self:RegisterChatCommand("yaqol", "OnSlashCommand")
     self:RegisterChatCommand("yq", "OnSlashCommand")
@@ -87,6 +109,9 @@ function yaqol:OnEnable()
     ns.SkyridingHUD.Init(self)
     ns.CombatRess.Init(self)
     ns.MythicTimer.Init(self)
+    ns.VaultTracker.Init(self)
+    ns.RunHistory.Init(self)
+    ns.MouseTracker.Init(self)
 end
 
 function yaqol:OnProfileChanged()
@@ -100,6 +125,9 @@ function yaqol:OnProfileChanged()
     ns.SkyridingHUD.Refresh(self)
     ns.CombatRess.Refresh(self)
     ns.MythicTimer.Refresh(self)
+    ns.VaultTracker.Refresh(self)
+    ns.RunHistory.Refresh(self)
+    ns.MouseTracker.Refresh(self)
 end
 
 function yaqol:OnSlashCommand(input)
@@ -114,6 +142,8 @@ function yaqol:OnSlashCommand(input)
         else
             ns.LayoutMode.Enter()
         end
+    elseif input == "history" then
+        ns.RunHistory.Toggle()
     else
         ns.Config.Toggle()
     end

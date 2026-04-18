@@ -1,6 +1,32 @@
 # yaqol
 
-## [v1.0.35](https://github.com/Larsmara/yaqol/tree/v1.0.35) (2026-04-18)
+## [v1.1.0](https://github.com/Larsmara/yaqol/tree/v1.1.0) (2026-04-18)
+[Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.0.35...v1.1.0) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
+
+**New:**
+- Mouse Tracker: new module — draws a ring and/or crosshair around the cursor, great for streaming or presentations
+- Mouse Tracker: ring uses 64 texture-quad segments for a smooth, gap-free circle with configurable radius, thickness, and opacity
+- Mouse Tracker: optional crosshair with configurable line length, center gap, and line width
+- Mouse Tracker: optional center dot with configurable size
+- Mouse Tracker: custom color picker with live swatch preview; quick preset colors (White/Red/Yellow/Cyan/Green); option to follow theme accent color
+- M+ Timer: completion banner now shows death count and time penalty
+- Options: panel position is now saved and restored across sessions
+- Run History: panel position is now saved and restored across sessions
+
+**Fixes:**
+- M+ Timer: body background now correctly follows the active theme color (was always a hardcoded dark stone texture)
+- M+ Timer: DiamondMetal header corners fixed to 32×39 px — no longer overflow the frame width
+- M+ Timer: boss kill times now recorded correctly (criteriaData sparse-indexing bug fixed)
+- M+ Timer: keystone level was reading the wrong return value from `GetActiveKeystoneInfo`
+- Run History: recording was broken — switched from `GetActiveKeystoneInfo` (returns nil after key deactivates) to `GetChallengeCompletionInfo`
+- Vault Tracker: M+ progress now displays correctly (`Enum.WeeklyRewardChestThresholdType.Activities` renamed from `MythicPlus` in 12.0)
+- Vault Tracker: colored reward boxes no longer washed out (draw layer was covering the colored texture)
+- Vault Tracker: item level now read from the correct `GetItemInfo` return index
+- Vault Tracker: `GetExampleRewardItemHyperlinks` return value now handled as a string (not a table)
+- Combat Ress: crash on M+ keystone level detection fixed
+- Buff Reminder: crash on M+ keystone level detection fixed
+- Teleport: own keystone now always displayed — was falling back to direct API calls that return 0 before M+ data loads; now reads from LibKeystone cache with correct unit token
+
 [Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.0.34...v1.0.35) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
 
 **New:**

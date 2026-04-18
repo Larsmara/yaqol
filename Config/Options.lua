@@ -1499,6 +1499,265 @@ local function BuildSkyriding(content, db, addon)
     return y - 20
 end
 
+local function BuildVaultTracker(content, db, addon)
+    local d   = db.vaultTracker
+    local y   = -T.PAD
+    local _, dh
+
+    local h1 = Label(content, "VAULT TRACKER", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    h1:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    _, dh = MakeToggle(content, "Enable Vault Tracker",
+        function() return d.enabled end,
+        function(v) d.enabled = v; ns.VaultTracker.Refresh(addon) end, y)
+    y = y - dh - 4
+
+    local note = Label(content,
+        "Hover the VAULT anchor to see your Great Vault progress — pips per slot, "
+        .. "completions needed, and estimated item level for unlocked slots. Drag to reposition.",
+        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+    note:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
+    note:SetWidth(T.PANEL_W - T.PAD*2 - 48)
+    note:SetJustifyH("LEFT")
+    y = y - 42
+
+    y = y - 8
+    local h2 = Label(content, "TRACKS", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    h2:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    _, dh = MakeToggle(content, "Show M+ track  |cff888888(always on)|r",
+        function() return true end,
+        function() end, y)
+    y = y - dh - 4
+
+    _, dh = MakeToggle(content, "Show Raid track",
+        function() return d.showRaid end,
+        function(v) d.showRaid = v; ns.VaultTracker.Refresh(addon) end, y)
+    y = y - dh - 4
+
+    _, dh = MakeToggle(content, "Show World track",
+        function() return d.showWorld end,
+        function(v) d.showWorld = v; ns.VaultTracker.Refresh(addon) end, y)
+    y = y - dh - 4
+
+    _, dh = MakeToggle(content, "Show Ranked PvP track",
+        function() return d.showPvP end,
+        function(v) d.showPvP = v; ns.VaultTracker.Refresh(addon) end, y)
+    y = y - dh - 8
+
+    local h3 = Label(content, "DISPLAY", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    h3:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    _, dh = MakeSlider(content, "Scale", 0.5, 2.0, 0.05,
+        function() return d.scale or 1.0 end,
+        function(v) d.scale = v; ns.VaultTracker.Refresh(addon) end, y,
+        function(v) return string.format("%.2f", v) end)
+    y = y - dh - 8
+
+    local resetBtn = MakeButton(content, "Reset Position", function()
+        d.point = "RIGHT"; d.relPoint = "RIGHT"; d.x = -20; d.y = 0
+        ns.VaultTracker.Refresh(addon)
+    end, 120, 22)
+    resetBtn:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
+    y = y - 30
+
+    return y - 20
+end
+
+local function BuildMouseTracker(content, db, addon)
+    local d = db.mouseTracker
+    local y = -T.PAD
+    local _, dh
+
+    -- Helper: open the WoW color picker, auto-disabling useAccent
+    local activeSwatch = nil  -- reference to the current swatch texture so we can update it live
+    local function PickColor()
+        d.useAccent = false
+        local prevR, prevG, prevB = d.r, d.g, d.b
+        local function refresh(r, g, b)
+            d.r, d.g, d.b = r, g, b
+            if activeSwatch then activeSwatch:SetColorTexture(r, g, b, 1) end
+            ns.MouseTracker.Refresh(addon)
+        end
+        ColorPickerFrame:SetupColorPickerAndShow({
+            r = d.r, g = d.g, b = d.b,
+            hasOpacity = false,
+            swatchFunc = function()
+                local r, g, b = ColorPickerFrame:GetColorRGB()
+                refresh(r, g, b)
+            end,
+            cancelFunc = function()
+                refresh(prevR, prevG, prevB)
+            end,
+        })
+    end
+
+    -- Header
+    local h1 = Label(content, "MOUSE TRACKER", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    h1:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    _, dh = MakeToggle(content, "Enable Mouse Tracker",
+        function() return d.enabled end,
+        function(v) d.enabled = v; ns.MouseTracker.Refresh(addon) end, y)
+    y = y - dh - 4
+
+    local note = Label(content,
+        "Draws indicators around your cursor. Useful for streaming, presentations, or just finding your mouse.",
+        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+    note:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
+    note:SetWidth(T.PANEL_W - T.PAD*2 - 48)
+    note:SetJustifyH("LEFT")
+    y = y - 34
+
+    -- Ring section ------------------------------------------------------------
+    y = y - 4
+    local h2 = Label(content, "RING", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    h2:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    _, dh = MakeToggle(content, "Show ring",
+        function() return d.showRing end,
+        function(v) d.showRing = v; ns.MouseTracker.Refresh(addon) end, y)
+    y = y - dh - 4
+
+    _, dh = MakeSlider(content, "Radius", 12, 80, 1,
+        function() return d.radius end,
+        function(v) d.radius = v; ns.MouseTracker.Refresh(addon) end, y,
+        function(v) return tostring(math.floor(v)) .. "px" end)
+    y = y - dh - 4
+
+    _, dh = MakeSlider(content, "Thickness", 1, 8, 1,
+        function() return d.thickness end,
+        function(v) d.thickness = v; ns.MouseTracker.Refresh(addon) end, y,
+        function(v) return tostring(math.floor(v)) .. "px" end)
+    y = y - dh - 4
+
+    _, dh = MakeSlider(content, "Opacity", 0.05, 1.0, 0.05,
+        function() return d.alpha end,
+        function(v) d.alpha = v; ns.MouseTracker.Refresh(addon) end, y,
+        function(v) return string.format("%d%%", v * 100) end)
+    y = y - dh - 8
+
+    -- Dot section -------------------------------------------------------------
+    local hDot = Label(content, "DOT", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    hDot:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    _, dh = MakeToggle(content, "Show center dot",
+        function() return d.showDot end,
+        function(v) d.showDot = v; ns.MouseTracker.Refresh(addon) end, y)
+    y = y - dh - 4
+
+    _, dh = MakeSlider(content, "Dot size", 2, 20, 1,
+        function() return d.dotSize end,
+        function(v) d.dotSize = v; ns.MouseTracker.Refresh(addon) end, y,
+        function(v) return tostring(math.floor(v)) .. "px" end)
+    y = y - dh - 8
+
+    -- Crosshair section -------------------------------------------------------
+    local hCross = Label(content, "CROSSHAIR", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    hCross:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    _, dh = MakeToggle(content, "Show crosshair",
+        function() return d.showCrosshair end,
+        function(v) d.showCrosshair = v; ns.MouseTracker.Refresh(addon) end, y)
+    y = y - dh - 4
+
+    _, dh = MakeSlider(content, "Line length", 6, 60, 1,
+        function() return d.crosshairLength end,
+        function(v) d.crosshairLength = v; ns.MouseTracker.Refresh(addon) end, y,
+        function(v) return tostring(math.floor(v)) .. "px" end)
+    y = y - dh - 4
+
+    _, dh = MakeSlider(content, "Center gap", 0, 24, 1,
+        function() return d.crosshairGap end,
+        function(v) d.crosshairGap = v; ns.MouseTracker.Refresh(addon) end, y,
+        function(v) return tostring(math.floor(v)) .. "px" end)
+    y = y - dh - 4
+
+    _, dh = MakeSlider(content, "Line width", 1, 6, 1,
+        function() return d.crosshairThickness end,
+        function(v) d.crosshairThickness = v; ns.MouseTracker.Refresh(addon) end, y,
+        function(v) return tostring(math.floor(v)) .. "px" end)
+    y = y - dh - 8
+
+    -- Color section -----------------------------------------------------------
+    local h3 = Label(content, "COLOR", "GameFontNormalSmall",
+        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    h3:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    _, dh = MakeToggle(content, "Use theme accent color",
+        function() return d.useAccent end,
+        function(v) d.useAccent = v; ns.MouseTracker.Refresh(addon) end, y)
+    y = y - dh - 8
+
+    -- Color picker button + swatch
+    local pickerBtn = CreateFrame("Button", nil, content)
+    pickerBtn:SetSize(110, 22)
+    pickerBtn:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
+    ns.Theme:StyleButton(pickerBtn, 110, 22)
+    local swatch = pickerBtn:CreateTexture(nil, "ARTWORK")
+    swatch:SetSize(12, 12)
+    swatch:SetPoint("LEFT", pickerBtn, "LEFT", 6, 0)
+    swatch:SetColorTexture(d.r, d.g, d.b, 1)
+    activeSwatch = swatch
+    local pickerLbl = pickerBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    pickerLbl:SetPoint("LEFT", swatch, "RIGHT", 5, 0)
+    pickerLbl:SetText("Custom Color")
+    pickerBtn:SetScript("OnClick", PickColor)
+    y = y - 28
+
+    -- Quick color presets
+    local presetLbl = Label(content, "Presets:", "GameFontNormalSmall",
+        T.textDim[1], T.textDim[2], T.textDim[3])
+    presetLbl:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
+    local presets = {
+        { label = "White",  r=1,    g=1,    b=1    },
+        { label = "Red",    r=0.95, g=0.2,  b=0.2  },
+        { label = "Yellow", r=1,    g=0.9,  b=0.1  },
+        { label = "Cyan",   r=0.1,  g=0.9,  b=0.95 },
+        { label = "Green",  r=0.2,  g=0.95, b=0.35 },
+    }
+    local bx = T.PAD + 52
+    for _, p in ipairs(presets) do
+        local pr, pg, pb = p.r, p.g, p.b
+        local btn = CreateFrame("Button", nil, content)
+        btn:SetSize(56, 18)
+        btn:SetPoint("TOPLEFT", content, "TOPLEFT", bx, y)
+        ns.Theme:StyleButton(btn, 56, 18)
+        local ps = btn:CreateTexture(nil, "ARTWORK")
+        ps:SetSize(10, 10)
+        ps:SetPoint("LEFT", btn, "LEFT", 4, 0)
+        ps:SetColorTexture(pr, pg, pb, 1)
+        local plbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        plbl:SetPoint("LEFT", ps, "RIGHT", 4, 0)
+        plbl:SetText(p.label)
+        btn:SetScript("OnClick", function()
+            d.r, d.g, d.b = pr, pg, pb
+            d.useAccent = false
+            if activeSwatch then activeSwatch:SetColorTexture(pr, pg, pb, 1) end
+            ns.MouseTracker.Refresh(addon)
+        end)
+        bx = bx + 60
+    end
+    y = y - 26
+
+    return y - 20
+end
+
 -- [ MAIN PANEL ] --------------------------------------------------------------
 local panel
 local TABS = {
@@ -1509,6 +1768,8 @@ local TABS = {
     { key="mythictimer",  label="M+ Timer"      },
     { key="skyriding",    label="Skyriding"     },
     { key="friendlist",   label="Friend List"   },
+    { key="vaulttracker", label="Vault Tracker"  },
+    { key="mousetracker", label="Mouse Tracker"  },
 }
 
 local function BuildPanel(addon)
@@ -1516,13 +1777,20 @@ local function BuildPanel(addon)
     local W, H = T.PANEL_W, T.PANEL_H
 
     local f = CreateFrame("Frame", "yaqolConfigPanel", UIParent)
-    f:SetSize(W, H); f:SetPoint("CENTER")
+    f:SetSize(W, H)
+    local pos = db.configPanelPos or {}
+    f:SetPoint(pos.point or "CENTER", UIParent, pos.relPoint or "CENTER", pos.x or 0, pos.y or 0)
     f:SetScale(db.configScale or 1.0)
     f:SetFrameStrata("DIALOG")
     f:SetMovable(true); f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop",  f.StopMovingOrSizing)
+    f:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        local p = db.configPanelPos
+        if not p then db.configPanelPos = {}; p = db.configPanelPos end
+        p.point, _, p.relPoint, p.x, p.y = self:GetPoint()
+    end)
     f:SetClampedToScreen(true); f:Hide()
     ns.Theme:ApplyBg(f)
     ns.Theme:ApplyBorder(f)
@@ -1571,10 +1839,27 @@ local function BuildPanel(addon)
     changelogBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     changelogBtn:SetScript("OnClick", function() ns.ChangelogUI.Toggle() end)
 
+    -- Run History button
+    local historyBtn = CreateFrame("Button", nil, header)
+    historyBtn:SetSize(90, 22)
+    historyBtn:SetPoint("RIGHT", changelogBtn, "LEFT", -6, 0)
+    ns.Theme:StyleButton(historyBtn, 90, 22)
+    local histLbl = historyBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    histLbl:SetPoint("CENTER")
+    histLbl:SetText(Accent() .. "Run History|r")
+    historyBtn:SetScript("OnEnter", function()
+        GameTooltip:SetOwner(historyBtn, "ANCHOR_BOTTOM")
+        GameTooltip:AddLine("Run History", 1, 1, 1)
+        GameTooltip:AddLine("View your M+ run log.", 0.68, 0.72, 0.74, true)
+        GameTooltip:Show()
+    end)
+    historyBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    historyBtn:SetScript("OnClick", function() ns.RunHistory.Toggle() end)
+
     -- Layout / Arrange button — same theme styling; icon sits inside on ARTWORK layer
     local layoutBtn = CreateFrame("Button", nil, header)
     layoutBtn:SetSize(100, 22)
-    layoutBtn:SetPoint("RIGHT", changelogBtn, "LEFT", -6, 0)
+    layoutBtn:SetPoint("RIGHT", historyBtn, "LEFT", -6, 0)
     ns.Theme:StyleButton(layoutBtn, 100, 22)
     local layoutIcon = layoutBtn:CreateTexture(nil, "ARTWORK")
     layoutIcon:SetSize(14, 14)
@@ -1676,6 +1961,8 @@ local function BuildPanel(addon)
         if tab.key == "skyriding"    then finalY = BuildSkyriding(tf, db, addon)      end
         if tab.key == "friendlist"   then finalY = BuildFriendList(tf, db, addon)     end
         if tab.key == "merchant"   then finalY = BuildMerchant(tf, db, addon)         end
+        if tab.key == "vaulttracker" then finalY = BuildVaultTracker(tf, db, addon)   end
+        if tab.key == "mousetracker" then finalY = BuildMouseTracker(tf, db, addon)   end
         tabHeights[tab.key] = math.abs(finalY)
     end
 

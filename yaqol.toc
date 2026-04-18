@@ -3,7 +3,7 @@
 ## Notes: Yet Another Quality Of Life — M+ Teleports, Buff Reminders & QoL automation
 ## IconTexture: YAQOL
 ## Author: Lars
-## Version: @project-version@
+## Version: 1.1.0
 ## X-Curse-Project-ID: 1502405
 ## SavedVariables: yaqolDB
 
@@ -34,4 +34,7 @@ Modules/Merchant/Merchant.lua
 Modules/RaidTools/RaidTools.lua
 Modules/SkyridingHUD/SkyridingHUD.lua
 Modules/CombatRess/CombatRess.lua
+Modules/VaultTracker/VaultTracker.lua
+Modules/RunHistory/RunHistory.lua
+Modules/MouseTracker/MouseTracker.lua
 Config/Options.lua

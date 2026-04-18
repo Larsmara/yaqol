@@ -74,6 +74,8 @@ end
 -- Returns: [dungeonIdx] = { {r,g,b,level,name,unit}, ... }
 local function CollectPartyKeystones()
     local result = {}
+    local myName = (UnitName("player") or ""):lower()
+    local ownKeyHandled = false
 
     local function AddEntry(mapID, level, unit, nameKey)
         if not mapID or mapID == 0 or not level or level == 0 then return end
@@ -91,26 +93,17 @@ local function CollectPartyKeystones()
         result[dungeonIdx][#result[dungeonIdx] + 1] = { r=r, g=g, b=b, level=level, name=nameKey, unit=unit }
     end
 
-    -- All party data (including self) comes through LibKeystone callback.
-    -- LibKeystone.Request() fires our callback with the player's own key too.
-    -- We also add own key directly in case not in a group / lib not loaded.
-    if C_MythicPlus then
-        local mapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID and C_MythicPlus.GetOwnedKeystoneChallengeMapID()
-        local level = C_MythicPlus.GetOwnedKeystoneLevel and C_MythicPlus.GetOwnedKeystoneLevel()
-        local myName = UnitName("player") or "player"
-        AddEntry(mapID, level, "player", myName)
-    end
-
-    -- Party members from LibKeystone cache
-    local myName = (UnitName("player") or ""):lower()
+    -- All party data (including self) comes through LibKeystone cache.
+    -- Own key arrives via LKS.Request callback; party members via CHAT_MSG_ADDON.
     for playerName, data in pairs(partyKeyCache) do
-        -- playerName is already normalized (no realm suffix) by OnLibKeystoneData
-        if playerName:lower() == myName then
-            -- own key already added above via C_MythicPlus
+        local lowerName = playerName:lower()
+        if lowerName == myName then
+            -- Own key came through LibKeystone — add it with "player" unit for class color.
+            AddEntry(data.mapID, data.level, "player", playerName)
+            ownKeyHandled = true
         else
             -- Resolve unit token for class colour; search raid OR party tokens
             local unit = nil
-            local lowerName = playerName:lower()
             if IsInRaid() then
                 for i = 1, GetNumGroupMembers() do
                     local u = "raid" .. i
@@ -130,6 +123,14 @@ local function CollectPartyKeystones()
             -- handles nil gracefully by falling back to the gold colour.
             AddEntry(data.mapID, data.level, unit, playerName)
         end
+    end
+
+    -- Fallback: own key via direct API if LibKeystone cache didn't provide it
+    -- (e.g., library not loaded, or pName was nil at load time).
+    if not ownKeyHandled and C_MythicPlus then
+        local mapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID and C_MythicPlus.GetOwnedKeystoneChallengeMapID()
+        local level = C_MythicPlus.GetOwnedKeystoneLevel and C_MythicPlus.GetOwnedKeystoneLevel()
+        AddEntry(mapID, level, "player", UnitName("player") or "player")
     end
 
     return result
@@ -564,7 +565,8 @@ function Teleport.Init(addon)
 
         elseif event == "MYTHIC_PLUS_CURRENT_AFFIX_UPDATE" then
             -- M+ data became available (delayed on login). Re-read own key.
-            RefreshButtons()
+            RequestPartyKeystones()  -- re-seed own key into cache
+            C_Timer.After(1, RefreshButtons)
             if IsInGroup() then
                 RequestWithRetries(1, 5)
             end
@@ -588,8 +590,14 @@ function Teleport.Init(addon)
             end
             CheckVisibility()
             RefreshButtons()
+            -- Always request own key; if also in a group, request from all members too.
             if IsInGroup() then
                 RequestWithRetries(2, 6, 12)
+            else
+                C_Timer.After(2, function()
+                    RequestPartyKeystones()
+                    C_Timer.After(1, RefreshButtons)
+                end)
             end
         end
     end)

@@ -99,6 +99,14 @@ local function ShowTimedBanner(elapsed, limit)
     f.timedBannerText:SetText(mainColour .. label .. "|r")
     f.timedBannerSub:SetText(subLine)
 
+    -- Death count line
+    if deathCount > 0 then
+        f.timedBannerDeaths:SetText(string.format("|cffee4444%d death%s|r  |cff888888(-%s penalty)|r",
+            deathCount, deathCount == 1 and "" or "s", FormatTime(timeLost)))
+    else
+        f.timedBannerDeaths:SetText("|cff44ee44No deaths|r")
+    end
+
     -- Colour the body bg to give a faint tint
     local r, g, b = 0.04, 0.07, 0.02
     if upgrades == 0 then r, g, b = 0.07, 0.02, 0.02 end
@@ -131,15 +139,17 @@ local function GetOrMakeFrame()
         p.point, _, p.relPoint, p.x, p.y = self:GetPoint()
     end)
 
-    -- Body background: stone texture drawn directly on f (BACKGROUND layer) so it always
-    -- sits behind the OVERLAY-layer FontStrings on the same frame.
-    -- Inset 4 px from the frame edge so it clears the Dialog NineSlice corner art.
+    -- Body background: theme-aware texture on BACKGROUND layer.
+    -- FlatSkin: solid themed color. BlizzardSkin: dark dialog texture tinted to theme bg.
     local bodyBg = f:CreateTexture(nil, "BACKGROUND", nil, -8)
-    bodyBg:SetTexture("Interface\\FrameGeneral\\UI-Background-Rock")
-    bodyBg:SetHorizTile(true); bodyBg:SetVertTile(true)
-    bodyBg:SetPoint("TOPLEFT",     f, "TOPLEFT",     4, -4)
-    bodyBg:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -4,  4)
-    bodyBg:SetVertexColor(0.10, 0.08, 0.06, 0.96)
+    if T.skin == "blizzard" then
+        bodyBg:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Background-Dark")
+        bodyBg:SetHorizTile(true); bodyBg:SetVertTile(true)
+        bodyBg:SetVertexColor(T.bg[1], T.bg[2], T.bg[3], T.bg[4])
+    else
+        bodyBg:SetColorTexture(T.bgPanel[1], T.bgPanel[2], T.bgPanel[3], T.bgPanel[4])
+    end
+    bodyBg:SetAllPoints()
 
     -- Dialog NineSlice border (same art as the Options panel) — overhangs 5 px outside f.
     ns.Theme:ApplyBorder(f)
@@ -298,6 +308,11 @@ local function GetOrMakeFrame()
     bannerSub:SetJustifyH("CENTER")
     f.timedBannerSub = bannerSub
 
+    local bannerDeaths = banner:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    bannerDeaths:SetPoint("TOP", bannerSub, "BOTTOM", 0, -2)
+    bannerDeaths:SetJustifyH("CENTER")
+    f.timedBannerDeaths = bannerDeaths
+
     f:SetPoint(
         d.point    or "CENTER",
         UIParent,
@@ -384,13 +399,14 @@ local function GatherCriteriaData()
     for i = 1, numCriteria do
         local info = C_ScenarioInfo.GetCriteriaInfo(i)
         if info then
-            criteriaData[i] = {
+            local entry = {
                 desc      = info.description,
                 qty       = info.quantity,
                 total     = info.totalQuantity,
                 completed = info.completed,
                 isWeighted = info.isWeightedProgress,
             }
+            criteriaData[#criteriaData + 1] = entry  -- sequential; safe for ipairs
             if info.isWeightedProgress then
                 -- quantity is a 0-100 percentage value for weighted-progress criteria
                 pullQty   = info.quantity
@@ -400,9 +416,15 @@ local function GatherCriteriaData()
                 numBosses = numBosses + 1
                 if info.completed then
                     bossesKilled = bossesKilled + 1
-                    -- Record kill time the first time this boss flips to completed
+                    -- Record kill time the first time this boss flips to completed.
+                    -- Re-sync from the world elapsed timer for accuracy (OnUpdate may lag).
                     if not prevBossCompleted[numBosses] and not bossKillTimes[numBosses] then
-                        bossKillTimes[numBosses] = elapsedBase + (elapsedAccum or 0)
+                        local killElapsed = elapsedBase + (elapsedAccum or 0)
+                        if timerID then
+                            local _, worldSec = GetWorldElapsedTime(timerID)
+                            if worldSec and worldSec > 0 then killElapsed = worldSec end
+                        end
+                        bossKillTimes[numBosses] = killElapsed
                     end
                 end
             end
@@ -538,7 +560,7 @@ local function ActivateTimer(worldTimerID, worldElapsed, limit)
     updateAccum = 0
     wipe(bossKillTimes)
 
-    local level, affixes, wasCharged = C_ChallengeMode.GetActiveKeystoneInfo()
+    local _, affixes, level = C_ChallengeMode.GetActiveKeystoneInfo()
     keystoneLevel = level or 0
     affixIDs = affixes or {}
 

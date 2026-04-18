@@ -22,9 +22,8 @@ local function ShouldShow()
     local _, iType = GetInstanceInfo()
     if iType == "raid" then return true end
     if iType == "party" and C_ChallengeMode.IsChallengeModeActive() then
-        -- tonumber() guards against the keystone level being a secret value
-        local lvl = tonumber(C_ChallengeMode.GetActiveKeystoneInfo()) or 0
-        return lvl >= 1
+        local _, _, lvl = C_ChallengeMode.GetActiveKeystoneInfo()
+        return (lvl or 0) >= 1
     end
     return false
 end

@@ -8,6 +8,28 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.1.0",
+        date    = "2026-04-18",
+        changes = {
+            "|cff4fc3f7New|r  Mouse Tracker: ring + crosshair around cursor — great for streaming or presentations",
+            "|cff4fc3f7New|r  Mouse Tracker: 64-segment texture-quad ring (smooth, gap-free) with configurable radius, thickness, opacity",
+            "|cff4fc3f7New|r  Mouse Tracker: optional crosshair with line length, center gap and line width",
+            "|cff4fc3f7New|r  Mouse Tracker: optional center dot with configurable size",
+            "|cff4fc3f7New|r  Mouse Tracker: custom color picker with live swatch; preset colors; theme accent option",
+            "|cff4fc3f7New|r  M+ Timer: completion banner now shows death count and time penalty",
+            "|cff4fc3f7New|r  Options & Run History panels now save and restore their position",
+            "|cff2dc9b8Fix|r  M+ Timer: body background now follows active theme color (was always dark stone)",
+            "|cff2dc9b8Fix|r  M+ Timer: header corners correctly sized — no longer overflow the frame",
+            "|cff2dc9b8Fix|r  M+ Timer: boss kill times now recorded correctly (sparse-index bug fixed)",
+            "|cff2dc9b8Fix|r  M+ Timer: keystone level read from correct GetActiveKeystoneInfo return value",
+            "|cff2dc9b8Fix|r  Run History: recording fixed — uses GetChallengeCompletionInfo (key info stays after run ends)",
+            "|cff2dc9b8Fix|r  Vault Tracker: M+ progress now accurate (Activities enum renamed in 12.0)",
+            "|cff2dc9b8Fix|r  Vault Tracker: reward box colours no longer washed out; item level reads correctly",
+            "|cff2dc9b8Fix|r  Combat Ress & Buff Reminder: crash on M+ keystone level detection fixed",
+            "|cff2dc9b8Fix|r  Teleport: own keystone now always shown regardless of M+ data load order",
+        },
+    },
+    {
         version = "1.0.35",
         date    = "2026-04-18",
         changes = {

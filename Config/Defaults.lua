@@ -5,6 +5,7 @@ ns.Defaults = {
     profile = {
         minimap = { hide = false, minimapPos = 220 },
         configScale = 1.0,
+        configPanelPos = { point = "CENTER", relPoint = "CENTER", x = 0, y = 0 },
         fpsBackup = nil,  -- snapshot of settings before Apply FPS
 
         -- QOL automation module
@@ -159,6 +160,16 @@ ns.Defaults = {
             point    = "CENTER", relPoint = "CENTER", x = 0, y = 200,
         },
 
+        -- Great Vault progress tracker
+        vaultTracker = {
+            enabled         = true,
+            showRaid        = true,
+            showWorld       = true,
+            showPvP         = false,
+            scale           = 1.0,
+            point = "RIGHT", relPoint = "RIGHT", x = -20, y = 0,
+        },
+
         -- Combat Resurrection tracker
         combatRess = {
             enabled = true,
@@ -187,8 +198,30 @@ ns.Defaults = {
             factionTint      = true,
             factionTintAlpha = 0.14,      -- 0..0.30
         },
+
+        -- Mouse Tracker ring + crosshair
+        mouseTracker = {
+            enabled   = false,
+            -- Ring
+            showRing  = true,
+            radius    = 32,
+            thickness = 2,
+            alpha     = 0.85,
+            useAccent = true,
+            r = 1.0, g = 1.0, b = 1.0,
+            -- Dot
+            showDot  = false,
+            dotSize  = 6,
+            -- Crosshair
+            showCrosshair      = false,
+            crosshairLength    = 20,
+            crosshairGap       = 6,
+            crosshairThickness = 2,
+        },
     },
     global = {
         theme = "mellow",  -- "mellow" | "blizzard"
+        runHistoryByChar = {},  -- ["Realm-Name"] = { runs[] }
+        historyPanelPos  = { point = "CENTER", relPoint = "CENTER", x = 0, y = 0 },
     },
 }

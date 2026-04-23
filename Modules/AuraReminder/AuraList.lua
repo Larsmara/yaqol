@@ -146,15 +146,11 @@ local function Known(spellID)
 end
 
 -- [ CATEGORY META ] -----------------------------------------------------------
--- Each category = { key, label, required }
--- required = true  → reminder fires if NONE of the list spells are active
--- required = false → optional; shown but does not block "all good"
+-- Kept for external reference; consumable data is now hardcoded above.
 AuraList.Categories = {
-    { key = "flasks",       label = "Flask",           required = true  },
-    { key = "food",         label = "Food",            required = true  },
-    { key = "augmentRunes", label = "Augment Rune",    required = true  },
-    { key = "weaponBuffs",  label = "Weapon Buff",     required = false },
-    { key = "custom",       label = "Custom",          required = true  },
+    { key = "flasks",       label = "Flask",        required = true  },
+    { key = "food",         label = "Food",         required = true  },
+    { key = "augmentRunes", label = "Augment Rune", required = true  },
 }
 
 -- Returns true if the player has any temporary weapon enchant on their main-hand.
@@ -347,6 +343,25 @@ end
 -- "Hearty Well Fed" to handle foods not in the configured list.
 local WELL_FED_IDS = { 455369, 462187 }  -- Midnight primary Well Fed spell IDs
 local WELL_FED_NAMES = { "Well Fed", "Hearty Well Fed" }
+
+-- Hardcoded consumable data (Midnight Season 1 + legacy variants)
+-- itemIDs used to count how many the player has in bags for the badge.
+local FLASKS = {
+    { spellID = 1235110, itemIDs = { 243682 } },  -- Flask of the Blood Knights
+    { spellID = 1235108, itemIDs = { 243680 } },  -- Flask of the Magisters
+    { spellID = 1235111, itemIDs = { 243683 } },  -- Flask of the Shattered Sun
+    { spellID = 1235057, itemIDs = { 243695 } },  -- Flask of Thalassian Resistance
+    { spellID = 1239355, itemIDs = { 243697 } },  -- Vicious Thalassian Flask of Honor
+    { spellID = 1235113 }, { spellID = 1235114 },  -- PvP-morphed variants
+    { spellID = 1235115 }, { spellID = 1235116 },
+}
+local AUGMENT_RUNES = {
+    { spellID = 1264426, itemIDs = { 259085  } },  -- Augment Rune (Void-Touched)
+    { spellID = 453250,  itemIDs = { 243191  } },  -- Augment Rune (Ethereal)
+    { spellID = 1234969 }, { spellID = 1242347 },  -- Midnight variants
+    { spellID = 393438,  itemIDs = { 189192  } },  -- Crystallized Augment Rune (TWW)
+    { spellID = 347901  },                         -- legacy
+}
 local function HasFoodBuff(foodList)
     -- 1. Primary Midnight Well Fed spell IDs (fast path)
     for _, id in ipairs(WELL_FED_IDS) do
@@ -450,83 +465,52 @@ function AuraList.GetMissing(db)
 
     local missing = {}
 
-    -- Standard consumable/custom categories (skipped while leveling)
+    -- Standard consumables (only at max level, hardcoded lists)
     if atMaxLevel then
-        for _, cat in ipairs(AuraList.Categories) do
-            local list = db[cat.key]
-            -- Food uses HasFoodBuff() which works even with an empty/absent list.
-            if cat.key == "food" and db.food ~= nil then
-                if not HasFoodBuff(list) then
-                    local itemCount = 0
-                    if list then
-                        for _, entry in ipairs(list) do
-                            if entry.itemIDs then
-                                for _, itemID in ipairs(entry.itemIDs) do
-                                    itemCount = itemCount + (GetItemCount(itemID, true) or 0)
-                                end
-                            end
-                        end
-                    end
-                    local icon = 133971  -- default food icon
-                    if list then
-                        for _, entry in ipairs(list) do
-                            local tex = SpellIcon(entry.spellID)
-                            if tex then icon = tex; break end
-                        end
-                    end
-                    missing[#missing + 1] = {
-                        label     = cat.label,
-                        spellID   = (list and list[1] and list[1].spellID) or WELL_FED_IDS[1],
-                        icon      = icon,
-                        required  = cat.required,
-                        itemCount = itemCount,
-                    }
-                end
-            elseif list and #list > 0 then
-                local found = false
-                for _, entry in ipairs(list) do
-                    if PlayerHasAura(entry.spellID) then
-                        found = true; break
-                    end
-                end
-                if not found then
-                    -- Sum item counts across all itemIDs listed in every entry in this category.
-                    local itemCount = 0
-                    for _, entry in ipairs(list) do
-                        if entry.itemIDs then
-                            for _, itemID in ipairs(entry.itemIDs) do
-                                itemCount = itemCount + (GetItemCount(itemID, true) or 0)
-                            end
-                        end
-                    end
-                    -- Use the icon from the first entry that has a valid texture,
-                    -- rather than always forcing list[1] (which may have a wrong/generic icon).
-                    local icon = nil
-                    for _, entry in ipairs(list) do
-                        local tex = SpellIcon(entry.spellID)
-                        if tex then icon = tex; break end
-                    end
-                    missing[#missing + 1] = {
-                        label     = cat.label,
-                        spellID   = list[1].spellID,
-                        icon      = icon,
-                        required  = cat.required,
-                        itemCount = itemCount > 0 and itemCount or nil,
-                    }
+        -- Flask
+        local hasFlask = false
+        for _, f in ipairs(FLASKS) do
+            if PlayerHasAura(f.spellID) then hasFlask = true; break end
+        end
+        if not hasFlask then
+            local count = 0
+            for _, f in ipairs(FLASKS) do
+                if f.itemIDs then
+                    for _, iid in ipairs(f.itemIDs) do count = count + (GetItemCount(iid, true) or 0) end
                 end
             end
+            missing[#missing+1] = { label="Flask", spellID=FLASKS[1].spellID,
+                icon=SpellIcon(FLASKS[1].spellID), required=true,
+                itemCount=count > 0 and count or nil }
         end
 
-        -- Weapon oil / temp enchant check (enabled when db.weaponOil == true)
-        if db.weaponOil then
-            if not HasWeaponOil() then
-                missing[#missing + 1] = {
-                    label    = "Weapon Oil",
-                    spellID  = 0,
-                    icon     = 134096,  -- generic weapon enchant icon
-                    required = false,
-                }
+        -- Food
+        if not HasFoodBuff(nil) then
+            missing[#missing+1] = { label="Food", spellID=WELL_FED_IDS[1],
+                icon=133971, required=true }
+        end
+
+        -- Augment Rune
+        local hasRune = false
+        for _, r in ipairs(AUGMENT_RUNES) do
+            if PlayerHasAura(r.spellID) then hasRune = true; break end
+        end
+        if not hasRune then
+            local count = 0
+            for _, r in ipairs(AUGMENT_RUNES) do
+                if r.itemIDs then
+                    for _, iid in ipairs(r.itemIDs) do count = count + (GetItemCount(iid, true) or 0) end
+                end
             end
+            missing[#missing+1] = { label="Augment Rune", spellID=AUGMENT_RUNES[1].spellID,
+                icon=SpellIcon(AUGMENT_RUNES[1].spellID), required=true,
+                itemCount=count > 0 and count or nil }
+        end
+
+        -- Weapon oil / temp enchant
+        if db.weaponOil and not HasWeaponOil() then
+            missing[#missing+1] = { label="Weapon Oil", spellID=0,
+                icon=134096, required=false }
         end
     end -- atMaxLevel
 
@@ -566,53 +550,30 @@ function AuraList.GetAll(db)
     local atMaxLevel = UnitLevel("player") >= GetMaxPlayerLevel()
     local all = {}
 
-    -- Consumable / custom categories
+    -- Consumables (hardcoded, present = shown dimmed)
     if atMaxLevel then
-        for _, cat in ipairs(AuraList.Categories) do
-            local list = db[cat.key]
-            if cat.key == "food" and db.food ~= nil then
-                if not inMissing[cat.label] then
-                    local icon = 133971
-                    if list then
-                        for _, entry in ipairs(list) do
-                            local tex = SpellIcon(entry.spellID)
-                            if tex then icon = tex; break end
-                        end
-                    end
-                    all[#all+1] = {
-                        label    = cat.label,
-                        spellID  = (list and list[1] and list[1].spellID) or WELL_FED_IDS[1],
-                        icon     = icon,
-                        required = cat.required,
-                        present  = true,
-                    }
-                end
-            elseif list and #list > 0 then
-                if not inMissing[cat.label] then
-                    local icon = nil
-                    for _, entry in ipairs(list) do
-                        local tex = SpellIcon(entry.spellID)
-                        if tex then icon = tex; break end
-                    end
-                    all[#all+1] = {
-                        label    = cat.label,
-                        spellID  = list[1].spellID,
-                        icon     = icon,
-                        required = cat.required,
-                        present  = true,
-                    }
-                end
-            end
+        local hasFlask = false
+        for _, f in ipairs(FLASKS) do if PlayerHasAura(f.spellID) then hasFlask = true; break end end
+        if not inMissing["Flask"] then
+            all[#all+1] = { label="Flask", spellID=FLASKS[1].spellID,
+                icon=SpellIcon(FLASKS[1].spellID), required=true, present=hasFlask }
+        end
+
+        if not inMissing["Food"] then
+            all[#all+1] = { label="Food", spellID=WELL_FED_IDS[1],
+                icon=133971, required=true, present=HasFoodBuff(nil) }
+        end
+
+        local hasRune = false
+        for _, r in ipairs(AUGMENT_RUNES) do if PlayerHasAura(r.spellID) then hasRune = true; break end end
+        if not inMissing["Augment Rune"] then
+            all[#all+1] = { label="Augment Rune", spellID=AUGMENT_RUNES[1].spellID,
+                icon=SpellIcon(AUGMENT_RUNES[1].spellID), required=true, present=hasRune }
         end
 
         if db.weaponOil and not inMissing["Weapon Oil"] then
-            all[#all+1] = {
-                label    = "Weapon Oil",
-                spellID  = 0,
-                icon     = 134096,
-                required = false,
-                present  = true,
-            }
+            all[#all+1] = { label="Weapon Oil", spellID=0, icon=134096,
+                required=false, present=HasWeaponOil() }
         end
     end
 

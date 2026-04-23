@@ -173,70 +173,6 @@ local function MakeInput(parent, placeholder, onEnter, w, h)
     return eb
 end
 
--- [ SPELL LIST WIDGET ] -------------------------------------------------------
-local spellRebuildFns = {}
-
-local function MakeSpellList(parent, db, key, startY)
-    if not db[key] then db[key] = {} end
-    local CONTENT_W = T.CONTENT_W - T.PAD * 2
-    local y = startY
-
-    local addInput = MakeInput(parent, "Add Spell ID…", function(val)
-        local id = tonumber(val); if not id then return end
-        local name = C_Spell.GetSpellName(id) or ("SpellID "..id)
-        table.insert(db[key], { spellID = id, label = name }); Config.Refresh()
-    end, 130, 22)
-    addInput:SetPoint("TOPLEFT", parent, "TOPLEFT", T.PAD, y)
-    y = y - 28
-
-    local rowPool = {}
-    local listAnchorY = y
-
-    local function RebuildRows()
-        for _, r in ipairs(rowPool) do r:Hide() end
-        rowPool = {}
-        local ry = listAnchorY
-        for i, entry in ipairs(db[key]) do
-            local row = CreateFrame("Frame", nil, parent)
-            row:SetSize(CONTENT_W, 26)
-            row:SetPoint("TOPLEFT", parent, "TOPLEFT", T.PAD, ry - (i-1)*28)
-            Bg(row, T.bgRow[1], T.bgRow[2], T.bgRow[3], 0.6)
-            local icon = row:CreateTexture(nil, "ARTWORK")
-            icon:SetSize(18, 18); icon:SetPoint("LEFT", row, "LEFT", 8, 0)
-            icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-            icon:SetTexture(C_Spell.GetSpellTexture(entry.spellID))
-            local name = Label(row, entry.label, "GameFontNormal")
-            name:SetPoint("LEFT", icon, "RIGHT", 8, 0)
-            
-            -- Delete Button (X) — plain button; UIPanelCloseButton's
-            -- oversized hit-rect bleeds outside the scroll frame.
-            local delBtn = CreateFrame("Button", nil, row)
-            delBtn:SetSize(20, 20)
-            delBtn:SetPoint("RIGHT", row, "RIGHT", -4, 0)
-            delBtn:SetFrameLevel(row:GetFrameLevel() + 5)
-            local delLbl = delBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            delLbl:SetPoint("CENTER"); delLbl:SetText("✕")
-            delLbl:SetTextColor(0.85, 0.30, 0.30, 1)
-            delBtn:SetScript("OnEnter", function() delLbl:SetTextColor(1, 0.45, 0.45, 1) end)
-            delBtn:SetScript("OnLeave", function() delLbl:SetTextColor(0.85, 0.30, 0.30, 1) end)
-            delBtn:SetScript("OnClick", function()
-                table.remove(db[key], i)
-                Config.Refresh()
-            end)
-
-            local sid = Label(row, tostring(entry.spellID), "GameFontNormal",
-                T.textDim[1], T.textDim[2], T.textDim[3])
-            sid:SetPoint("RIGHT", delBtn, "LEFT", -8, 0)
-            rowPool[i] = row
-        end
-    end
-    RebuildRows()
-    spellRebuildFns[key] = RebuildRows
-
-    local totalH = 28 + (#db[key] > 0 and #db[key]*28 or 0) + 8
-    return totalH
-end
-
 -- [ FPS / PERFORMANCE CVARS ] -------------------------------------------------
 local PERFORMANCE_CVARS = {
     -- Graphics Tab
@@ -350,7 +286,7 @@ end
 -- [ TAB CONTENT BUILDERS ] ----------------------------------------------------
 local tabRebuildFns = {}
 local tabPreviewFns = {}  -- key → { show=fn, hide=fn } for live frame preview on tab switch
-local BuildSpells, BuildClassBuffs
+local BuildClassBuffs
 
 local function BuildGeneral(content, db, addon)
     local y = -T.PAD
@@ -680,26 +616,6 @@ local function BuildTeleport(content, db, addon)
     return y - 30
 end
 
-local function BuildSpells(content, db, startY)
-    local y = startY or -T.PAD
-    local cats = {
-        { key="flasks",       label="Flasks / Phials"        },
-        { key="food",         label="Food"          },
-        { key="augmentRunes", label="Augment Runes" },
-        { key="weaponBuffs",  label="Weapon Buffs"  },
-        { key="custom",       label="Custom"        },
-    }
-    for _, cat in ipairs(cats) do
-        local h = Label(content, cat.label:upper(), "GameFontNormalSmall",
-            T.textHeader[1], T.textHeader[2], T.textHeader[3])
-        h:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
-        Divider(content, y); y = y - 10
-        local totalH = MakeSpellList(content, db, cat.key, y)
-        y = y - totalH - 10
-    end
-    return y
-end
-
 local function BuildClassBuffs(content, db, addon, startY)
     local y = startY or -T.PAD
     local r = db.reminder
@@ -810,7 +726,6 @@ local function BuildReminder(content, db, addon)
         function() return db.reminder.weaponOil end,
         function(v) db.reminder.weaponOil = v; ns.AuraReminder.Refresh(addon) end, y)
     y = y - dh - 10
-    y = BuildSpells(content, db.reminder, y - 10)
     y = BuildClassBuffs(content, db, addon, y - 10)
     return y - 20
 end
@@ -1089,6 +1004,11 @@ local function BuildQOL(content, db, addon)
     _, dh = MakeToggle(content, "Auto-slot keystone when opening the Keystone UI",
         function() return q.autoSlotKeystone end,
         function(v) q.autoSlotKeystone = v end, y)
+    y = y - dh - 4
+
+    _, dh = MakeToggle(content, "Auto-start dungeon after keystone is slotted (3-second countdown)",
+        function() return q.autoStartChallenge end,
+        function(v) q.autoStartChallenge = v end, y)
     y = y - dh - 14
 
     -- ── PETS ──────────────────────────────────────────────────────────────
@@ -2211,5 +2131,4 @@ function Config.Toggle()
 end
 
 function Config.Refresh()
-    for _, fn in pairs(spellRebuildFns) do fn() end
 end

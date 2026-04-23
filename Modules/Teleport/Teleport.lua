@@ -194,7 +194,7 @@ local function CheckVisibility()
     end
 
     local inInstance, instanceType = IsInInstance()
-    if inInstance and (instanceType == "party" or instanceType == "raid" or instanceType == "pvp" or instanceType == "arena") then
+    if inInstance and (instanceType == "party" or instanceType == "raid" or instanceType == "pvp" or instanceType == "arena" or instanceType == "scenario") then
         panel:Hide()
         return
     end
@@ -276,8 +276,8 @@ local function MakePanel()
     local rHl = refreshBtn:CreateTexture(nil, "HIGHLIGHT")
     rHl:SetAllPoints(); rHl:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.20)
     local rIcon = refreshBtn:CreateTexture(nil, "OVERLAY")
-    rIcon:SetPoint("CENTER"); rIcon:SetSize(12, 12)
-    rIcon:SetTexture("Interface\\Buttons\\UI-RefreshButton")
+    rIcon:SetPoint("CENTER"); rIcon:SetSize(14, 14)
+    rIcon:SetAtlas("UI-RefreshButton", false)
     rIcon:SetVertexColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
     refreshBtn:SetScript("OnEnter", function()
         f:SetAlpha(1)
@@ -317,8 +317,29 @@ local function MakePanel()
             end
             return
         end
-        -- Normal click: don't wipe the cache (keep what we have visible while waiting
-        -- for updated responses). Just re-request and refresh after delay.
+        -- Always rebuild the mapID lookup before refreshing — it may have been
+        -- populated before M+ data was ready (MYTHIC_PLUS_CURRENT_AFFIX_UPDATE).
+        BuildChallengeMapLookup()
+        -- Visual feedback: spin the icon 180° for 0.4 s using an animation group.
+        rIcon:SetVertexColor(T.accent[1], T.accent[2], T.accent[3], 1)
+        C_Timer.After(0.6, function()
+            rIcon:SetVertexColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
+        end)
+        -- Force-seed own keystone from C_MythicPlus directly (bypasses LibKeystone).
+        -- This ensures the pill shows even if LibKeystone never fired for this session.
+        if C_MythicPlus then
+            local okM, mapID = pcall(function() return C_MythicPlus.GetOwnedKeystoneChallengeMapID and C_MythicPlus.GetOwnedKeystoneChallengeMapID() end)
+            local okL, level  = pcall(function() return C_MythicPlus.GetOwnedKeystoneLevel and C_MythicPlus.GetOwnedKeystoneLevel() end)
+            local hasKey = okM and okL
+                and pcall(function() return type(mapID) == "number" and mapID > 0 and type(level) == "number" and level > 0 end)
+            if hasKey then
+                local shortName = (UnitName("player") or ""):match("^([^%-]+)") or ""
+                if shortName ~= "" then
+                    partyKeyCache[shortName] = { mapID = mapID, level = level }
+                end
+            end
+        end
+        -- Immediate repaint, then request from party with retries.
         RefreshButtons()
         RequestPartyKeystones()
         C_Timer.After(4, RefreshButtons)
@@ -375,6 +396,23 @@ local function MakeButton(parent, dungeon, idx)
     icon:SetPoint("LEFT", btn, "LEFT", 1, 0)
     icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
     btn.icon = icon
+
+    -- Cooldown frame (used only for timing; all visuals are suppressed)
+    local cdFrame = CreateFrame("Cooldown", nil, btn, "CooldownFrameTemplate")
+    cdFrame:SetAllPoints(btn)
+    cdFrame:SetDrawEdge(false)
+    cdFrame:SetDrawSwipe(false)
+    cdFrame:SetHideCountdownNumbers(true)
+    btn.cdFrame = cdFrame
+
+    -- Cooldown text overlay — shown on all buttons while a CD is active
+    local cdText = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    cdText:SetPoint("CENTER", btn, "CENTER")
+    cdText:SetShadowColor(0, 0, 0, 1)
+    cdText:SetShadowOffset(1, -1)
+    cdText:SetTextColor(1, 0.82, 0.1, 1)
+    cdText:Hide()
+    btn.cdText = cdText
 
     -- Label
     local label = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -437,6 +475,60 @@ local function MakeButton(parent, dungeon, idx)
 
     btn.spellID = dungeon.spellID
     return btn
+end
+
+-- [ COOLDOWN ] ----------------------------------------------------------------
+-- All teleport spells share a cooldown category; reading one gives the global
+-- timer. We prefer a learned spell so the data is meaningful, but fall back to
+-- the first entry if none are known yet.
+local function UpdateCooldowns()
+    if not buttons then return end
+    local cdInfo
+    for _, btn in ipairs(buttons) do
+        if btn.learned then
+            cdInfo = C_Spell.GetSpellCooldown(btn.spellID)
+            break
+        end
+    end
+    if not cdInfo then
+        cdInfo = C_Spell.GetSpellCooldown(buttons[1] and buttons[1].spellID or DUNGEONS[1].spellID)
+    end
+
+    -- Calculate remaining time (ignore GCDs ≤ 1.5 s)
+    local remaining = 0
+    if cdInfo and cdInfo.startTime and cdInfo.startTime > 0 and cdInfo.duration > 1.5 then
+        remaining = (cdInfo.startTime + cdInfo.duration) - GetTime()
+        if remaining < 0 then remaining = 0 end
+    end
+
+    local cdStr
+    if remaining > 0 then
+        local mins = math.floor(remaining / 60)
+        local secs = math.floor(remaining % 60)
+        if mins > 0 then
+            cdStr = string.format("%d:%02d", mins, secs)
+        else
+            cdStr = string.format("%ds", secs)
+        end
+    end
+
+    for _, btn in ipairs(buttons) do
+        if btn.cdFrame then
+            if cdInfo then
+                btn.cdFrame:SetCooldown(cdInfo.startTime, cdInfo.duration)
+            else
+                btn.cdFrame:Clear()
+            end
+        end
+        if btn.cdText then
+            if cdStr then
+                btn.cdText:SetText(cdStr)
+                btn.cdText:Show()
+            else
+                btn.cdText:Hide()
+            end
+        end
+    end
 end
 
 -- [ REFRESH LOGIC ] -----------------------------------------------------------
@@ -529,6 +621,7 @@ local function RefreshButtons()
     -- Dynamically shrink the main panel if spells are hidden
     local dynamicH = HEADER_H + (visibleCount > 0 and (visibleCount * (BTN_H + BTN_PAD)) + PANEL_PAD * 2 - BTN_PAD or PANEL_PAD * 2)
     panel:SetHeight(dynamicH)
+    UpdateCooldowns()
 end
 
 -- [ PUBLIC API ] --------------------------------------------------------------
@@ -606,9 +699,14 @@ function Teleport.Init(addon)
     watcher:RegisterEvent("CHALLENGE_MODE_COMPLETED")
     watcher:RegisterEvent("BAG_UPDATE_DELAYED")
     watcher:RegisterEvent("MYTHIC_PLUS_CURRENT_AFFIX_UPDATE")
+    watcher:RegisterEvent("SPELL_UPDATE_COOLDOWN")
+    watcher:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
     watcher:SetScript("OnEvent", function(self, event, ...)
         if event == "SPELLS_CHANGED" then
             RefreshButtons()
+
+        elseif event == "SPELL_UPDATE_COOLDOWN" or event == "UNIT_SPELLCAST_SUCCEEDED" then
+            UpdateCooldowns()
 
         elseif event == "CHALLENGE_MODE_KEYSTONE_SLOTTED" then
             -- Key slotted — we're about to start; grab latest party keys.

@@ -8,6 +8,17 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.1.3",
+        date    = "2026-04-23",
+        changes = {
+            "|cff2dc9b8Fix|r  Teleport: panel now correctly hidden inside Delves (scenario instance type was not excluded)",
+            "|cff2dc9b8Fix|r  Teleport: cooldown swipe removed — replaced with a centered countdown text shown on every button while a CD is active",
+            "|cff2dc9b8Fix|r  M+ Timer: Blizzard objective/timer suppression no longer bleeds into Delves — Show hooks now guard on IsChallengeModeActive()",
+            "|cff2dc9b8Fix|r  Pet Reminder: warning now clears correctly when pet returns during combat (InCombatLockdown no longer blocks HidePetWarning)",
+            "|cff2dc9b8Fix|r  Pet Reminder: warning clears faster after dismounting — second check scheduled 2 s after mount state changes",
+        },
+    },
+    {
         version = "1.1.2",
         date    = "2026-04-18",
         changes = {

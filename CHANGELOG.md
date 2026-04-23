@@ -1,5 +1,15 @@
 # yaqol
 
+## [v1.1.3](https://github.com/Larsmara/yaqol/tree/v1.1.3) (2026-04-23)
+[Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.1.2...v1.1.3) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
+
+**Fixes:**
+- Teleport: panel now correctly hidden inside Delves — the `scenario` instance type was not excluded from the visibility check
+- Teleport: cooldown swipe removed; a formatted countdown text (`1:23` / `45s`) is now shown centered on every button while the shared teleport CD is active
+- M+ Timer: Blizzard objective tracker / timer suppression no longer bleeds into Delves — `Show` hooks on `ChallengeModeBlock`, `ObjectivesBlock`, and `ScenarioTimerFrame` now check `C_ChallengeMode.IsChallengeModeActive()` before hiding
+- Pet Reminder: "No active pet" banner now clears immediately when the pet returns during combat — `InCombatLockdown()` no longer blocked `HidePetWarning()` for live pets
+- Pet Reminder: banner clears reliably after dismounting — a second check is scheduled 2 s after `PLAYER_MOUNT_DISPLAY_CHANGED` to handle slow state resolution
+
 ## [v1.1.2](https://github.com/Larsmara/yaqol/tree/v1.1.2) (2026-04-18)
 [Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.1.1...v1.1.2) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
 

@@ -859,28 +859,44 @@ local function CheckPetNow()
     if not enabled then HidePetWarning() return end
     local _, classFile = UnitClass("player")
     if not PET_CLASSES[classFile] then return end
-    if InCombatLockdown() then return end
     if IsMounted() then HidePetWarning(); return end
     local petExists = UnitExists("pet")
     local petDead = petExists and UnitIsDead("pet")
-    local petPassive = petExists and not petDead and (GetPetActionInfo(2) == "PET_ACTION_PASSIVE")
+    -- If the pet is alive and present, always clear the warning — even in combat.
+    -- (InCombatLockdown only blocks the passive check to avoid taint.)
+    if petExists and not petDead then
+        if InCombatLockdown() then
+            HidePetWarning()  -- clear "no pet" / "dead" banners; skip passive check in combat
+            return
+        end
+        local petPassive = (GetPetActionInfo(2) == "PET_ACTION_PASSIVE")
+        if petPassive then
+            ShowPetWarning("Pet is on Passive!", false) -- fades after 8 s
+        else
+            HidePetWarning()
+        end
+        return
+    end
+    -- Pet is missing or dead — don't show warnings in combat (can't summon anyway).
+    if InCombatLockdown() then return end
     if not petExists then
-        ShowPetWarning("No active pet!", true)   -- stays until a pet is summoned
+        ShowPetWarning("No active pet!", true)    -- stays until a pet is summoned
     elseif petDead then
         ShowPetWarning("Your pet is dead!", false) -- fades after 8 s
-    elseif petPassive then
-        ShowPetWarning("Pet is on Passive!", false) -- fades after 8 s
-    else
-        HidePetWarning()                           -- pet is alive and not passive, dismiss warning
     end
 end
 
 -- UNIT_PET fires before the game state fully updates; delay so
 -- UnitExists("pet") reflects the new state.  Also filters out
 -- party member pet changes (arg1 ~= "player").
-local function CheckPet(unit)
+local function CheckPet(unit, extraDelay)
     if unit and unit ~= "player" then return end
     C_Timer.After(0.5, CheckPetNow)
+    -- For dismount / mount-display changes the pet state can settle slowly;
+    -- schedule a second check so a sluggish update doesn't leave the banner up.
+    if extraDelay then
+        C_Timer.After(extraDelay, CheckPetNow)
+    end
 end
 
 -- ============================================================================
@@ -906,7 +922,7 @@ local function OnEvent(self, event, arg1)
     elseif event == "CINEMATIC_START"                   then OnCinematicStart()
     elseif event == "DELETE_ITEM_CONFIRM"                then OnDeleteItemConfirm()
     elseif event == "UNIT_PET"                          then CheckPet(arg1)
-    elseif event == "PLAYER_MOUNT_DISPLAY_CHANGED"       then CheckPet("player")
+    elseif event == "PLAYER_MOUNT_DISPLAY_CHANGED"       then CheckPet("player", 2)
     elseif event == "PLAYER_ENTERING_WORLD"             then
         MaybeShowAffixFrame()
         CheckPet("player")
@@ -921,7 +937,16 @@ end
 -- AUTO-SLOT KEYSTONE
 --   When ChallengesKeystoneFrame opens, find the keystone in bags and slot it.
 -- ============================================================================
-local keystoneHooked = false
+local keystoneHooked  = false
+local startTimer      = nil  -- C_Timer handle for the auto-start countdown
+local START_COUNTDOWN = 3    -- seconds between keystone slot and auto-start
+
+local function CancelStartCountdown()
+    if startTimer then startTimer:Cancel(); startTimer = nil end
+    if ChallengesKeystoneFrame and ChallengesKeystoneFrame.StartButton then
+        ChallengesKeystoneFrame.StartButton:SetText(START_CHALLENGE)
+    end
+end
 
 local function SlotKeystone()
     if not cfg().autoSlotKeystone then return end
@@ -940,22 +965,53 @@ local function SlotKeystone()
     end
 end
 
+local function BeginAutoStart()
+    if not cfg().autoStartChallenge then return end
+    if not ChallengesKeystoneFrame then return end
+    local btn = ChallengesKeystoneFrame.StartButton
+    local remaining = START_COUNTDOWN
+    local function Tick()
+        if not cfg().autoStartChallenge or not ChallengesKeystoneFrame:IsShown() then
+            CancelStartCountdown()
+            return
+        end
+        if remaining <= 0 then
+            startTimer = nil
+            if btn then btn:SetText(START_CHALLENGE) end
+            C_ChallengeMode.StartChallengeMode()
+            ChallengesKeystoneFrame:Hide()
+            return
+        end
+        if btn then btn:SetText("Starting in " .. remaining .. "...") end
+        remaining = remaining - 1
+        startTimer = C_Timer.NewTimer(1, Tick)
+    end
+    Tick()
+end
+
 local function HookAutoSlotKeystone()
     if keystoneHooked then return end
     keystoneHooked = true
-    -- ChallengesKeystoneFrame is a load-on-demand frame; hook when it appears.
     local hookFrame = CreateFrame("Frame")
     hookFrame:RegisterEvent("ADDON_LOADED")
-    hookFrame:SetScript("OnEvent", function(_, _, name)
-        if name == "Blizzard_ChallengesUI" and ChallengesKeystoneFrame then
+    hookFrame:RegisterEvent("CHALLENGE_MODE_KEYSTONE_SLOTTED")
+    hookFrame:SetScript("OnEvent", function(_, event, name)
+        if event == "ADDON_LOADED" and name == "Blizzard_ChallengesUI" and ChallengesKeystoneFrame then
             ChallengesKeystoneFrame:HookScript("OnShow", SlotKeystone)
-            hookFrame:UnregisterAllEvents()
+            ChallengesKeystoneFrame:HookScript("OnHide", CancelStartCountdown)
+            -- OnKeystoneRemoved is a mixin method called when the keystone is dragged out;
+            -- no event fires for this, so we hook the method directly.
+            hooksecurefunc(ChallengesKeystoneFrame, "OnKeystoneRemoved", CancelStartCountdown)
+            hookFrame:UnregisterEvent("ADDON_LOADED")
+        elseif event == "CHALLENGE_MODE_KEYSTONE_SLOTTED" then
+            BeginAutoStart()
         end
     end)
-    -- If already loaded (e.g. reload while frame is open)
     if ChallengesKeystoneFrame then
         ChallengesKeystoneFrame:HookScript("OnShow", SlotKeystone)
-        hookFrame:UnregisterAllEvents()
+        ChallengesKeystoneFrame:HookScript("OnHide", CancelStartCountdown)
+        hooksecurefunc(ChallengesKeystoneFrame, "OnKeystoneRemoved", CancelStartCountdown)
+        hookFrame:UnregisterEvent("ADDON_LOADED")
     end
 end
 

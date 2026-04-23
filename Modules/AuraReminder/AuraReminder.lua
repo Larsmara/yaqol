@@ -15,6 +15,41 @@ local isActive        = false
 local dismissTimer    = nil
 local _unitAuraPending = false  -- coalesce UNIT_AURA burst into one deferred scan
 
+-- [ KEYSTONE LABEL ] ---------------------------------------------------------
+-- Cache keystone data from LibKeystone broadcasts so we can identify who holds
+-- the key when inside an active Mythic+ dungeon.
+local keystoneCache = {}  -- shortName → { level, mapID }
+local lksRegTable   = {}  -- unique LibKeystone registration handle
+
+local function UpdateKeyLabel()
+    if not frame or not frame.keyLabel then return end
+    if not C_ChallengeMode.IsChallengeModeActive() then
+        frame.keyLabel:Hide()
+        return
+    end
+    local keystoneLevel = C_ChallengeMode.GetActiveKeystoneInfo()
+    if not keystoneLevel then frame.keyLabel:Hide(); return end
+    -- Try to match by active map ID first, then fall back to level match.
+    local activeMapID = C_ChallengeMode.GetActiveChallengeMapID
+        and C_ChallengeMode.GetActiveChallengeMapID() or nil
+    local holder
+    if activeMapID then
+        for name, data in pairs(keystoneCache) do
+            if data.mapID == activeMapID then holder = name; break end
+        end
+    end
+    if not holder then
+        for name, data in pairs(keystoneCache) do
+            if data.level == keystoneLevel then holder = name; break end
+        end
+    end
+    local text = holder
+        and string.format("%s |cffFFD700+%d|r", holder, keystoneLevel)
+        or  string.format("|cffFFD700+%d|r", keystoneLevel)
+    frame.keyLabel:SetText(text)
+    frame.keyLabel:Show()
+end
+
 -- [ FRAME CONSTRUCTION ] ------------------------------------------------------
 local function MakeFrame()
     local f = CreateFrame("Frame", "yaqolReminderFrame", UIParent)
@@ -34,6 +69,14 @@ local function MakeFrame()
     f:SetScript("OnLeave", function(self) self:SetAlpha(0.7) end)
     f:SetClampedToScreen(true)
     f:Hide()
+
+    -- Key holder label: shown above the icon row while inside an active M+ run.
+    local keyLabel = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    keyLabel:SetPoint("BOTTOM", f, "TOP", 0, 4)
+    keyLabel:SetShadowColor(0, 0, 0, 1)
+    keyLabel:SetShadowOffset(1, -1)
+    keyLabel:Hide()
+    f.keyLabel = keyLabel
 
     f.rows = {}
     return f
@@ -266,6 +309,7 @@ local function ShowMissing(missing)
 
     frame:Show()
     StartBlink()
+    UpdateKeyLabel()
 
     local db = ns.Addon:Profile().reminder
     if db.dismissAfter and db.dismissAfter > 0 then
@@ -349,10 +393,29 @@ function AuraReminder.Init(addon)
     frame:SetPoint(db.point, UIParent, db.relPoint, db.x, db.y)
     frame:SetScale(db.scale or 1.0)
 
+    -- Register with LibKeystone so we know who holds each party member's key.
+    -- This lets us display the key holder's name above the reminder panel during M+.
+    local LibKeystone = LibStub and LibStub("LibKeystone", true)
+    if LibKeystone then
+        LibKeystone.Register(lksRegTable, function(keyLevel, keyMapID, _, playerName, channel)
+            if channel ~= "PARTY" then return end
+            if not playerName or playerName == "" then
+                playerName = UnitName("player") or ""
+            end
+            local shortName = playerName:match("^([^%-]+)") or playerName
+            if keyLevel and keyLevel > 0 and keyMapID and keyMapID > 0 then
+                keystoneCache[shortName] = { level = keyLevel, mapID = keyMapID }
+            else
+                keystoneCache[shortName] = nil
+            end
+        end)
+    end
+
     local watcher = CreateFrame("Frame")
     watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
     watcher:RegisterEvent("ZONE_CHANGED_NEW_AREA")
     watcher:RegisterEvent("CHALLENGE_MODE_START")
+    watcher:RegisterEvent("CHALLENGE_MODE_COMPLETED")
     watcher:RegisterEvent("PLAYER_REGEN_ENABLED")
     watcher:RegisterEvent("PLAYER_REGEN_DISABLED")
     watcher:RegisterEvent("UNIT_AURA")
@@ -463,6 +526,9 @@ function AuraReminder.Init(addon)
             StopWeaponTicker()
             ScheduleCheck()
 
+        elseif event == "CHALLENGE_MODE_COMPLETED" then
+            UpdateKeyLabel()
+
         elseif event == "PLAYER_REGEN_ENABLED" then
             if isActive then CheckAndShow() end
 
@@ -475,6 +541,7 @@ function AuraReminder.Init(addon)
 
         elseif event == "UNIT_AURA" then
             local unit = ...
+            -- Buff reminder re-scan
             local isParty = unit and (unit:sub(1,5) == "party" or unit:sub(1,4) == "raid")
             if unit ~= "player" and not isParty then return end
             local rdb = ns.Addon:Profile().reminder
@@ -489,12 +556,16 @@ function AuraReminder.Init(addon)
                     _unitAuraPending = false
                     if not isActive then return end
                     local cdb = ns.Addon:Profile().reminder
+                    -- Mirror CheckAndShow: don't hide mid-combat if frame was showing valid data.
+                    if InCombatLockdown() then return end
                     if cdb.onlyOutOfCombat and InCombatLockdown() then return end
-                    local missing = ns.AuraList.GetMissing(cdb)
-                    if #missing == 0 then
-                        AuraReminder.Hide()
+                    local items = cdb.showAllBuffs
+                        and ns.AuraList.GetAll(cdb)
+                        or  ns.AuraList.GetMissing(cdb)
+                    if cdb.showAllBuffs then
+                        if #items == 0 then AuraReminder.Hide() else ShowMissing(items) end
                     else
-                        ShowMissing(missing)
+                        if #items == 0 then AuraReminder.Hide() else ShowMissing(items) end
                     end
                 end)
             end

@@ -483,7 +483,7 @@ local function UpdateDisplay()
             ns.Theme:PaintFill(f.barFill, {0.55, 0.72, 0.18, 1})  -- yellow-green: filling
         end
         f.pullText:SetText(format("%s%.2f%%|r",
-            (pullQty >= pullTotal) and ns.Theme.EscapeColor("accent") or "|cffaacc44",
+            (pullQty >= pullTotal) and ns.Theme.EscapeColor("accent") or "|cffffffff",
             pullPct * 100))
     else
         f.barFill:SetWidth(1)
@@ -562,7 +562,7 @@ local function ActivateTimer(worldTimerID, worldElapsed, limit)
     updateAccum = 0
     wipe(bossKillTimes)
 
-    local _, affixes, level = C_ChallengeMode.GetActiveKeystoneInfo()
+    local level, affixes = C_ChallengeMode.GetActiveKeystoneInfo()
     keystoneLevel = level or 0
     affixIDs = affixes or {}
 
@@ -822,16 +822,16 @@ local function HookBlizzardBlock()
         if not challengeBlock then return false end
 
         hooksecurefunc(challengeBlock, "Show", function(block)
-            if cfg().enabled and cfg().hideBlizzard then block:Hide() end
+            if cfg().enabled and cfg().hideBlizzard and C_ChallengeMode.IsChallengeModeActive() then block:Hide() end
         end)
         if objectivesBlock then
             hooksecurefunc(objectivesBlock, "Show", function(block)
-                if cfg().enabled and cfg().hideBlizzard then block:Hide() end
+                if cfg().enabled and cfg().hideBlizzard and C_ChallengeMode.IsChallengeModeActive() then block:Hide() end
             end)
         end
         if ScenarioTimerFrame then
             hooksecurefunc(ScenarioTimerFrame, "Show", function(f)
-                if cfg().enabled and cfg().hideBlizzard then f:Hide() end
+                if cfg().enabled and cfg().hideBlizzard and C_ChallengeMode.IsChallengeModeActive() then f:Hide() end
             end)
         end
         -- Hide immediately in case blocks are already shown (e.g. /reload inside a key).

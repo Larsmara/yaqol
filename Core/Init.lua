@@ -14,7 +14,7 @@ function yaqol:OnInitialize()
 
     -- Migrate: ensure spell list sub-tables exist for profiles created before they were added
     local r = self.db.profile.reminder
-    for _, key in ipairs({"flasks","food","augmentRunes","weaponBuffs","custom","classBuffs","partyBuffs"}) do
+    for _, key in ipairs({"classBuffs","partyBuffs"}) do
         if not r[key] then r[key] = {} end
     end
     if r.enableClassBuffs == nil then r.enableClassBuffs = true end
@@ -42,23 +42,6 @@ function yaqol:OnInitialize()
         -- Only reset if it was never explicitly set to false by the user.
         -- Since old default was false, we can't distinguish — just upgrade to true.
         r.enabledDungeon = true
-    end
-
-    -- Migrate: if profile still has old TWW flask IDs (< Midnight S1), reset to new defaults
-    local twwFlaskIDs = { [431932]=true,[431934]=true,[431935]=true,[431936]=true,[431933]=true,
-                          [432021]=true,[432022]=true,[432023]=true,[432024]=true,[432025]=true }
-    if r.flasks and r.flasks[1] and twwFlaskIDs[r.flasks[1].spellID] then
-        r.flasks = CopyTable(ns.Defaults.profile.reminder.flasks)
-    end
-    -- Migrate: reset old TWW augment rune ID (441392) to new Midnight rune IDs
-    if r.augmentRunes and r.augmentRunes[1] and r.augmentRunes[1].spellID == 441392 then
-        r.augmentRunes = CopyTable(ns.Defaults.profile.reminder.augmentRunes)
-    end
-    -- Migrate: reset old individual food spell IDs to new generic Well Fed IDs
-    local oldFoodIDs = { [431780]=true,[431781]=true,[431782]=true,[431783]=true,
-                         [431784]=true,[431785]=true,[431786]=true }
-    if r.food and r.food[1] and oldFoodIDs[r.food[1].spellID] then
-        r.food = CopyTable(ns.Defaults.profile.reminder.food)
     end
 
     -- Migrate: ensure combatRess defaults exist for old profiles

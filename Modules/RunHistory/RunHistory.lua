@@ -40,6 +40,11 @@ local filterWeek    = "all"   -- "week" | "season" | "all"
 local filterDungeon = "all"   -- dungeon name string or "all"
 local filterMinKey  = 0       -- minimum key level
 
+-- Group snapshot taken at CHALLENGE_MODE_START, used by RecordCurrentRun.
+-- GetChallengeCompletionInfo().members is unreliable (may return fewer members
+-- than actually ran the key), so we capture the full party when the key begins.
+local partySnapshot = nil
+
 -- [ HELPERS ] -----------------------------------------------------------------
 local function db()
     return ns.Addon.db.global
@@ -146,27 +151,20 @@ local function RecordCurrentRun()
         deaths = C_ChallengeMode.GetDeathCount() or 0
     end
 
-    -- Group members (from completion info; falls back to live group)
+    -- Group members: prefer the snapshot captured at CHALLENGE_MODE_START.
+    -- GetChallengeCompletionInfo().members is unreliable — it may contain fewer
+    -- members than actually ran the key, so we never use it.
     local members = {}
-    if info.members and #info.members >= 1 then
-        for _, m in ipairs(info.members) do
-            if m.name then
-                local _, class = m.memberGUID and GetPlayerInfoByGUID(m.memberGUID) or nil
-                members[#members + 1] = {
-                    name  = m.name,
-                    class = class or "UNKNOWN",
-                    role  = "NONE",
-                }
-            end
-        end
+    if partySnapshot and #partySnapshot > 0 then
+        members = partySnapshot
     else
-        -- fallback: read live group
+        -- Fallback: read live group (should still be intact at completion time).
         local function AddMember(unit)
-            local uName = UnitName(unit)
+            local uName, uRealm = UnitName(unit)
             if not uName then return end
             local _, class = UnitClass(unit)
             local role = UnitGroupRolesAssigned(unit) or "NONE"
-            members[#members + 1] = { name = uName, class = class or "UNKNOWN", role = role }
+            members[#members + 1] = { name = uName, realm = uRealm or "", class = class or "UNKNOWN", role = role }
         end
         AddMember("player")
         if IsInGroup() then
@@ -301,7 +299,7 @@ local function RebuildRows(charKey)
                     local classColour = RAID_CLASS_COLORS and RAID_CLASS_COLORS[m.class]
                     local r2, g2, b2 = 1, 1, 1
                     if classColour then r2, g2, b2 = classColour.r, classColour.g, classColour.b end
-                    GameTooltip:AddLine("  " .. m.name, r2, g2, b2)
+                    GameTooltip:AddLine("  " .. m.name .. (m.realm and m.realm ~= "" and "-" .. m.realm or ""), r2, g2, b2)
                 end
             end
             if r.affixIDs and #r.affixIDs > 0 then
@@ -419,20 +417,16 @@ local function BuildPanel()
     charLbl:SetText(selectedChar)
     charDropBtn:SetScript("OnClick", function(self)
         local keys = GetCharKeys()
-        local menu = {}
-        for _, k in ipairs(keys) do
-            local kRef = k
-            menu[#menu+1] = {
-                text    = kRef,
-                notCheckable = true,
-                func = function()
+        MenuUtil.CreateContextMenu(self, function(_, rootDescription)
+            for _, k in ipairs(keys) do
+                local kRef = k
+                rootDescription:CreateButton(kRef, function()
                     selectedChar = kRef
                     charLbl:SetText(kRef)
                     RebuildRows(kRef)
-                end,
-            }
-        end
-        EasyMenu(menu, CreateFrame("Frame", "yaqolCharMenuAnchor", UIParent), "cursor", 0, 0, "MENU")
+                end)
+            end
+        end)
     end)
 
     -- Divider under header
@@ -478,20 +472,18 @@ local function BuildPanel()
     dungLbl:SetText("All Dungeons")
     dungeonBtn:SetScript("OnClick", function(self)
         local names = GetDungeonNames(selectedChar)
-        local menu = {}
-        for _, n in ipairs(names) do
-            local nRef = n
-            menu[#menu+1] = {
-                text = (nRef == "all") and "All Dungeons" or nRef,
-                notCheckable = true,
-                func = function()
-                    filterDungeon = nRef
-                    dungLbl:SetText((nRef == "all") and "All Dungeons" or nRef)
-                    RebuildRows(selectedChar)
-                end,
-            }
-        end
-        EasyMenu(menu, CreateFrame("Frame", "yaqolDungMenuAnchor", UIParent), "cursor", 0, 0, "MENU")
+        MenuUtil.CreateContextMenu(self, function(_, rootDescription)
+            for _, n in ipairs(names) do
+                local nRef = n
+                rootDescription:CreateButton(
+                    (nRef == "all") and "All Dungeons" or nRef,
+                    function()
+                        filterDungeon = nRef
+                        dungLbl:SetText((nRef == "all") and "All Dungeons" or nRef)
+                        RebuildRows(selectedChar)
+                    end)
+            end
+        end)
     end)
 
     -- Min key level input
@@ -607,10 +599,27 @@ function RunHistory.Init(addon)
     currentCharKey = nil  -- resolved lazily after PLAYER_LOGIN
 
     local watcher = CreateFrame("Frame")
+    watcher:RegisterEvent("CHALLENGE_MODE_START")
     watcher:RegisterEvent("CHALLENGE_MODE_COMPLETED")
     watcher:SetScript("OnEvent", function(_, event)
-        if event == "CHALLENGE_MODE_COMPLETED" then
+        if event == "CHALLENGE_MODE_START" then
+            -- Snapshot the full party now, before the key might cause anyone to
+            -- leave. This is what RecordCurrentRun uses for the members table.
+            partySnapshot = {}
+            local function Snap(unit)
+                local uName, uRealm = UnitName(unit)
+                if not uName then return end
+                local _, class = UnitClass(unit)
+                local role = UnitGroupRolesAssigned(unit) or "NONE"
+                partySnapshot[#partySnapshot + 1] = { name = uName, realm = uRealm or "", class = class or "UNKNOWN", role = role }
+            end
+            Snap("player")
+            if IsInGroup() then
+                for i = 1, GetNumSubgroupMembers() do Snap("party" .. i) end
+            end
+        elseif event == "CHALLENGE_MODE_COMPLETED" then
             RecordCurrentRun()
+            partySnapshot = nil  -- clear for next run
             -- Refresh panel if open
             if panel and panel:IsShown() then
                 RebuildRows(CharKey())

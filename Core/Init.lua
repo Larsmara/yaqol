@@ -101,6 +101,14 @@ function yaqol:OnInitialize()
 end
 
 function yaqol:OnEnable()
+    -- Re-apply saved Game UI Scale (CVars may not persist across reload/crash)
+    local savedScale = self.db.profile.gameUIScale
+    if savedScale then
+        SetCVar("useUiScale", "1")
+        SetCVar("uiScale", string.format("%.4f", savedScale))
+        UIParent:SetScale(savedScale)
+    end
+
     ns.MinimapButton.Init(self)
     ns.Teleport.Init(self)
     ns.AuraReminder.Init(self)
@@ -148,6 +156,8 @@ function yaqol:OnSlashCommand(input)
         end
     elseif input == "history" then
         ns.RunHistory.Toggle()
+    elseif input == "dmtest" then
+        ns.RunHistory.DumpDamageMeter()
     else
         ns.Config.Toggle()
     end

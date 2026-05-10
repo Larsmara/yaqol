@@ -1,5 +1,15 @@
 # yaqol
 
+## [v1.1.4](https://github.com/Larsmara/yaqol/tree/v1.1.4) (2026-05-10)
+[Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.1.3...v1.1.4) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
+
+**Fixes:**
+- LibKeystone: `SendAddonMessage` is now blocked inside instances (dungeons, raids, delves, BGs) — WoW 12.0 rejects these calls and spammed "You aren't in a party" in chat
+- Teleport: `RequestPartyKeystones` now skips `LibKeystone.Request` when inside any instance, preventing system error spam in delves and M+
+- M+ Timer: completion chat message silently discarded when the group has disbanded before the player zones out (was sending to PARTY with no group)
+- M+ Timer: `GatherCriteriaData` no longer crashes on `elapsedBase` being nil — scenario events (world quests, delves) fire `SCENARIO_CRITERIA_UPDATE` outside an active M+ timer
+- Game UI Scale: chosen scale now persists across reloads — saved in the addon profile and re-applied on login (CVars alone don't reliably survive reloads)
+
 ## [v1.1.3](https://github.com/Larsmara/yaqol/tree/v1.1.3) (2026-04-23)
 [Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.1.2...v1.1.3) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
 

@@ -420,7 +420,9 @@ local function GatherCriteriaData()
                     bossesKilled = bossesKilled + 1
                     -- Record kill time the first time this boss flips to completed.
                     -- Re-sync from the world elapsed timer for accuracy (OnUpdate may lag).
-                    if not prevBossCompleted[numBosses] and not bossKillTimes[numBosses] then
+                    -- Guard: elapsedBase is nil when this fires outside an active M+ timer
+                    -- (e.g. world quest scenarios that also emit SCENARIO_CRITERIA_UPDATE).
+                    if not prevBossCompleted[numBosses] and not bossKillTimes[numBosses] and elapsedBase then
                         local killElapsed = elapsedBase + (elapsedAccum or 0)
                         if timerID then
                             local _, worldSec = GetWorldElapsedTime(timerID)
@@ -721,7 +723,11 @@ local function OnEvent(self, event, ...)
             pendingChatMsg = nil
             local _, iType = GetInstanceInfo()
             if iType == "none" or iType == nil then
-                SendChatMessage(m.text, m.channel)
+                if m.channel == "PARTY" and not IsInGroup() then
+                    -- Group disbanded before we could send; silently discard.
+                else
+                    SendChatMessage(m.text, m.channel)
+                end
             end
             -- If still in an instance (e.g. stayed for loot), discard — don't
             -- spam on every zone transition.
@@ -783,7 +789,7 @@ end
 local blizzBlockHooked = false
 
 -- Immediately apply the current hideBlizzard setting to any already-visible block.
-local function ApplyBlizzardBlockVisibility()
+ApplyBlizzardBlockVisibility = function()
     local enabled = cfg().enabled and cfg().hideBlizzard
     if ScenarioObjectiveTracker then
         local challengeBlock = ScenarioObjectiveTracker.ChallengeModeBlock

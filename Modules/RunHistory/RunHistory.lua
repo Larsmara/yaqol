@@ -45,6 +45,17 @@ local filterMinKey  = 0       -- minimum key level
 -- than actually ran the key), so we capture the full party when the key begins.
 local partySnapshot = nil
 
+-- Player ilvl captured at CHALLENGE_MODE_START
+local snapshotIlvl = nil
+
+-- C_DamageMeter constants
+local DM_SESSION_OVERALL = 0   -- DamageMeterSessionType.Overall
+local DM_TYPE_DAMAGE     = 0   -- DamageMeterType.DamageDone
+local DM_TYPE_HEALING    = 2   -- DamageMeterType.HealingDone
+
+-- Forward declaration — defined after RecordCurrentRun
+local PendingDamageMeterPatch
+
 -- [ HELPERS ] -----------------------------------------------------------------
 local function db()
     return ns.Addon.db.global
@@ -106,6 +117,14 @@ end
 local function FmtDate(ts)
     if not ts then return "" end
     return date("%b %d", ts)
+end
+
+-- Large number → compact string (e.g. 1234567 → "1.23M", 45600 → "45.6K")
+local function FmtNumber(n)
+    if not n or n == 0 then return "0" end
+    if n >= 1e6 then return string.format("%.2fM", n / 1e6) end
+    if n >= 1e3 then return string.format("%.1fK", n / 1e3) end
+    return tostring(math.floor(n))
 end
 
 -- Returns the Unix timestamp of the most recent weekly reset (Tuesday 09:00 UTC).
@@ -175,6 +194,14 @@ local function RecordCurrentRun()
     -- Current season
     local season = (C_MythicPlus.GetCurrentSeason and C_MythicPlus.GetCurrentSeason()) or 0
 
+    -- Strip GUIDs before persisting (they change between sessions)
+    -- Keep a GUID→index map for the deferred damage meter patch.
+    local guidMap = {}
+    for i, m in ipairs(members) do
+        if m.guid then guidMap[m.guid] = i end
+        m.guid = nil
+    end
+
     local run = {
         mapID     = mapID,
         dungeon   = name,
@@ -187,10 +214,92 @@ local function RecordCurrentRun()
         members   = members,
         date      = time(),
         season    = season,
+        totalDamage  = 0,
+        totalHealing = 0,
+        ilvl         = snapshotIlvl,
     }
 
     local runs = GetRuns()
     table.insert(runs, 1, run)  -- newest first
+
+    -- Damage meter values are SecretWhenInCombat and the player is typically
+    -- still in combat when CHALLENGE_MODE_COMPLETED fires. Defer the read
+    -- until combat drops (PLAYER_REGEN_ENABLED), then patch the saved run.
+    PendingDamageMeterPatch(run, guidMap)
+end
+
+-- Reads C_DamageMeter data and writes it into the given run record.
+-- Returns true if data was successfully read.
+local function ReadDamageMeter(run, guidMap)
+    if not C_DamageMeter or not C_DamageMeter.GetCombatSessionFromType then return false end
+
+    local function SafeNum(val)
+        if val == nil then return nil end
+        if issecretvalue(val) then return nil end
+        return val
+    end
+
+    local function SafeStr(val)
+        if val == nil then return nil end
+        if issecretvalue(val) then return nil end
+        return val
+    end
+
+    -- Damage
+    local dmgSession = C_DamageMeter.GetCombatSessionFromType(DM_SESSION_OVERALL, DM_TYPE_DAMAGE)
+    if dmgSession then
+        local total = SafeNum(dmgSession.totalAmount)
+        if total then run.totalDamage = total end
+        if dmgSession.combatSources then
+            for _, src in ipairs(dmgSession.combatSources) do
+                local guid = SafeStr(src.sourceGUID)
+                local amt  = SafeNum(src.totalAmount)
+                if guid and amt then
+                    local idx = guidMap[guid]
+                    if idx and run.members[idx] then run.members[idx].damage = amt end
+                end
+            end
+        end
+    end
+
+    -- Healing
+    local healSession = C_DamageMeter.GetCombatSessionFromType(DM_SESSION_OVERALL, DM_TYPE_HEALING)
+    if healSession then
+        local total = SafeNum(healSession.totalAmount)
+        if total then run.totalHealing = total end
+        if healSession.combatSources then
+            for _, src in ipairs(healSession.combatSources) do
+                local guid = SafeStr(src.sourceGUID)
+                local amt  = SafeNum(src.totalAmount)
+                if guid and amt then
+                    local idx = guidMap[guid]
+                    if idx and run.members[idx] then run.members[idx].healing = amt end
+                end
+            end
+        end
+    end
+
+    return (run.totalDamage or 0) > 0 or (run.totalHealing or 0) > 0
+end
+
+-- Schedule deferred damage meter read: try immediately, fall back to PLAYER_REGEN_ENABLED.
+local pendingPatchFrame
+PendingDamageMeterPatch = function(run, guidMap)
+    -- Try immediately (player might already be out of combat)
+    if not InCombatLockdown() then
+        local ok, err = pcall(ReadDamageMeter, run, guidMap)
+        if ok then return end
+    end
+
+    -- Defer until combat ends
+    if not pendingPatchFrame then
+        pendingPatchFrame = CreateFrame("Frame")
+    end
+    pendingPatchFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+    pendingPatchFrame:SetScript("OnEvent", function(self)
+        self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+        pcall(ReadDamageMeter, run, guidMap)
+    end)
 end
 
 -- [ FILTERING ] ---------------------------------------------------------------
@@ -292,6 +401,9 @@ local function RebuildRows(charKey)
         rowF:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:AddLine(r.dungeon .. " +" .. r.level, 1, 1, 1)
+            if r.ilvl then
+                GameTooltip:AddLine("iLvl: " .. r.ilvl, T.textDim[1], T.textDim[2], T.textDim[3])
+            end
             if r.members and #r.members > 0 then
                 GameTooltip:AddLine(" ")
                 GameTooltip:AddLine("Group:", T.textHeader[1], T.textHeader[2], T.textHeader[3])
@@ -299,8 +411,16 @@ local function RebuildRows(charKey)
                     local classColour = RAID_CLASS_COLORS and RAID_CLASS_COLORS[m.class]
                     local r2, g2, b2 = 1, 1, 1
                     if classColour then r2, g2, b2 = classColour.r, classColour.g, classColour.b end
-                    GameTooltip:AddLine("  " .. m.name .. (m.realm and m.realm ~= "" and "-" .. m.realm or ""), r2, g2, b2)
+                    local suffix = ""
+                    if m.damage and m.damage > 0 then suffix = suffix .. "  D:" .. FmtNumber(m.damage) end
+                    if m.healing and m.healing > 0 then suffix = suffix .. "  H:" .. FmtNumber(m.healing) end
+                    GameTooltip:AddLine("  " .. m.name .. (m.realm and m.realm ~= "" and "-" .. m.realm or "") .. suffix, r2, g2, b2)
                 end
+            end
+            if (r.totalDamage and r.totalDamage > 0) or (r.totalHealing and r.totalHealing > 0) then
+                GameTooltip:AddLine(" ")
+                GameTooltip:AddDoubleLine("Total Damage", FmtNumber(r.totalDamage or 0), T.textHeader[1], T.textHeader[2], T.textHeader[3], 1, 1, 1)
+                GameTooltip:AddDoubleLine("Total Healing", FmtNumber(r.totalHealing or 0), T.textHeader[1], T.textHeader[2], T.textHeader[3], 1, 1, 1)
             end
             if r.affixIDs and #r.affixIDs > 0 then
                 GameTooltip:AddLine(" ")
@@ -611,15 +731,20 @@ function RunHistory.Init(addon)
                 if not uName then return end
                 local _, class = UnitClass(unit)
                 local role = UnitGroupRolesAssigned(unit) or "NONE"
-                partySnapshot[#partySnapshot + 1] = { name = uName, realm = uRealm or "", class = class or "UNKNOWN", role = role }
+                local guid = UnitGUID(unit)
+                partySnapshot[#partySnapshot + 1] = { name = uName, realm = uRealm or "", class = class or "UNKNOWN", role = role, guid = guid }
             end
             Snap("player")
             if IsInGroup() then
                 for i = 1, GetNumSubgroupMembers() do Snap("party" .. i) end
             end
+            -- Capture player ilvl (GetAverageItemLevel returns overall, equipped, pvp)
+            local _, equipped = GetAverageItemLevel()
+            snapshotIlvl = equipped and math.floor(equipped) or nil
         elseif event == "CHALLENGE_MODE_COMPLETED" then
             RecordCurrentRun()
             partySnapshot = nil  -- clear for next run
+            snapshotIlvl = nil
             -- Refresh panel if open
             if panel and panel:IsShown() then
                 RebuildRows(CharKey())
@@ -639,5 +764,119 @@ function RunHistory.Toggle()
     else
         RebuildRows(CharKey())
         panel:Show()
+    end
+end
+
+-- Debug: dump C_DamageMeter state to chat so we can see the actual API shape.
+function RunHistory.DumpDamageMeter()
+    local P = function(msg) print("|cff33ccffyaqol dmtest|r " .. msg) end
+    if not C_DamageMeter then P("C_DamageMeter namespace does NOT exist."); return end
+
+    local avail = C_DamageMeter.IsDamageMeterAvailable and C_DamageMeter.IsDamageMeterAvailable()
+    P("IsDamageMeterAvailable() = " .. tostring(avail))
+
+    local ok, sessions = pcall(C_DamageMeter.GetAvailableCombatSessions)
+    if not ok then P("GetAvailableCombatSessions() errored: " .. tostring(sessions)); return end
+    if not sessions or #sessions == 0 then P("No sessions available."); return end
+    P(#sessions .. " sessions. Using first: sessionID=" .. tostring(sessions[1].sessionID) .. " name=" .. tostring(sessions[1].name))
+
+    local sid = sessions[1].sessionID
+    local myGUID = UnitGUID("player")
+    P("Player GUID: " .. tostring(myGUID))
+
+    -- Helper to dump a table
+    local function DumpTable(tbl, indent)
+        indent = indent or "  "
+        if type(tbl) ~= "table" then P(indent .. "raw=" .. tostring(tbl) .. " (" .. type(tbl) .. ")"); return end
+        for fk, fv in pairs(tbl) do
+            if type(fv) == "table" then
+                local sub = {}
+                local n = 0
+                for sk, sv in pairs(fv) do
+                    n = n + 1
+                    sub[#sub + 1] = tostring(sk) .. "=" .. tostring(sv)
+                    if n >= 8 then sub[#sub + 1] = "..."; break end
+                end
+                P(indent .. "." .. tostring(fk) .. " = {" .. table.concat(sub, ", ") .. "}")
+            else
+                P(indent .. "." .. tostring(fk) .. " = " .. tostring(fv) .. " (" .. type(fv) .. ")")
+            end
+        end
+    end
+
+    -- Probe GetCombatSessionFromID(sessionID, type) with type 0-5
+    P("--- GetCombatSessionFromID(sid, type) ---")
+    for t = 0, 5 do
+        local sOk, sData = pcall(C_DamageMeter.GetCombatSessionFromID, sid, t)
+        if sOk and sData then
+            P("type=" .. t .. " returned:")
+            DumpTable(sData, "    ")
+        elseif sOk then
+            P("type=" .. t .. " returned nil")
+        else
+            P("type=" .. t .. " errored: " .. tostring(sData))
+        end
+    end
+
+    -- Probe GetCombatSessionSourceFromID(sessionID, type, sourceGUID)
+    P("--- GetCombatSessionSourceFromID(sid, type, myGUID) ---")
+    for t = 0, 5 do
+        local sOk, sData = pcall(C_DamageMeter.GetCombatSessionSourceFromID, sid, t, myGUID)
+        if sOk and sData then
+            P("type=" .. t .. " returned:")
+            DumpTable(sData, "    ")
+        elseif sOk then
+            P("type=" .. t .. " returned nil")
+        else
+            P("type=" .. t .. " errored: " .. tostring(sData))
+        end
+    end
+
+    -- Probe GetCombatSessionSourceFromID without GUID (just sid, type)
+    P("--- GetCombatSessionSourceFromID(sid, type) [no GUID] ---")
+    for t = 0, 5 do
+        local sOk, sData = pcall(C_DamageMeter.GetCombatSessionSourceFromID, sid, t)
+        if sOk and sData then
+            P("type=" .. t .. " returned:")
+            if type(sData) == "table" then
+                -- might be array of entries
+                local isArr = (#sData > 0)
+                if isArr then
+                    P("    (array of " .. #sData .. " entries)")
+                    for i = 1, math.min(3, #sData) do
+                        P("    [" .. i .. "]:")
+                        DumpTable(sData[i], "      ")
+                    end
+                else
+                    DumpTable(sData, "    ")
+                end
+            else
+                P("    raw=" .. tostring(sData))
+            end
+        elseif sOk then
+            P("type=" .. t .. " returned nil")
+        else
+            P("type=" .. t .. " errored: " .. tostring(sData))
+        end
+    end
+
+    -- Probe GetSessionDurationSeconds
+    if C_DamageMeter.GetSessionDurationSeconds then
+        local dOk, dur = pcall(C_DamageMeter.GetSessionDurationSeconds, sid)
+        P("GetSessionDurationSeconds(" .. sid .. ") = " .. (dOk and tostring(dur) or ("error: " .. tostring(dur))))
+    end
+
+    -- Probe GetCombatSessionFromType(sessionType, type)
+    P("--- GetCombatSessionFromType(sessionType, type) ---")
+    for st = 0, 3 do
+        for t = 0, 3 do
+            local tOk, tData = pcall(C_DamageMeter.GetCombatSessionFromType, st, t)
+            if tOk and tData then
+                P("sessionType=" .. st .. " type=" .. t .. " returned:")
+                DumpTable(tData, "    ")
+            elseif not tOk and not tostring(tData):find("Usage:") then
+                P("sessionType=" .. st .. " type=" .. t .. " errored: " .. tostring(tData))
+            end
+        end
     end
 end

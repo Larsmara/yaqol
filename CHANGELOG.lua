@@ -8,6 +8,17 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.1.4",
+        date    = "2026-05-10",
+        changes = {
+            "|cff2dc9b8Fix|r  LibKeystone: SendAddonMessage blocked inside instances — stops \"You aren't in a party\" spam (WoW 12.0 restriction)",
+            "|cff2dc9b8Fix|r  Teleport: keystone requests skipped inside instances — prevents system error spam in delves and M+",
+            "|cff2dc9b8Fix|r  M+ Timer: completion chat message discarded when group disbands before zone-out",
+            "|cff2dc9b8Fix|r  M+ Timer: no longer crashes on scenario criteria events outside M+ (elapsedBase nil guard)",
+            "|cff2dc9b8Fix|r  Game UI Scale: chosen scale now persists across reloads (saved in addon profile)",
+        },
+    },
+    {
         version = "1.1.3",
         date    = "2026-04-23",
         changes = {

@@ -94,6 +94,10 @@ end
 
 local function RequestPartyKeystones()
     if LibKeystone then
+        -- 12.0.0: SendAddonMessage is blocked inside instances; skip request
+        -- to avoid "You aren't in a party" system error spam.
+        local _, iType = GetInstanceInfo()
+        if iType and iType ~= "none" then return end
         LibKeystone.Request("PARTY")
     end
 end

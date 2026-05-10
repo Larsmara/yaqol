@@ -101,10 +101,18 @@ do
 	end
 end
 
-local SendAddonMessage, CTimerNewTimer = C_ChatInfo.SendAddonMessage, C_Timer.NewTimer
+local RealSendAddonMessage, CTimerNewTimer = C_ChatInfo.SendAddonMessage, C_Timer.NewTimer
 local GetTime = GetTime
 local next = next
 local throttleTime = 3 -- Seconds
+
+-- 12.0.0: SendAddonMessage is blocked inside instances (dungeons, raids, BGs, arenas).
+-- Calling it anyway produces a "You aren't in a party" system error.
+local function SendAddonMessage(prefix, msg, chatType, target)
+	local _, iType = GetInstanceInfo()
+	if iType and iType ~= "none" then return end
+	return RealSendAddonMessage(prefix, msg, chatType, target)
+end
 do
 	local throttleTable = {
 		GUILD = 0,

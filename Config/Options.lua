@@ -502,6 +502,7 @@ local function BuildGeneral(content, db, addon)
             SetCVar("useUiScale", "1")
             SetCVar("uiScale", string.format("%.4f", stepVal))
             UIParent:SetScale(stepVal)
+            db.gameUIScale = stepVal
             RefreshUIScaleBtns()
         end)
     end

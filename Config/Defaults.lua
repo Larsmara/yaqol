@@ -5,6 +5,7 @@ ns.Defaults = {
     profile = {
         minimap = { hide = false, minimapPos = 220 },
         configScale = 1.0,
+        gameUIScale = nil,  -- saved Game UI Scale; nil = don't override Blizzard default
         configPanelPos = { point = "CENTER", relPoint = "CENTER", x = 0, y = 0 },
         fpsBackup = nil,  -- snapshot of settings before Apply FPS
 

@@ -1192,6 +1192,56 @@ local function BuildQOL(content, db, addon)
         function(v) q.autoStartChallenge = v end, y)
     y = y - dh - 14
 
+    -- [ COMBAT LOGGING ] --------------------------------------------------
+    local hCL = Label(content, "COMBAT LOGGING", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
+    hCL:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    _, dh = MakeToggle(content, "Automatically start combat logging",
+        function() return q.autoLog end,
+        function(v) q.autoLog = v; ns.QOL.Refresh(addon) end, y)
+    y = y - dh - 2
+
+    local clNote = Label(content,
+        "Starts /combatlog when entering selected content and stops when leaving. "
+        .."Forces Advanced Combat Logging on.",
+        "SystemFont_Small", T.textDim[1], T.textDim[2], T.textDim[3])
+    clNote:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
+    clNote:SetWidth(T.PANEL_W - T.PAD*2 - 48)
+    clNote:SetJustifyH("LEFT")
+    y = y - 30
+
+    _, dh = MakeToggle(content, "  M+ Keystones",
+        function() return q.autoLogMythicPlus end,
+        function(v) q.autoLogMythicPlus = v; ns.QOL.Refresh(addon) end, y)
+    y = y - dh - 2
+
+    _, dh = MakeToggle(content, "  Mythic Raids",
+        function() return q.autoLogMythicRaid end,
+        function(v) q.autoLogMythicRaid = v; ns.QOL.Refresh(addon) end, y)
+    y = y - dh - 2
+
+    _, dh = MakeToggle(content, "  Heroic Raids",
+        function() return q.autoLogHeroicRaid end,
+        function(v) q.autoLogHeroicRaid = v; ns.QOL.Refresh(addon) end, y)
+    y = y - dh - 2
+
+    _, dh = MakeToggle(content, "  Normal Raids",
+        function() return q.autoLogNormalRaid end,
+        function(v) q.autoLogNormalRaid = v; ns.QOL.Refresh(addon) end, y)
+    y = y - dh - 2
+
+    _, dh = MakeToggle(content, "  LFR",
+        function() return q.autoLogLFR end,
+        function(v) q.autoLogLFR = v; ns.QOL.Refresh(addon) end, y)
+    y = y - dh - 2
+
+    _, dh = MakeToggle(content, "  Arenas",
+        function() return q.autoLogArena end,
+        function(v) q.autoLogArena = v; ns.QOL.Refresh(addon) end, y)
+    y = y - dh - 14
+
     -- [ PETS ] ------------------------------------------------------------
     local h7 = Label(content, "PETS", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])

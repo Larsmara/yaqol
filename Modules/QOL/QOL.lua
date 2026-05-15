@@ -927,6 +927,125 @@ end
 
 -- [ PUBLIC API ] --------------------------------------------------------------
 
+-- [ AUTO COMBAT LOGGING ] ----------------------------------------------------
+-- Automatically starts/stops /combatlog on zone transitions based on instance
+-- type and difficulty.  Forces advancedCombatLogging on when logging starts.
+do
+    -- LFR difficulty IDs (regular + timewalking)
+    local LFR_DIFFS = { [7] = true, [17] = true }
+
+    -- Map raid difficulty to the config key that controls it
+    local RAID_DIFF_KEY = {
+        [16] = "autoLogMythicRaid",   -- mythic
+        [15] = "autoLogHeroicRaid",   -- heroic
+        [14] = "autoLogNormalRaid",   -- normal
+    }
+
+    -- Retail map-ID floors: anything below these is legacy content
+    local MIN_RAID_MAP    = 2657
+    local MIN_DUNGEON_MAP = 959
+
+    -- Legacy dungeons that still rotate into the M+ pool
+    local LEGACY_DUNGEON = {
+        [1594] = true,  -- The MOTHERLODE!!
+        [1208] = true,  -- Grimrail Depot
+        [1195] = true,  -- Iron Docks
+        [1651] = true,  -- Return to Karazhan
+        [657]  = true,  -- The Vortex Pinnacle
+        [643]  = true,  -- Throne of the Tides
+        [670]  = true,  -- Grim Batol
+        [658]  = true,  -- Pit of Saron
+    }
+
+    local weStartedLog = false   -- true when *we* turned logging on
+    local logFrame
+
+    local function EnsureAdvancedLogging()
+        if GetCVar("advancedCombatLogging") ~= "1" then
+            SetCVar("advancedCombatLogging", 1)
+        end
+    end
+
+    local function ShouldLog()
+        local d = cfg()
+        if not d.autoLog then return false end
+
+        local _, zoneType, rawDiff, _, _, _, _, rawMapID = GetInstanceInfo()
+        local diff  = tonumber(rawDiff)
+        local mapID = tonumber(rawMapID)
+        if not diff or not mapID then return false end
+
+        -- LFR
+        if LFR_DIFFS[diff] then return d.autoLogLFR end
+
+        -- Raids (retail only)
+        if zoneType == "raid" and mapID >= MIN_RAID_MAP then
+            local key = RAID_DIFF_KEY[diff]
+            if key then return d[key] end
+            return true  -- timewalking / other unrecognised difficulties
+        end
+
+        -- M+ and mythic 0 dungeons
+        if d.autoLogMythicPlus then
+            local isMythic = (diff == 23 or diff == 8)  -- 23 = keystone, 8 = mythic
+            local isRetail = mapID >= MIN_DUNGEON_MAP or LEGACY_DUNGEON[mapID]
+            if isMythic and isRetail then return true end
+        end
+
+        -- Arena
+        if d.autoLogArena and (zoneType == "arena" or zoneType == "ratedarena") then
+            return true
+        end
+
+        return false
+    end
+
+    local function ApplyLoggingState()
+        local shouldLog = ShouldLog()
+        if shouldLog then
+            EnsureAdvancedLogging()
+            LoggingCombat(true)
+            if not weStartedLog then
+                Notify("Combat logging " .. ns.Theme.EscapeColor("accent") .. "started|r.")
+            end
+            weStartedLog = true
+        elseif weStartedLog and LoggingCombat() then
+            LoggingCombat(false)
+            Notify("Combat logging " .. ns.Theme.EscapeColor("accent") .. "stopped|r.")
+            weStartedLog = false
+        end
+    end
+
+    -- Initialise or tear down the auto-log event frame
+    function QOL.RefreshAutoLog()
+        local d = cfg()
+        if d.autoLog then
+            if not logFrame then
+                logFrame = CreateFrame("Frame")
+                logFrame:SetScript("OnEvent", function(_, ev)
+                    if ev == "ZONE_CHANGED_NEW_AREA" then
+                        C_Timer.After(2, ApplyLoggingState)
+                    elseif ev == "CHALLENGE_MODE_START" then
+                        C_Timer.After(1, ApplyLoggingState)
+                    end
+                end)
+            end
+            logFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+            logFrame:RegisterEvent("CHALLENGE_MODE_START")
+            -- Check immediately in case we just enabled the option mid-instance
+            C_Timer.After(2, ApplyLoggingState)
+        elseif logFrame then
+            logFrame:UnregisterAllEvents()
+            -- Stop logging if we were the ones who started it
+            if weStartedLog and LoggingCombat() then
+                LoggingCombat(false)
+                Notify("Combat logging " .. ns.Theme.EscapeColor("accent") .. "stopped|r.")
+                weStartedLog = false
+            end
+        end
+    end
+end
+
 -- [ AUTO-SLOT KEYSTONE ] -----------------------------------------------------
 -- When ChallengesKeystoneFrame opens, find the keystone in bags and slot it.
 local keystoneHooked  = false
@@ -1020,6 +1139,7 @@ function QOL.Init(addonObj)
     QOL.Refresh(addon)
     HookHoldToRelease()
     HookAutoSlotKeystone()
+    QOL.RefreshAutoLog()
     -- Build frames now so LayoutMode can find them immediately.
     GetOrMakeDurFrame()
     -- Check for pet class before building pet frame
@@ -1077,4 +1197,5 @@ function QOL.Refresh(addonObj)
     end
 
     ApplyFasterLooting()
+    QOL.RefreshAutoLog()
 end

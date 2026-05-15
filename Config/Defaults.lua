@@ -37,6 +37,15 @@ ns.Defaults = {
             autoStartChallenge  = false, -- auto-start the M+ after keystone slots (3-second countdown)
             petReminder     = false,  -- warn when hunter/warlock pet is dead or missing
             petPoint = "CENTER", petRelPoint = "CENTER", petX = 0, petY = 100,
+
+            -- Auto combat logging
+            autoLog            = false,  -- master toggle for automatic combat logging
+            autoLogMythicPlus  = true,   -- log M+ keystones
+            autoLogMythicRaid  = true,   -- log mythic raids
+            autoLogHeroicRaid  = true,   -- log heroic raids
+            autoLogNormalRaid  = true,   -- log normal raids
+            autoLogLFR         = false,  -- log LFR
+            autoLogArena       = false,  -- log arenas
         },
 
         -- Mythic+ Timer module

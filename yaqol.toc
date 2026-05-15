@@ -15,6 +15,7 @@ Libs/AceAddon-3.0/AceAddon-3.0.xml
 Libs/AceConsole-3.0/AceConsole-3.0.xml
 Libs/AceEvent-3.0/AceEvent-3.0.xml
 Libs/AceDB-3.0/AceDB-3.0.xml
+Libs/LibCustomGlow/LibCustomGlow-1.0.lua
 
 ## Addon
 CHANGELOG.lua
@@ -26,6 +27,7 @@ Core/MinimapButton.lua
 Core/LayoutMode.lua
 Modules/Teleport/Teleport.lua
 Modules/AuraReminder/AuraList.lua
+Modules/AuraReminder/AuraGlow.lua
 Modules/AuraReminder/AuraReminder.lua
 Modules/QOL/QOL.lua
 Modules/MythicTimer/MythicTimer.lua

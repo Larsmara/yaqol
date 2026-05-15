@@ -72,6 +72,7 @@ ns.Defaults = {
             minKeystoneLevel = 1,
             remindOnBuffLost = true,
             onlyOutOfCombat = true,
+            showInCombat = true,       -- show visual-only (non-clickable) reminders during combat
             showTooltip = true,
             enterDelay = 2,
             dismissAfter = 0,    -- 0 = never auto-dismiss
@@ -93,6 +94,26 @@ ns.Defaults = {
             -- partyBuffs[key] = false disables a single buff (e.g. { fort = false })
             enablePartyBuffs = true,
             partyBuffs = {},
+
+            -- Duration thresholds (Phase 4): show reminder when buff is about to expire
+            showUnderDurationDungeon = 20,  -- minutes (0 = disabled)
+            showUnderDurationRaid = 10,     -- minutes (0 = disabled)
+            partyBuffRangeCheck = true,     -- only count in-range members as missing
+            flaskRaid    = "auto",          -- flask preference key for raids
+            flaskDungeon = "auto",          -- flask preference key for dungeon/M+/open world
+            foodRaid     = "auto",          -- food category key for raids
+            foodDungeon  = "auto",          -- food category key for dungeon/M+/open world
+
+            -- Display (Phase 5)
+            showNonInstanced = false,
+            showText = false,
+            textSize = 10,
+            textColor = { r = 1, g = 1, b = 1 },
+            glowType = "BLIZZARD",             -- "NONE" | "BLIZZARD" | "PIXEL" | "AUTOCAST" | "PULSE"
+            glowColor = { r = 1, g = 0.8, b = 0, a = 1 },
+            iconSpacing = 4,
+            opacity = 0.7,
+            frameStrata = "HIGH",
         },
 
         -- Merchant module

@@ -23,6 +23,31 @@ function yaqol:OnInitialize()
     end
     if r.enableClassBuffs == nil then r.enableClassBuffs = true end
     if r.enablePartyBuffs == nil then r.enablePartyBuffs = true end
+    if r.showInCombat == nil then r.showInCombat = true end
+
+    -- Migrate: Phase 4 duration thresholds, range check, and consumable preferences
+    if r.showUnderDurationDungeon == nil then r.showUnderDurationDungeon = 20 end
+    if r.showUnderDurationRaid == nil then r.showUnderDurationRaid = 10 end
+    if r.partyBuffRangeCheck == nil then r.partyBuffRangeCheck = true end
+    if r.flaskRaid == nil then r.flaskRaid = "auto" end
+    if r.flaskDungeon == nil then r.flaskDungeon = "auto" end
+    if r.foodRaid == nil then r.foodRaid = "auto" end
+    if r.foodDungeon == nil then r.foodDungeon = "auto" end
+    -- Remove obsolete preference keys from old profiles
+    r.preferredFlask = nil
+    r.preferredFood = nil
+    r.preferredWeaponEnchant = nil
+
+    -- Migrate: Phase 5 display settings
+    if r.showNonInstanced == nil then r.showNonInstanced = false end
+    if r.showText == nil then r.showText = false end
+    if r.textSize == nil then r.textSize = 10 end
+    if r.textColor == nil then r.textColor = { r = 1, g = 1, b = 1 } end
+    if r.glowType == nil then r.glowType = "BLIZZARD" end
+    if r.glowColor == nil then r.glowColor = { r = 1, g = 0.8, b = 0, a = 1 } end
+    if r.iconSpacing == nil then r.iconSpacing = 4 end
+    if r.opacity == nil then r.opacity = 0.7 end
+    if r.frameStrata == nil then r.frameStrata = "HIGH" end
 
     -- Migrate: new QOL settings added in v1.0.5
     local q = self.db.profile.qol

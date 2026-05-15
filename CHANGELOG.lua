@@ -8,6 +8,20 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.2.0",
+        date    = "2026-05-15",
+        changes = {
+            "|cff44ccffRedesign|r  Visual overhaul — borders removed, unified SystemFont + OUTLINE treatment across all modules",
+            "|cff44ccffRedesign|r  Raid Toolbar — single panel background, atlas icons, fade-out toggle replaces collapse",
+            "|cff00cc66New|r  AuraReminder: clickable icons — left-click to cast buff or use consumable",
+            "|cff00cc66New|r  AuraReminder: glow effects (Blizzard/Pixel/Autocast/Pulse) via LibCustomGlow",
+            "|cff00cc66New|r  AuraReminder: duration threshold — remind when flask/food is about to expire",
+            "|cff00cc66New|r  AuraReminder: consumable preference dropdowns (flask & food per content type)",
+            "|cff00cc66New|r  AuraReminder: party buff range check, text labels, combat-aware display, open-world mode",
+            "|cff00cc66New|r  Pet Reminder: Lone Wolf suppression, Grimoire of Sacrifice detection",
+        },
+    },
+    {
         version = "1.1.4",
         date    = "2026-05-10",
         changes = {

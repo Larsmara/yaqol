@@ -792,6 +792,9 @@ end
 
 -- ============================================================================
 local PET_CLASSES = { HUNTER = true, WARLOCK = true }
+local LONE_WOLF_SPELL_ID    = 155228  -- Hunter MM passive: petless playstyle
+local GRIMOIRE_SACRIFICE_ID   = 108503  -- Warlock talent: sacrifice pet for buff
+local GRIMOIRE_SACRIFICE_BUFF = 196099  -- Aura granted after sacrificing
 local petFrame
 local petFadeTimer
 
@@ -855,20 +858,35 @@ local function ShowPetWarning(msg, persistent)
     end
 end
 
+-- Returns true when the Grimoire of Sacrifice buff is active on the player.
+local function HasSacrificeBuff()
+    local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, GRIMOIRE_SACRIFICE_BUFF)
+    return ok and aura ~= nil
+end
+
 local function CheckPetNow()
     local enabled = cfg().petReminder
     if not enabled then HidePetWarning() return end
     local _, classFile = UnitClass("player")
     if not PET_CLASSES[classFile] then return end
+    -- Lone Wolf hunters intentionally play petless — suppress all warnings.
+    if classFile == "HUNTER" and IsPlayerSpell(LONE_WOLF_SPELL_ID) then
+        HidePetWarning(); return
+    end
     if IsMounted() then HidePetWarning(); return end
     local petExists = UnitExists("pet")
     local petDead = petExists and UnitIsDead("pet")
+    local hasGoS = classFile == "WARLOCK" and IsPlayerSpell(GRIMOIRE_SACRIFICE_ID)
     -- If the pet is alive and present, always clear the warning — even in combat.
     -- (InCombatLockdown only blocks the passive check to avoid taint.)
     if petExists and not petDead then
         if InCombatLockdown() then
             HidePetWarning()  -- clear "no pet" / "dead" banners; skip passive check in combat
             return
+        end
+        -- GoS warlock with a live pet should sacrifice it.
+        if hasGoS then
+            ShowPetWarning("Sacrifice pet", true); return
         end
         local petPassive = (GetPetActionInfo(2) == "PET_ACTION_PASSIVE")
         if petPassive then
@@ -881,7 +899,12 @@ local function CheckPetNow()
     -- Pet is missing or dead — don't show warnings in combat (can't summon anyway).
     if InCombatLockdown() then return end
     if not petExists then
-        ShowPetWarning("No active pet!", true)    -- stays until a pet is summoned
+        if hasGoS then
+            -- Already sacrificed → silent; needs to summon + sacrifice → remind.
+            if HasSacrificeBuff() then HidePetWarning() else ShowPetWarning("Sacrifice pet", true) end
+        else
+            ShowPetWarning("No active pet!", true)
+        end
     elseif petDead then
         ShowPetWarning("Your pet is dead!", false) -- fades after 8 s
     end
@@ -923,7 +946,9 @@ local function OnEvent(self, event, arg1)
     elseif event == "CINEMATIC_START"                   then OnCinematicStart()
     elseif event == "DELETE_ITEM_CONFIRM"                then OnDeleteItemConfirm()
     elseif event == "UNIT_PET"                          then CheckPet(arg1)
+    elseif event == "UNIT_AURA"                          then CheckPet(arg1)
     elseif event == "PLAYER_MOUNT_DISPLAY_CHANGED"       then CheckPet("player", 2)
+    elseif event == "PLAYER_TALENT_UPDATE"               then CheckPet("player")
     elseif event == "PLAYER_ENTERING_WORLD"             then
         MaybeShowAffixFrame()
         CheckPet("player")
@@ -1075,6 +1100,15 @@ function QOL.Refresh(addonObj)
     Reg("DELETE_ITEM_CONFIRM", d.autoConfirmDelete)
     Reg("UNIT_PET",         d.petReminder)
     Reg("PLAYER_MOUNT_DISPLAY_CHANGED", d.petReminder)
+    Reg("PLAYER_TALENT_UPDATE",         d.petReminder)
+    -- GoS warlocks need UNIT_AURA to react when the sacrifice buff drops.
+    -- Scoped to "player" via RegisterUnitEvent to avoid per-frame spam.
+    local _, classFile = UnitClass("player")
+    if d.petReminder and classFile == "WARLOCK" then
+        frame:RegisterUnitEvent("UNIT_AURA", "player")
+    else
+        frame:UnregisterEvent("UNIT_AURA")
+    end
 
     ApplyFasterLooting()
 end

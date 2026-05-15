@@ -173,6 +173,144 @@ local function MakeInput(parent, placeholder, onEnter, w, h)
     return eb
 end
 
+-- [ DROPDOWN WIDGET ] ---------------------------------------------------------
+-- Inline button-row dropdown matching the existing toggle/slider style.
+-- choices = { { value="...", label="..." }, ... }
+-- Returns the row frame and its height.
+local function MakeDropdown(parent, label, choices, getValue, setValue, yOff)
+    local row = CreateFrame("Frame", nil, parent)
+    row:SetSize(T.CONTENT_W - T.PAD*2, T.ROW_H + 6)
+    row:SetPoint("TOPLEFT", parent, "TOPLEFT", T.PAD, yOff)
+
+    local lbl = Label(row, label, "SystemFont_Small")
+    lbl:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
+
+    -- Build button row for each choice
+    local btns = {}
+    local bx = 0
+    for _, choice in ipairs(choices) do
+        local mb = CreateFrame("Button", nil, row)
+        local btnW = math.max(80, #choice.label * 7 + 16)
+        mb:SetSize(btnW, 18)
+        mb:SetPoint("TOPLEFT", row, "TOPLEFT", bx, -18)
+        bx = bx + btnW + 4
+        local mbBg = mb:CreateTexture(nil, "BACKGROUND"); mbBg:SetAllPoints()
+        local mbHl = mb:CreateTexture(nil, "HIGHLIGHT"); mbHl:SetAllPoints()
+        mbHl:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.15)
+        local mbLbl = mb:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
+        mbLbl:SetPoint("CENTER"); mbLbl:SetText(choice.label)
+        btns[#btns+1] = { value = choice.value, bg = mbBg, lbl = mbLbl }
+    end
+
+    local function RefreshBtns()
+        local cur = getValue()
+        for _, b in ipairs(btns) do
+            if b.value == cur then
+                b.bg:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.35)
+                b.lbl:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
+            else
+                b.bg:SetColorTexture(T.bgRow[1], T.bgRow[2], T.bgRow[3], 1)
+                b.lbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
+            end
+        end
+    end
+    RefreshBtns()
+
+    -- Wire click handlers
+    for i, choice in ipairs(choices) do
+        local val = choice.value
+        local btnFrame = btns[i].bg:GetParent()
+        btnFrame:SetScript("OnClick", function()
+            setValue(val)
+            RefreshBtns()
+        end)
+    end
+
+    row.Refresh = RefreshBtns
+    return row, T.ROW_H + 26
+end
+
+-- [ COLOR PICKER WIDGET ] ----------------------------------------------------
+-- Small color swatch + label. Clicking opens the WoW color picker.
+-- getter() -> r, g, b, a
+-- setter(r, g, b, a) called on change and cancel-restore
+local function MakeColorPicker(parent, label, getter, setter, yOff)
+    local row = CreateFrame("Frame", nil, parent)
+    row:SetSize(T.CONTENT_W - T.PAD*2, T.ROW_H)
+    row:SetPoint("TOPLEFT", parent, "TOPLEFT", T.PAD, yOff)
+
+    local lbl = Label(row, label, "SystemFont_Small")
+    lbl:SetPoint("LEFT", row, "LEFT", 24, 0)
+
+    local swatch = CreateFrame("Button", nil, row)
+    swatch:SetSize(16, 16)
+    swatch:SetPoint("LEFT", row, "LEFT", 0, 0)
+    local swatchTex = swatch:CreateTexture(nil, "ARTWORK")
+    swatchTex:SetAllPoints()
+
+    local function RefreshSwatch()
+        local r, g, b, a = getter()
+        swatchTex:SetColorTexture(r or 1, g or 1, b or 1, a or 1)
+    end
+    RefreshSwatch()
+
+    swatch:SetScript("OnClick", function()
+        local pr, pg, pb, pa = getter()
+        ColorPickerFrame:SetupColorPickerAndShow({
+            r = pr, g = pg, b = pb,
+            hasOpacity = true,
+            opacity = 1 - (pa or 1),
+            swatchFunc = function()
+                local r, g, b = ColorPickerFrame:GetColorRGB()
+                local a = 1 - ColorPickerFrame:GetColorAlpha()
+                setter(r, g, b, a)
+                RefreshSwatch()
+            end,
+            cancelFunc = function()
+                setter(pr, pg, pb, pa)
+                RefreshSwatch()
+            end,
+        })
+    end)
+
+    row.Refresh = RefreshSwatch
+    return row, T.ROW_H + 4
+end
+
+-- [ SELECT DROPDOWN WIDGET ] --------------------------------------------------
+-- Uses the native Blizzard WowStyle1DropdownTemplate for reliable interaction.
+-- choices = { { value = "key", label = "Display Text" }, ... }
+local function MakeSelectDropdown(parent, labelText, choices, getValue, setValue, yOff)
+    local DDW = 220
+    local ROW_H = 44  -- label + dropdown button
+    local row = CreateFrame("Frame", nil, parent)
+    row:SetSize(T.CONTENT_W - T.PAD*2, ROW_H)
+    row:SetPoint("TOPLEFT", parent, "TOPLEFT", T.PAD, yOff)
+
+    local lbl = Label(row, labelText, "SystemFont_Small")
+    lbl:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
+
+    local dropdown = CreateFrame("DropdownButton", nil, row, "WowStyle1DropdownTemplate")
+    dropdown:SetPoint("TOPLEFT", row, "TOPLEFT", -16, -14)
+    dropdown:SetWidth(DDW)
+    dropdown:SetupMenu(function(_, rootDescription)
+        for _, choice in ipairs(choices) do
+            rootDescription:CreateRadio(
+                choice.label,
+                function(data) return getValue() == data end,
+                function(data) setValue(data) end,
+                choice.value
+            )
+        end
+    end)
+
+    function row.Refresh()
+        dropdown:Update()
+    end
+
+    return row, ROW_H
+end
+
 -- [ FPS / PERFORMANCE CVARS ] -------------------------------------------------
 local PERFORMANCE_CVARS = {
     -- Graphics Tab
@@ -586,6 +724,9 @@ local function BuildReminder(content, db, addon)
     local toggles = {
         { "Enable Buff Reminders",                 function() return db.reminder.enabled end,            function(v) db.reminder.enabled = v; ns.AuraReminder.Refresh(addon) end },
         { "Re-trigger if Buff Falls Off Mid-Run",  function() return db.reminder.remindOnBuffLost end,   function(v) db.reminder.remindOnBuffLost = v end },
+        { "Show Reminders During Combat  |cff888888(visual only, not clickable)|r",
+          function() return db.reminder.showInCombat end,
+          function(v) db.reminder.showInCombat = v end },
         { "Show Tooltip on Hover",                 function()
             if db.reminder.showTooltip == nil then db.reminder.showTooltip = true end
             return db.reminder.showTooltip
@@ -612,7 +753,156 @@ local function BuildReminder(content, db, addon)
         function() return db.reminder.weaponOil end,
         function(v) db.reminder.weaponOil = v; ns.AuraReminder.Refresh(addon) end, y)
     y = y - dh - 10
+
+    -- ── DURATION THRESHOLDS ───────────────────────────────────────────────
+    y = y - 10
+    local h3 = Label(content, "DURATION THRESHOLDS", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
+    h3:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    local noteD = Label(content,
+        "Show reminders when a buff is about to expire, even if it's still active.",
+        "SystemFont_Small", 0.7, 0.7, 0.7)
+    noteD:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
+    noteD:SetWidth(T.PANEL_W - T.PAD*2 - 16)
+    noteD:SetJustifyH("LEFT")
+    y = y - 30
+
+    _, dh = MakeSlider(content, "Dungeon / M+ Threshold (minutes)", 0, 60, 5,
+        function() return db.reminder.showUnderDurationDungeon or 0 end,
+        function(v) db.reminder.showUnderDurationDungeon = v end, y,
+        function(v) return v == 0 and "Off" or string.format("%d min", v) end)
+    y = y - dh - 8
+
+    _, dh = MakeSlider(content, "Raid Threshold (minutes)", 0, 60, 5,
+        function() return db.reminder.showUnderDurationRaid or 0 end,
+        function(v) db.reminder.showUnderDurationRaid = v end, y,
+        function(v) return v == 0 and "Off" or string.format("%d min", v) end)
+    y = y - dh - 8
+
+    _, dh = MakeToggle(content, "Only show party missing for members in range (~28yd)",
+        function() return db.reminder.partyBuffRangeCheck end,
+        function(v) db.reminder.partyBuffRangeCheck = v end, y)
+    y = y - dh - 10
+
+    -- ── CONSUMABLE PREFERENCES ───────────────────────────────────────────
+    local h4 = Label(content, "CONSUMABLE PREFERENCES", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
+    h4:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    local noteC = Label(content,
+        "Choose which flask or food to use when you left-click a reminder icon. "
+        .. "Separate settings for raids vs dungeons/open world. Falls back to Auto if chosen item is not in bags.",
+        "SystemFont_Small", 0.7, 0.7, 0.7)
+    noteC:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
+    noteC:SetWidth(T.PANEL_W - T.PAD*2 - 16)
+    noteC:SetJustifyH("LEFT")
+    y = y - 44
+
+    local flaskChoices = ns.AuraList.FLASK_CHOICES
+    local foodChoices  = ns.AuraList.FOOD_CHOICES
+
+    _, dh = MakeSelectDropdown(content, "Flask (Raid)", flaskChoices,
+        function() return db.reminder.flaskRaid or "auto" end,
+        function(v) db.reminder.flaskRaid = v end, y)
+    y = y - dh - 4
+
+    _, dh = MakeSelectDropdown(content, "Flask (Dungeon / Open World)", flaskChoices,
+        function() return db.reminder.flaskDungeon or "auto" end,
+        function(v) db.reminder.flaskDungeon = v end, y)
+    y = y - dh - 4
+
+    _, dh = MakeSelectDropdown(content, "Food (Raid)", foodChoices,
+        function() return db.reminder.foodRaid or "auto" end,
+        function(v) db.reminder.foodRaid = v end, y)
+    y = y - dh - 4
+
+    _, dh = MakeSelectDropdown(content, "Food (Dungeon / Open World)", foodChoices,
+        function() return db.reminder.foodDungeon or "auto" end,
+        function(v) db.reminder.foodDungeon = v end, y)
+    y = y - dh - 10
+
     y = BuildClassBuffs(content, db, addon, y - 10)
+
+    -- ── DISPLAY ───────────────────────────────────────────────────────────
+    y = y - 10
+    local hDisp = Label(content, "DISPLAY", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
+    hDisp:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    -- Glow Type dropdown
+    local glowChoices = {
+        { value = "NONE",     label = "None" },
+        { value = "BLIZZARD", label = "Blizzard Glow" },
+        { value = "PIXEL",    label = "Pixel Glow" },
+        { value = "AUTOCAST", label = "Autocast Shine" },
+        { value = "PULSE",    label = "Alpha Pulse" },
+    }
+    _, dh = MakeDropdown(content, "Glow Style", glowChoices,
+        function() return db.reminder.glowType or "BLIZZARD" end,
+        function(v) db.reminder.glowType = v; ns.AuraReminder.Refresh(addon) end, y)
+    y = y - dh - 8
+
+    -- Glow Color picker
+    _, dh = MakeColorPicker(content, "Glow Color",
+        function()
+            local c = db.reminder.glowColor or { r = 1, g = 0.8, b = 0, a = 1 }
+            return c.r, c.g, c.b, c.a
+        end,
+        function(r, g, b, a)
+            db.reminder.glowColor = { r = r, g = g, b = b, a = a or 1 }
+            ns.AuraReminder.Refresh(addon)
+        end, y)
+    y = y - dh - 8
+
+    -- Show Text toggle
+    _, dh = MakeToggle(content, "Show Text Labels Below Icons",
+        function() return db.reminder.showText end,
+        function(v) db.reminder.showText = v; ns.AuraReminder.Refresh(addon) end, y)
+    y = y - dh - 2
+
+    -- Text Size slider
+    _, dh = MakeSlider(content, "Text Size", 6, 18, 1,
+        function() return db.reminder.textSize or 10 end,
+        function(v) db.reminder.textSize = v; ns.AuraReminder.Refresh(addon) end, y,
+        function(v) return tostring(v) end)
+    y = y - dh - 8
+
+    -- Icon Spacing slider
+    _, dh = MakeSlider(content, "Icon Spacing", 0, 20, 1,
+        function() return db.reminder.iconSpacing or 4 end,
+        function(v) db.reminder.iconSpacing = v; ns.AuraReminder.Refresh(addon) end, y,
+        function(v) return string.format("%dpx", v) end)
+    y = y - dh - 8
+
+    -- Opacity slider
+    _, dh = MakeSlider(content, "Base Opacity", 0.1, 1.0, 0.05,
+        function() return db.reminder.opacity or 0.7 end,
+        function(v) db.reminder.opacity = v; ns.AuraReminder.Refresh(addon) end, y,
+        function(v) return string.format("%.0f%%", v * 100) end)
+    y = y - dh - 8
+
+    -- Frame Strata dropdown
+    local strataChoices = {
+        { value = "MEDIUM", label = "Medium" },
+        { value = "HIGH",   label = "High" },
+        { value = "DIALOG", label = "Dialog" },
+    }
+    _, dh = MakeDropdown(content, "Frame Strata", strataChoices,
+        function() return db.reminder.frameStrata or "HIGH" end,
+        function(v) db.reminder.frameStrata = v; ns.AuraReminder.Refresh(addon) end, y)
+    y = y - dh - 10
+
+    -- Open World toggle
+    _, dh = MakeToggle(content,
+        "Show Reminders in Open World  |cff888888(outside instances)|r",
+        function() return db.reminder.showNonInstanced end,
+        function(v) db.reminder.showNonInstanced = v; ns.AuraReminder.Refresh(addon) end, y)
+    y = y - dh - 10
+
     return y - 20
 end
 

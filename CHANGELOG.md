@@ -1,5 +1,31 @@
 # yaqol
 
+## [v1.2.0](https://github.com/Larsmara/yaqol/tree/v1.2.0) (2026-05-15)
+[Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.1.4...v1.2.0) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
+
+**Visual Redesign:**
+- Theme: strip all borders, legacy font objects (`GameFontNormal*`), and `ApplyBorder`/`ApplyBorderCompact` — all modules now use `SystemFont_*` with `ApplyHudFont` for consistent OUTLINE + shadow treatment
+- Raid Toolbar: remove collapse tab, per-button backgrounds, and separators; unified 26 px button height, single semi-transparent panel background, atlas icons for Clear All and Ready Check
+- Raid Toolbar: new fade-out toggle (replaces minimized state) — ghosts bar to 0.15 alpha with smooth animation and leave delay
+- Remove per-panel borders from Teleport, VaultTracker, RunHistory, SkyridingHUD, and QOL affix/durability/pet frames
+- MythicTimer: affix text replaces affix icons; completion state refactored
+
+**New — AuraReminder:**
+- Clickable reminders: icons are now `SecureActionButton` — left-click to cast the missing buff or use the consumable directly
+- Glow effects via LibCustomGlow: configurable glow type (Blizzard, Pixel, Autocast, Pulse, or None) with custom color
+- Duration threshold detection: remind when flask/food is about to expire (configurable per dungeon and raid, in minutes)
+- Consumable preference dropdowns: choose preferred flask and food for raids vs dungeons/M+ (or "auto" for best available)
+- Party buff range check option: only count in-range members as missing the buff
+- Optional text labels below icons (short labels like "Fort", "MotW", "Flask")
+- Combat-aware display: show visual-only (non-clickable) reminders during combat when enabled
+- Open-world mode: optionally show reminders outside of instances
+- Configurable opacity, frame strata, icon spacing
+- Middle-click to dismiss individual reminders
+
+**New — QOL Pet Reminder:**
+- Lone Wolf (MM Hunter) detection: suppress all pet warnings when the talent is active
+- Grimoire of Sacrifice (Warlock): show "Sacrifice pet" reminder when the talent is known and a live pet is out
+
 ## [v1.1.4](https://github.com/Larsmara/yaqol/tree/v1.1.4) (2026-05-10)
 [Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.1.3...v1.1.4) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
 

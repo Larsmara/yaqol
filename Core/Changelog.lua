@@ -33,7 +33,6 @@ local function BuildFrame()
 
     -- background (fully opaque so it sits cleanly over the config panel)
     ns.Theme:ApplyBg(f)
-    ns.Theme:ApplyBorder(f)
 
     -- left accent stripe
     local stripe = f:CreateTexture(nil, "BORDER")
@@ -45,9 +44,8 @@ local function BuildFrame()
     local header = CreateFrame("Frame", nil, f)
     header:SetSize(W, T.HEADER_H)
     header:SetPoint("TOPLEFT")
-    ns.Theme:ApplyHeader(header)
 
-    local titleLbl = header:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local titleLbl = header:CreateFontString(nil, "OVERLAY", "SystemFont_Large")
     titleLbl:SetPoint("LEFT", header, "LEFT", T.PAD, 0)
     titleLbl:SetText(ns.Theme.EscapeColor("accent") .. "What's New|r")
     titleLbl:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
@@ -102,7 +100,7 @@ local function BuildFrame()
             ns.Theme.EscapeColor("accent"),
             entry.version,
             "aaaaaa", entry.date)
-        local vLbl = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local vLbl = content:CreateFontString(nil, "OVERLAY", "SystemFont_Med1")
         vLbl:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
         vLbl:SetText(versionStr)
         y = y - 20
@@ -112,12 +110,12 @@ local function BuildFrame()
         div:SetHeight(1)
         div:SetPoint("TOPLEFT",  content, "TOPLEFT",  T.PAD,        y)
         div:SetPoint("TOPRIGHT", content, "TOPRIGHT", -T.PAD - 14,  y)
-        div:SetColorTexture(T.border[1], T.border[2], T.border[3], T.border[4])
+        div:SetColorTexture(T.textDim[1], T.textDim[2], T.textDim[3], 0.15)
         y = y - 8
 
         -- change lines
         for _, line in ipairs(entry.changes or {}) do
-            local lbl = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            local lbl = content:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
             lbl:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 4, y)
             lbl:SetWidth(T.W - T.PAD*2 - 30)
             lbl:SetJustifyH("LEFT")

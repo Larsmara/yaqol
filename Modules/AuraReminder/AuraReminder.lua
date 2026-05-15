@@ -6,7 +6,6 @@ local AuraReminder = ns.AuraReminder
 local ICON_SIZE    = 36
 local ICON_PAD     = 4
 local PANEL_PAD    = 6
-local T = ns.Theme  -- populated by Theme.Init() before any frame is built
 
 -- [ STATE ] -------------------------------------------------------------------
 local frame, rows
@@ -71,10 +70,9 @@ local function MakeFrame()
     f:Hide()
 
     -- Key holder label: shown above the icon row while inside an active M+ run.
-    local keyLabel = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    local keyLabel = f:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     keyLabel:SetPoint("BOTTOM", f, "TOP", 0, 4)
-    keyLabel:SetShadowColor(0, 0, 0, 1)
-    keyLabel:SetShadowOffset(1, -1)
+    ns.Theme:ApplyHudFont(keyLabel)
     keyLabel:Hide()
     f.keyLabel = keyLabel
 
@@ -86,10 +84,6 @@ local function GetOrMakeRow(idx)
     if frame.rows[idx] then return frame.rows[idx] end
     local row = CreateFrame("Frame", nil, frame)
     row:SetSize(ICON_SIZE, ICON_SIZE)
-
-    local bg = row:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetColorTexture(T.bg[1], T.bg[2], T.bg[3], 1)
 
     local icon = row:CreateTexture(nil, "ARTWORK")
     icon:SetPoint("TOPLEFT", row, "TOPLEFT", 1, -1)
@@ -115,10 +109,9 @@ local function GetOrMakeRow(idx)
     end
 
     -- Item count badge (bottom-right corner, e.g. "3 in bags")
-    local countText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    countText:SetShadowColor(0, 0, 0, 1)
-    countText:SetShadowOffset(1, -1)
+    local countText = row:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     countText:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -2, 2)
+    ns.Theme:ApplyHudFont(countText)
     countText:SetTextColor(1, 1, 1, 1)
     countText:Hide()
     row.countText = countText
@@ -129,10 +122,9 @@ local function GetOrMakeRow(idx)
     countText.bg = countBg
 
     -- Party missing badge (top-right corner): red number = how many members missing
-    local partyBadge = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    partyBadge:SetShadowColor(0, 0, 0, 1)
-    partyBadge:SetShadowOffset(1, -1)
+    local partyBadge = row:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     partyBadge:SetPoint("TOPRIGHT", icon, "TOPRIGHT", -2, -2)
+    ns.Theme:ApplyHudFont(partyBadge)
     partyBadge:SetTextColor(1, 0.25, 0.25, 1)
     partyBadge:Hide()
     row.partyBadge = partyBadge
@@ -143,10 +135,9 @@ local function GetOrMakeRow(idx)
     partyBadge.bg = partyBg
 
     -- "Missing from group" indicator (top-left): orange ! when another class's buff is absent
-    local groupBadge = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    groupBadge:SetShadowColor(0, 0, 0, 1)
-    groupBadge:SetShadowOffset(1, -1)
+    local groupBadge = row:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     groupBadge:SetPoint("TOPLEFT", icon, "TOPLEFT", 2, -2)
+    ns.Theme:ApplyHudFont(groupBadge)
     groupBadge:SetTextColor(1, 0.55, 0.1, 1)
     groupBadge:SetText("!")
     groupBadge:Hide()

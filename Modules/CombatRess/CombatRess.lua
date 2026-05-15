@@ -93,12 +93,6 @@ local function BuildFrame()
     icon:SetTexture(iconTex)
     icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
-    -- [ DARK BORDER ] ---------------------------------------------------------
-    local border = CreateFrame("Frame", nil, f, "BackdropTemplate")
-    border:SetAllPoints(f)
-    border:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
-    border:SetBackdropBorderColor(0, 0, 0, 0.9)
-
     -- [ COOLDOWN SWIPE + COUNTDOWN NUMBERS ] ----------------------------------
     local cd = CreateFrame("Cooldown", nil, f, "CooldownFrameTemplate")
     cd:SetAllPoints(f)
@@ -112,11 +106,9 @@ local function BuildFrame()
 
     -- [ CHARGE COUNT LABEL ] --------------------------------------------------
     -- Bottom-right corner; hidden when charges = 0 via SetAlpha trick.
-    local countText = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightOutline")
+    local countText = f:CreateFontString(nil, "OVERLAY", "SystemFont_Med1")
     countText:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -1, 1)
-    countText:SetFont(countText:GetFont(), 12, "OUTLINE")
-    countText:SetShadowColor(0, 0, 0, 1)
-    countText:SetShadowOffset(1, -1)
+    ns.Theme:ApplyHudFont(countText)
     f.countText = countText
 
     -- [ TOOLTIP ] -------------------------------------------------------------

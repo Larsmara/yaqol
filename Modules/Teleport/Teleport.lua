@@ -230,24 +230,15 @@ local function MakePanel()
     f:SetFrameStrata("MEDIUM")
     f.restingAlpha = 0.8
 
-    ns.Theme:ApplyBg(f)
-    ns.Theme:ApplyBorderCompact(f)
-
     -- Header strip
     local header = CreateFrame("Frame", nil, f)
     header:SetSize(FRAME_W, HEADER_H)
     header:SetPoint("TOPLEFT")
-    local hbg = header:CreateTexture(nil, "BACKGROUND")
-    hbg:SetAllPoints()
-    hbg:SetColorTexture(T.accent[1]*0.08, T.accent[2]*0.08, T.accent[3]*0.08, 1)
-    local hdiv = header:CreateTexture(nil, "OVERLAY")
-    hdiv:SetHeight(1)
-    hdiv:SetPoint("BOTTOMLEFT"); hdiv:SetPoint("BOTTOMRIGHT")
-    hdiv:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.45)
-    local titleLbl = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local titleLbl = header:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     titleLbl:SetPoint("LEFT", header, "LEFT", PANEL_PAD, 0)
     titleLbl:SetText("DUNGEONS")
     titleLbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
+    ns.Theme:ApplyHudFont(titleLbl)
 
     -- Close button (inside header) — uses WoW minimize button texture (always renders)
     local closeBtn = CreateFrame("Button", nil, header)
@@ -375,19 +366,6 @@ local function MakeButton(parent, dungeon, idx)
     btn:SetAttribute("type", "spell")
     btn:SetAttribute("spell", dungeon.spellID)
 
-    -- 1px neutral border using OVERLAY sublayer 7 so they render above
-    -- InsecureActionButtonTemplate's own overlay textures.
-    local function MakeEdge()
-        local t = btn:CreateTexture(nil, "OVERLAY", nil, 7)
-        t:SetColorTexture(T.border[1], T.border[2], T.border[3], 0.6)
-        return t
-    end
-    local edgeT = MakeEdge(); edgeT:SetPoint("TOPLEFT",btn,"TOPLEFT",0,0);      edgeT:SetPoint("TOPRIGHT",btn,"TOPRIGHT",0,0);    edgeT:SetHeight(1)
-    local edgeB = MakeEdge(); edgeB:SetPoint("BOTTOMLEFT",btn,"BOTTOMLEFT",0,0); edgeB:SetPoint("BOTTOMRIGHT",btn,"BOTTOMRIGHT",0,0); edgeB:SetHeight(1)
-    local edgeL = MakeEdge(); edgeL:SetPoint("TOPLEFT",btn,"TOPLEFT",0,0);      edgeL:SetPoint("BOTTOMLEFT",btn,"BOTTOMLEFT",0,0);  edgeL:SetWidth(1)
-    local edgeR = MakeEdge(); edgeR:SetPoint("TOPRIGHT",btn,"TOPRIGHT",0,0);    edgeR:SetPoint("BOTTOMRIGHT",btn,"BOTTOMRIGHT",0,0); edgeR:SetWidth(1)
-    btn.edgeT, btn.edgeB, btn.edgeL, btn.edgeR = edgeT, edgeB, edgeL, edgeR
-
     local bg = btn:CreateTexture(nil, "BORDER")
     bg:SetPoint("TOPLEFT", btn, "TOPLEFT", 1, -1)
     bg:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -1, 1)
@@ -410,22 +388,20 @@ local function MakeButton(parent, dungeon, idx)
     btn.cdFrame = cdFrame
 
     -- Cooldown text overlay — shown on all buttons while a CD is active
-    local cdText = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    local cdText = btn:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     cdText:SetPoint("CENTER", btn, "CENTER")
-    cdText:SetShadowColor(0, 0, 0, 1)
-    cdText:SetShadowOffset(1, -1)
+    ns.Theme:ApplyHudFont(cdText)
     cdText:SetTextColor(1, 0.82, 0.1, 1)
     cdText:Hide()
     btn.cdText = cdText
 
     -- Label
-    local label = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    label:SetShadowColor(0, 0, 0, 1)
-    label:SetShadowOffset(1, -1)
+    local label = btn:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     label:SetPoint("LEFT", icon, "RIGHT", 6, 0)
     label:SetPoint("RIGHT", btn, "RIGHT", -4, 0)
     label:SetJustifyH("LEFT")
     label:SetText(dungeon.name)
+    ns.Theme:ApplyHudFont(label)
     btn.label = label
 
     -- Left accent bar: class color of primary keystone owner; hidden when no keys.
@@ -454,10 +430,9 @@ local function MakeButton(parent, dungeon, idx)
         pillBar:SetWidth(2)
         pillBar:SetPoint("TOPLEFT",    pill, "TOPLEFT",    0, 0)
         pillBar:SetPoint("BOTTOMLEFT", pill, "BOTTOMLEFT", 0, 0)
-        local pillText = pill:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local pillText = pill:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
         pillText:SetPoint("CENTER", pill, "CENTER", 1, 0)
-        pillText:SetShadowColor(0, 0, 0, 1)
-        pillText:SetShadowOffset(1, -1)
+        ns.Theme:ApplyHudFont(pillText)
         btn.pills[p] = { frame = pill, bg = pillBg, bar = pillBar, text = pillText }
     end
 

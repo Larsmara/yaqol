@@ -2,6 +2,7 @@
 
 # Improvements
 - Shift modifier to release, should be dissabled in pvp
+- Pet reminders, check if warlock and has Grimoire of Sacrifice or if hunter and has Lone Wolf. These talents make the class "petless", so change warning to "Sacrifice pet" for grimoire and nothing for lone wolf
 
 # Features
-- While inside a mythic dungeon, show who has the key above the buff reminders. Show name of player and key level. No frame, just text
+- 

@@ -145,16 +145,14 @@ local function BuildPanel()
         p.point, _, p.relPoint, p.x, p.y = self:GetPoint()
     end)
 
-    ns.Theme:ApplyBg(f, "bg")
-    ns.Theme:ApplyBorder(f)
-
     local y = -6
 
     -- ── CHARGES ──────────────────────────────────────────────────────────
-    local chargeLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local chargeLbl = f:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     chargeLbl:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
     chargeLbl:SetText("Charges")
     chargeLbl:SetTextColor(T.accent[1], T.accent[2], T.accent[3], 0.8)
+    ns.Theme:ApplyHudFont(chargeLbl)
     y = y - LABEL_H - 2
 
     local trackW = math.floor((HUD_W - (MAX_PIPS - 1) * PIP_GAP) / MAX_PIPS)
@@ -184,15 +182,17 @@ local function BuildPanel()
     surgeRow:SetSize(HUD_W + PAD * 2, LABEL_H + 2 + BAR_H)
     surgeRow:SetPoint("TOPLEFT", f, "TOPLEFT", 0, y)
 
-    local wsLbl = surgeRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local wsLbl = surgeRow:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     wsLbl:SetPoint("TOPLEFT", surgeRow, "TOPLEFT", PAD, 0)
     wsLbl:SetText("Whirling Surge")
     wsLbl:SetTextColor(WS_R, WS_G, WS_B, 0.8)
+    ns.Theme:ApplyHudFont(wsLbl)
 
-    surgeLabel = surgeRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    surgeLabel = surgeRow:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     surgeLabel:SetPoint("TOPRIGHT", surgeRow, "TOPRIGHT", -PAD, 0)
     surgeLabel:SetText("")
     surgeLabel:SetTextColor(WS_R, WS_G, WS_B, 1)
+    ns.Theme:ApplyHudFont(surgeLabel)
 
     local wsTrack = surgeRow:CreateTexture(nil, "BACKGROUND")
     wsTrack:SetSize(HUD_W, BAR_H)

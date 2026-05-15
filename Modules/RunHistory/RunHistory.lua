@@ -332,11 +332,11 @@ local statsLbl
 -- Build a single column header label
 local function ColHeader(parent, text, x, w, yOff)
     local T = ns.Theme
-    local lbl = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local lbl = parent:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     lbl:SetPoint("TOPLEFT", parent, "TOPLEFT", x, yOff)
     lbl:SetWidth(w)
     lbl:SetJustifyH("LEFT")
-    lbl:SetTextColor(T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    lbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3])
     lbl:SetText(text)
     return lbl
 end
@@ -364,14 +364,14 @@ local function RebuildRows(charKey)
         local rowBg = rowF:CreateTexture(nil, "BACKGROUND")
         rowBg:SetAllPoints()
         if i % 2 == 0 then
-            rowBg:SetColorTexture(T.bg[1] + 0.03, T.bg[2] + 0.03, T.bg[3] + 0.03, 0.6)
+            rowBg:SetColorTexture(T.bgRow[1], T.bgRow[2], T.bgRow[3], T.bgRow[4])
         else
             rowBg:SetColorTexture(T.bg[1], T.bg[2], T.bg[3], 0.4)
         end
 
         local x = 4
         local function AddCell(text, w, r2, g2, b2)
-            local f2 = rowF:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            local f2 = rowF:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
             f2:SetPoint("LEFT", rowF, "LEFT", x, 0)
             f2:SetWidth(w - 4)
             f2:SetJustifyH("LEFT")
@@ -386,7 +386,7 @@ local function RebuildRows(charKey)
         AddCell("+" .. (r.level or "?"), COL.key,     T.accent[1], T.accent[2], T.accent[3])
         AddCell(FmtTime(r.elapsed),      COL.time)
         -- Inline colour codes handled by SetText
-        local deltaF = rowF:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local deltaF = rowF:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
         deltaF:SetPoint("LEFT", rowF, "LEFT", x, 0)
         deltaF:SetWidth(COL.delta - 4)
         deltaF:SetJustifyH("LEFT")
@@ -406,7 +406,7 @@ local function RebuildRows(charKey)
             end
             if r.members and #r.members > 0 then
                 GameTooltip:AddLine(" ")
-                GameTooltip:AddLine("Group:", T.textHeader[1], T.textHeader[2], T.textHeader[3])
+                GameTooltip:AddLine("Group:", T.textDim[1], T.textDim[2], T.textDim[3])
                 for _, m in ipairs(r.members) do
                     local classColour = RAID_CLASS_COLORS and RAID_CLASS_COLORS[m.class]
                     local r2, g2, b2 = 1, 1, 1
@@ -419,12 +419,12 @@ local function RebuildRows(charKey)
             end
             if (r.totalDamage and r.totalDamage > 0) or (r.totalHealing and r.totalHealing > 0) then
                 GameTooltip:AddLine(" ")
-                GameTooltip:AddDoubleLine("Total Damage", FmtNumber(r.totalDamage or 0), T.textHeader[1], T.textHeader[2], T.textHeader[3], 1, 1, 1)
-                GameTooltip:AddDoubleLine("Total Healing", FmtNumber(r.totalHealing or 0), T.textHeader[1], T.textHeader[2], T.textHeader[3], 1, 1, 1)
+                GameTooltip:AddDoubleLine("Total Damage", FmtNumber(r.totalDamage or 0), T.textDim[1], T.textDim[2], T.textDim[3], 1, 1, 1)
+                GameTooltip:AddDoubleLine("Total Healing", FmtNumber(r.totalHealing or 0), T.textDim[1], T.textDim[2], T.textDim[3], 1, 1, 1)
             end
             if r.affixIDs and #r.affixIDs > 0 then
                 GameTooltip:AddLine(" ")
-                GameTooltip:AddLine("Affixes:", T.textHeader[1], T.textHeader[2], T.textHeader[3])
+                GameTooltip:AddLine("Affixes:", T.textDim[1], T.textDim[2], T.textDim[3])
                 for _, id in ipairs(r.affixIDs) do
                     local affixName = C_ChallengeMode.GetAffixInfo(id)
                     if affixName then
@@ -506,7 +506,6 @@ local function BuildPanel()
     f:SetClampedToScreen(true)
     f:Hide()
     T:ApplyBg(f)
-    T:ApplyBorder(f)
 
     -- [ HEADER ] --------------------------------------------------------------
     local header = CreateFrame("Frame", nil, f)
@@ -514,7 +513,7 @@ local function BuildPanel()
     header:SetPoint("TOPLEFT", f, "TOPLEFT", 0, 0)
     header:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
 
-    local title = header:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local title = header:CreateFontString(nil, "OVERLAY", "SystemFont_Med1")
     title:SetPoint("LEFT", header, "LEFT", 12, 0)
     title:SetTextColor(T.accent[1], T.accent[2], T.accent[3])
     title:SetText("RUN HISTORY")
@@ -530,7 +529,7 @@ local function BuildPanel()
     charDropBtn:SetSize(160, 20)
     charDropBtn:SetPoint("RIGHT", closeBtn, "LEFT", -8, 0)
     T:StyleButton(charDropBtn, 160, 20)
-    local charLbl = charDropBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local charLbl = charDropBtn:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     charLbl:SetPoint("LEFT", charDropBtn, "LEFT", 6, 0)
     charLbl:SetWidth(130)
     charLbl:SetJustifyH("LEFT")
@@ -554,7 +553,7 @@ local function BuildPanel()
     hDiv:SetHeight(1)
     hDiv:SetPoint("TOPLEFT", f, "TOPLEFT", 8, -HEADER_H)
     hDiv:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -HEADER_H)
-    hDiv:SetColorTexture(T.border[1], T.border[2], T.border[3], T.border[4])
+    hDiv:SetColorTexture(T.textDim[1], T.textDim[2], T.textDim[3], 0.15)
 
     -- [ FILTER ROW ] ----------------------------------------------------------
     local filterY = -(HEADER_H + 6)
@@ -566,7 +565,7 @@ local function BuildPanel()
     timeBtn:SetSize(100, 20)
     timeBtn:SetPoint("TOPLEFT", f, "TOPLEFT", 8, filterY)
     T:StyleButton(timeBtn, 100, 20)
-    local timeLbl = timeBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local timeLbl = timeBtn:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     timeLbl:SetPoint("CENTER"); timeLbl:SetText(timeLabels[filterWeek])
     timeBtn:SetScript("OnClick", function()
         local cur = filterWeek
@@ -585,7 +584,7 @@ local function BuildPanel()
     dungeonBtn:SetSize(160, 20)
     dungeonBtn:SetPoint("LEFT", timeBtn, "RIGHT", 6, 0)
     T:StyleButton(dungeonBtn, 160, 20)
-    local dungLbl = dungeonBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local dungLbl = dungeonBtn:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     dungLbl:SetPoint("LEFT", dungeonBtn, "LEFT", 6, 0)
     dungLbl:SetWidth(140)
     dungLbl:SetJustifyH("LEFT")
@@ -607,7 +606,7 @@ local function BuildPanel()
     end)
 
     -- Min key level input
-    local keyLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local keyLabel = f:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     keyLabel:SetPoint("LEFT", dungeonBtn, "RIGHT", 8, 0)
     keyLabel:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3])
     keyLabel:SetText("Key ≥")
@@ -618,7 +617,7 @@ local function BuildPanel()
     keyEB:SetAutoFocus(false)
     keyEB:SetNumeric(true)
     keyEB:SetMaxLetters(3)
-    keyEB:SetFontObject("GameFontNormalSmall")
+    keyEB:SetFontObject("SystemFont_Small")
     keyEB:SetTextColor(T.text[1], T.text[2], T.text[3])
     keyEB:SetTextInsets(4, 4, 0, 0)
     local keyBg = keyEB:CreateTexture(nil, "BACKGROUND")
@@ -626,7 +625,7 @@ local function BuildPanel()
     keyBg:SetColorTexture(T.bgInput[1], T.bgInput[2], T.bgInput[3], T.bgInput[4])
     local keyBorder = keyEB:CreateTexture(nil, "BORDER")
     keyBorder:SetHeight(1); keyBorder:SetPoint("BOTTOM")
-    keyBorder:SetColorTexture(T.border[1], T.border[2], T.border[3], T.border[4])
+    keyBorder:SetColorTexture(T.textDim[1], T.textDim[2], T.textDim[3], 0.15)
     keyEB:SetScript("OnEnterPressed", function(self)
         filterMinKey = tonumber(self:GetText()) or 0
         self:ClearFocus()
@@ -639,7 +638,7 @@ local function BuildPanel()
     clearBtn:SetSize(80, 20)
     clearBtn:SetPoint("LEFT", keyEB, "RIGHT", 6, 0)
     T:StyleButton(clearBtn, 80, 20)
-    local clearLbl = clearBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local clearLbl = clearBtn:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     clearLbl:SetPoint("CENTER"); clearLbl:SetText("Clear Filters")
     clearBtn:SetScript("OnClick", function()
         filterWeek = "all"; filterDungeon = "all"; filterMinKey = 0
@@ -669,7 +668,7 @@ local function BuildPanel()
     cDiv:SetHeight(1)
     cDiv:SetPoint("TOPLEFT",  f, "TOPLEFT",  8, colY - 18)
     cDiv:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, colY - 18)
-    cDiv:SetColorTexture(T.border[1], T.border[2], T.border[3], T.border[4])
+    cDiv:SetColorTexture(T.textDim[1], T.textDim[2], T.textDim[3], 0.15)
 
     -- [ SCROLL FRAME ] --------------------------------------------------------
     local scrollTop = HEADER_H + FILTER_H + 22
@@ -705,7 +704,7 @@ local function BuildPanel()
     statsBar:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  8,  4)
     statsBar:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -8, 4)
 
-    statsLbl = statsBar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    statsLbl = statsBar:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     statsLbl:SetPoint("LEFT", statsBar, "LEFT", 4, 0)
     statsLbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3])
     statsLbl:SetText("No runs recorded yet.")

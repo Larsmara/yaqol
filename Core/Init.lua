@@ -7,6 +7,10 @@ _G.yaqol = yaqol
 
 function yaqol:OnInitialize()
     self.db = LibStub("AceDB-3.0"):New("yaqolDB", ns.Defaults, true)
+
+    -- Migrate: remove stale theme key from existing SavedVariables
+    if self.db.global.theme then self.db.global.theme = nil end
+
     ns.Theme.Init()
     self.db.RegisterCallback(self, "OnProfileChanged", "OnProfileChanged")
     self.db.RegisterCallback(self, "OnProfileCopied", "OnProfileChanged")
@@ -37,6 +41,10 @@ function yaqol:OnInitialize()
     if not self.db.profile.mythicTimer then
         self.db.profile.mythicTimer = CopyTable(ns.Defaults.profile.mythicTimer)
     end
+    local mt = self.db.profile.mythicTimer
+    if mt.showBackdrop  == nil then mt.showBackdrop  = false end
+    if mt.showKillTimes == nil then mt.showKillTimes = false end
+    if mt.fontScale     == nil then mt.fontScale     = 1.0   end
     -- Migrate: old profiles had enabledDungeon=false by mistake; default is now true
     if r.enabledDungeon == nil or r.enabledDungeon == false then
         -- Only reset if it was never explicitly set to false by the user.

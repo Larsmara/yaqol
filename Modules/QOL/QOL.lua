@@ -420,10 +420,11 @@ local function GetOrMakeDurFrame()
     warnIcon:SetTexture("Interface\\DialogFrame\\UI-Dialog-Icon-AlertOther")
     f.warnIcon = warnIcon
 
-    local txt = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local txt = f:CreateFontString(nil, "OVERLAY", "SystemFont_Large")
     txt:SetPoint("LEFT", warnIcon, "RIGHT", 8, 0)
     txt:SetPoint("RIGHT", f, "RIGHT", -8, 0)
     txt:SetJustifyH("LEFT")
+    ns.Theme:ApplyHudFont(txt)
     f.txt = txt
 
     -- Restore saved position, falling back to sensible default
@@ -518,9 +519,8 @@ local function BuildAffixFrame()
     f:SetClampedToScreen(true)
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 100)
 
-    -- Background + border
+    -- Background
     ns.Theme:ApplyBg(f)
-    ns.Theme:ApplyBorder(f)
 
     -- Border stripe (left)
     local stripe = f:CreateTexture(nil, "BORDER")
@@ -537,7 +537,7 @@ local function BuildAffixFrame()
     hline:SetHeight(1); hline:SetPoint("BOTTOMLEFT"); hline:SetPoint("BOTTOMRIGHT")
     hline:SetColorTexture(AT.accent[1], AT.accent[2], AT.accent[3], 0.7)
 
-    local title = header:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local title = header:CreateFontString(nil, "OVERLAY", "SystemFont_Med1")
     title:SetPoint("LEFT", header, "LEFT", PAD, 0)
     title:SetText(ns.Theme.EscapeColor("accent") .. "M+|r Affixes This Week")
     title:SetTextColor(AT.text[1], AT.text[2], AT.text[3], 1)
@@ -564,7 +564,7 @@ local function BuildAffixFrame()
     end
     RefreshStartupBtn()
 
-    local startupTip = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local startupTip = header:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     startupTip:SetPoint("RIGHT", startupBtn, "LEFT", -4, 0)
     startupTip:SetText("Show on login")
     startupTip:SetTextColor(AT.textDim[1], AT.textDim[2], AT.textDim[3], 1)
@@ -591,7 +591,7 @@ local function BuildAffixFrame()
         if not affixList or #affixList == 0 then
             self:SetSize(W, 32 + 40)
             body:SetHeight(40)
-            local nodata = body:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            local nodata = body:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
             nodata:SetPoint("CENTER", body, "CENTER", 0, 0)
             nodata:SetText("No affix data available yet.")
             nodata:SetTextColor(AT.textDim[1], AT.textDim[2], AT.textDim[3], 1)
@@ -609,7 +609,7 @@ local function BuildAffixFrame()
             if not name then break end
 
             -- Milestone label
-            local mileLbl = body:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            local mileLbl = body:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
             mileLbl:SetPoint("TOPLEFT", body, "TOPLEFT", PAD + ICON_SIZE + 8, y + 2)
             mileLbl:SetTextColor(AT.accent[1], AT.accent[2], AT.accent[3], 0.9)
             mileLbl:SetText(string.format("+%d and above", milestone))
@@ -634,13 +634,13 @@ local function BuildAffixFrame()
             end
 
             -- Affix name
-            local nameLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            local nameLbl = row:CreateFontString(nil, "OVERLAY", "SystemFont_Med1")
             nameLbl:SetPoint("TOPLEFT", icon, "TOPRIGHT", 8, -2)
             nameLbl:SetText(name)
             nameLbl:SetTextColor(AT.text[1], AT.text[2], AT.text[3], 1)
 
             -- Description (wrapped)
-            local descLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            local descLbl = row:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
             descLbl:SetPoint("TOPLEFT", nameLbl, "BOTTOMLEFT", 0, -2)
             descLbl:SetPoint("RIGHT", row, "RIGHT", -4, 0)
             descLbl:SetJustifyH("LEFT")
@@ -672,7 +672,7 @@ local function BuildAffixFrame()
         div:SetHeight(1)
         div:SetPoint("TOPLEFT",  body, "TOPLEFT",  PAD,  y)
         div:SetPoint("TOPRIGHT", body, "TOPRIGHT", -PAD, y)
-        div:SetColorTexture(AT.border[1], AT.border[2], AT.border[3], AT.border[4])
+        div:SetColorTexture(AT.textDim[1], AT.textDim[2], AT.textDim[3], 0.30)
         y = y - 10
 
         local totalH = math.abs(y) + PAD
@@ -814,8 +814,9 @@ local function GetOrMakePetFrame()
     local bg = f:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
     bg:SetColorTexture(0.1, 0.02, 0.02, 0.75)
-    local txt = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local txt = f:CreateFontString(nil, "OVERLAY", "SystemFont_Large")
     txt:SetPoint("CENTER"); txt:SetJustifyH("CENTER")
+    ns.Theme:ApplyHudFont(txt)
     f.txt = txt
     f:SetPoint(
         d.petPoint    or "CENTER",

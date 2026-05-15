@@ -157,12 +157,10 @@ local function BuildPopup()
         end)
     end)
     T:ApplyBg(f)
-    T:ApplyBorder(f)
 
-    -- Header label
-    local hdr = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local hdr = f:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     hdr:SetPoint("TOPLEFT", f, "TOPLEFT", POPUP_PAD, -6)
-    hdr:SetTextColor(T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    hdr:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3])
     hdr:SetText("GREAT VAULT")
 
     -- Divider under header
@@ -170,7 +168,7 @@ local function BuildPopup()
     div:SetHeight(1)
     div:SetPoint("TOPLEFT",  f, "TOPLEFT",  POPUP_PAD, -HEADER_H)
     div:SetPoint("TOPRIGHT", f, "TOPRIGHT", -POPUP_PAD, -HEADER_H)
-    div:SetColorTexture(T.border[1], T.border[2], T.border[3], T.border[4])
+    div:SetColorTexture(T.textDim[1], T.textDim[2], T.textDim[3], 0.15)
 
     f.trackRows = {}
 
@@ -186,7 +184,7 @@ local function BuildPopup()
         local row = {}
 
         -- Track label, vertically centred against the box height
-        local lbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local lbl = f:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
         lbl:SetPoint("TOPLEFT", f, "TOPLEFT", POPUP_PAD, rowY - (SLOT_BOX / 2 - 6))
         lbl:SetWidth(LABEL_W - 4)
         lbl:SetJustifyH("LEFT")
@@ -214,7 +212,7 @@ local function BuildPopup()
             boxBorder:SetColorTexture(0, 0, 0, 0.8)
 
             -- ilvl label (below box, prominent)
-            local ilvlLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            local ilvlLbl = f:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
             ilvlLbl:SetPoint("TOPLEFT", f, "TOPLEFT", slotX, rowY - SLOT_BOX - 2)
             ilvlLbl:SetWidth(SLOT_W - 4)
             ilvlLbl:SetJustifyH("LEFT")
@@ -223,7 +221,7 @@ local function BuildPopup()
             slot.ilvlLbl = ilvlLbl
 
             -- Progress count label (below ilvl)
-            local cntLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            local cntLbl = f:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
             cntLbl:SetPoint("TOPLEFT", f, "TOPLEFT", slotX, rowY - SLOT_BOX - 16)
             cntLbl:SetWidth(SLOT_W - 4)
             cntLbl:SetJustifyH("LEFT")
@@ -319,9 +317,8 @@ local function BuildAnchor()
     end)
 
     T:ApplyBg(f)
-    T:ApplyBorder(f)
 
-    local lbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local lbl = f:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     lbl:SetPoint("CENTER")
     lbl:SetTextColor(T.accent[1], T.accent[2], T.accent[3])
     lbl:SetText("VAULT")

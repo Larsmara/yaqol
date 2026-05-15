@@ -53,12 +53,12 @@ local function MakeOverlay(targetFrame, label)
     AddEdge("TOPRIGHT",   "BOTTOMRIGHT", false)
 
     -- Label
-    local lbl = ov:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local lbl = ov:CreateFontString(nil, "OVERLAY", "SystemFont_Med1")
     lbl:SetPoint("CENTER", ov, "CENTER", 0, 4)
     lbl:SetText(label)
     lbl:SetTextColor(T.accent[1], T.accent[2], T.accent[3], 1)
 
-    local hint = ov:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local hint = ov:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     hint:SetPoint("CENTER", ov, "CENTER", 0, -12)
     hint:SetText("Drag to move")
     hint:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
@@ -112,7 +112,7 @@ local function MakeDoneFrame()
     checkIcon:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
     checkIcon:SetVertexColor(T.accent[1], T.accent[2], T.accent[3], 1)
 
-    local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local lbl = btn:CreateFontString(nil, "OVERLAY", "SystemFont_Med1")
     lbl:SetPoint("LEFT", checkIcon, "RIGHT", 4, 0)
     lbl:SetText("Done Arranging")
     lbl:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
@@ -184,13 +184,13 @@ local function GetDescriptors()
             show     = function()
                 local f = ns.MythicTimer and ns.MythicTimer.GetFrame and ns.MythicTimer.GetFrame()
                 if f then
-                    f.title:SetText(ns.Theme.EscapeColor("accent") .. "[+12]|r The Stonevault")
-                    f.timerText:SetText("|cff44ee4422:15|r")
-                    f.paceText:SetText("|cff44ee44+3 18:30|r       |cffeeee44+2 24:40|r")
-                    f.deathIcon:Show()
-                    f.deathText:SetText("|cffee22222|r  |cff999999(-0:10)|r")
-                    f.pullText:SetText("|cffcccccc85%|r  (272/320)")
-                    f:SetHeight(160)
+                    if f.levelText then f.levelText:SetText(ns.Theme.EscapeColor("accent") .. "+12|r") end
+                    if f.affixText then f.affixText:SetText("Tyrannical · Storming · Sanguine") end
+                    if f.timerText then f.timerText:SetText("|cff44ee4422:15|r") end
+                    if f.nextUpgradeText then f.nextUpgradeText:SetText("|cff44ee44+3  18:30|r") end
+                    if f.deathIcon then f.deathIcon:Show() end
+                    if f.deathText then f.deathText:SetText("|cffee22222  -0:10|r") end
+                    if f.forcesText then f.forcesText:SetText("|cffcccccc85.00%|r") end
                     f:SetAlpha(1)
                     f:Show()
                 end

@@ -1,5 +1,13 @@
 # yaqol
 
+## [v1.2.1](https://github.com/Larsmara/yaqol/tree/v1.2.1) (2026-05-15)
+[Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.2.0...v1.2.1) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
+
+**New:**
+- Auto Combat Logging: automatically start/stop `/combatlog` on zone transitions — configurable per content type (M+, Mythic/Heroic/Normal raids, LFR, Arenas)
+- Forces `advancedCombatLogging` CVar on when logging starts
+- Prints a chat notification when logging starts or stops
+
 ## [v1.2.0](https://github.com/Larsmara/yaqol/tree/v1.2.0) (2026-05-15)
 [Full Changelog](https://github.com/Larsmara/yaqol/compare/v1.1.4...v1.2.0) [Previous Releases](https://github.com/Larsmara/yaqol/releases)
 

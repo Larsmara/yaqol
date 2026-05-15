@@ -8,6 +8,14 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.2.1",
+        date    = "2026-05-15",
+        changes = {
+            "|cff00cc66New|r  Auto Combat Logging — start/stop /combatlog on zone transitions (M+, raids, arenas)",
+            "|cff00cc66New|r  Forces advancedCombatLogging when logging starts; chat notification on start/stop",
+        },
+    },
+    {
         version = "1.2.0",
         date    = "2026-05-15",
         changes = {

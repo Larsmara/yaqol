@@ -24,7 +24,7 @@ local overlays = {}
 -- The floating "Done" button frame.
 local doneFrame
 
--- ─── OVERLAY CONSTRUCTION ───────────────────────────────────────────────────
+-- [ OVERLAY CONSTRUCTION ] ----------------------------------------------------
 
 -- Creates a single overlay parented to 'targetFrame'.  The overlay covers the
 -- target entirely, shows its name, and re-dispatches drag events to the target
@@ -80,7 +80,7 @@ local function MakeOverlay(targetFrame, label)
     return ov
 end
 
--- ─── DONE BUTTON ────────────────────────────────────────────────────────────
+-- [ DONE BUTTON ] -------------------------------------------------------------
 
 local function MakeDoneFrame()
     local f = CreateFrame("Frame", "yaqolLayoutDoneFrame", UIParent)
@@ -128,7 +128,7 @@ local function MakeDoneFrame()
     return f
 end
 
--- ─── ENTER / EXIT ────────────────────────────────────────────────────────────
+-- [ ENTER / EXIT ] ------------------------------------------------------------
 
 -- Descriptor table: each entry = { getFrame, label, saveFn }
 -- saveFn is called after drag to ensure position is persisted (some frames do

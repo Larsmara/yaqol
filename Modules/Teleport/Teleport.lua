@@ -34,7 +34,6 @@ local challengeMapToDungeon = {
 -- map list and name-matching against DUNGEONS[i].searchKey.
 -- Safe to call multiple times; only updates entries we can confirm.
 local function BuildChallengeMapLookup()
-    if not (C_ChallengeMode and C_ChallengeMode.GetMapTable) then return end
     local maps = C_ChallengeMode.GetMapTable()
     if not maps then return end
     for _, mapID in ipairs(maps) do
@@ -60,8 +59,8 @@ local HEADER_H = 26  -- header strip containing title + controls
 local FRAME_W = BTN_W + PANEL_PAD * 2
 
 local DISABLED_ALPHA = 0.3
-local LEARNED_COLOR = { 0.9, 0.9, 0.9 }
-local UNKNOWN_COLOR = { 0.5, 0.5, 0.5 }
+local LEARNED_COLOR = { r = 0.9, g = 0.9, b = 0.9 }
+local UNKNOWN_COLOR = { r = 0.5, g = 0.5, b = 0.5 }
 local T = ns.Theme  -- populated by Theme.Init() before BuildPanel runs
 
 -- [ KEYSTONE DATA VIA LIBKEYSTONE ] -----------------------------------------
@@ -116,7 +115,7 @@ local function CollectPartyKeystones()
         local r, g, b = 1, 0.82, 0.1  -- fallback gold (used when unit token is unknown)
         if unit then
             local _, classFile = UnitClass(unit)
-            if classFile and C_ClassColor and C_ClassColor.GetClassColor then
+            if classFile then
                 local c = C_ClassColor.GetClassColor(classFile)
                 if c then r, g, b = c.r, c.g, c.b end
             end
@@ -157,9 +156,9 @@ local function CollectPartyKeystones()
 
     -- Always supplement with direct C_MythicPlus read for own key.
     -- This covers: LibKeystone not loaded, pName nil at lib load, or data not yet in cache.
-    if C_MythicPlus then
-        local mapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID and C_MythicPlus.GetOwnedKeystoneChallengeMapID()
-        local level = C_MythicPlus.GetOwnedKeystoneLevel and C_MythicPlus.GetOwnedKeystoneLevel()
+    do
+        local mapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID()
+        local level = C_MythicPlus.GetOwnedKeystoneLevel()
         if mapID and mapID > 0 and level and level > 0 then
             local name = UnitName("player") or "player"
             if not ownKeyHandled then
@@ -322,12 +321,10 @@ local function MakePanel()
         end)
         -- Force-seed own keystone from C_MythicPlus directly (bypasses LibKeystone).
         -- This ensures the pill shows even if LibKeystone never fired for this session.
-        if C_MythicPlus then
-            local okM, mapID = pcall(function() return C_MythicPlus.GetOwnedKeystoneChallengeMapID and C_MythicPlus.GetOwnedKeystoneChallengeMapID() end)
-            local okL, level  = pcall(function() return C_MythicPlus.GetOwnedKeystoneLevel and C_MythicPlus.GetOwnedKeystoneLevel() end)
-            local hasKey = okM and okL
-                and pcall(function() return type(mapID) == "number" and mapID > 0 and type(level) == "number" and level > 0 end)
-            if hasKey then
+        do
+            local mapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID()
+            local level = C_MythicPlus.GetOwnedKeystoneLevel()
+            if type(mapID) == "number" and mapID > 0 and type(level) == "number" and level > 0 then
                 local shortName = (UnitName("player") or ""):match("^([^%-]+)") or ""
                 if shortName ~= "" then
                     partyKeyCache[shortName] = { mapID = mapID, level = level }
@@ -535,13 +532,13 @@ local function RefreshButtons()
         
         if learned then
             btn:Enable()
-            btn.label:SetTextColor(LEARNED_COLOR[1], LEARNED_COLOR[2], LEARNED_COLOR[3])
+            btn.label:SetTextColor(LEARNED_COLOR.r, LEARNED_COLOR.g, LEARNED_COLOR.b)
         else
             btn:Disable()
-            btn.label:SetTextColor(UNKNOWN_COLOR[1], UNKNOWN_COLOR[2], UNKNOWN_COLOR[3])
+            btn.label:SetTextColor(UNKNOWN_COLOR.r, UNKNOWN_COLOR.g, UNKNOWN_COLOR.b)
         end
         
-        -- ── Keystone border + badge ──────────────────────────────────────────
+        -- [ KEYSTONE BORDER + BADGE ] -----------------------------------------
         local owners = partyKeys[i]  -- array of { r,g,b,level,name,unit } or nil
 
         -- Show if: spell learned, OR showUnknown is on, OR a party member has this key

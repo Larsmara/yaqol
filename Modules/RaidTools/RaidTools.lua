@@ -2,16 +2,14 @@ local ADDON_NAME, ns = ...
 ns.RaidTools = {}
 local RaidTools = ns.RaidTools
 
--- ============================================================================
--- RAID TOOLS BAR
---   A compact always-visible toolbar with:
---     • 8 world marker buttons — left-click to place, right-click to clear
---       (uses SecureActionButtonTemplate; requires lead/assist)
---     • Clear All markers button
---     • Ready Check button          (requires lead/assist)
---     • Countdown: 3 s / 5 s / 10 s (requires lead/assist)
---   Movable, position saved. Optional fade-out on mouse leave.
--- ============================================================================
+-- [ RAID TOOLS BAR ] ----------------------------------------------------------
+-- A compact always-visible toolbar with:
+--   8 world marker buttons — left-click to place, right-click to clear
+--     (uses SecureActionButtonTemplate; requires lead/assist)
+--   Clear All markers button
+--   Ready Check button          (requires lead/assist)
+--   Countdown: 3 s / 5 s / 10 s (requires lead/assist)
+-- Movable, position saved. Optional fade-out on mouse leave.
 
 -- [ CONSTANTS ] ---------------------------------------------------------------
 -- World marker icon textures (same order as in-game: 1=Star … 8=Skull)
@@ -150,7 +148,7 @@ local function RefreshMarkerStates()
 end
 
 local function MakePanel()
-    -- ── dimensions ────────────────────────────────────────────────────────
+    -- [ DIMENSIONS ] ----------------------------------------------------------
     local markerW    = 8 * BTN_SZ + 7 * BTN_GAP
     local sepW       = SEP_GAP + SEP_W + SEP_GAP  -- gap + line + gap
     local actionW    = BTN_SZ + BTN_GAP + BTN_SZ + BTN_GAP + 3 * ACT_W_CD + 2 * BTN_GAP  -- CLR + RC + 3 countdowns
@@ -158,7 +156,7 @@ local function MakePanel()
     local contentW   = innerW + PAD * 2
     local barH       = BTN_SZ + PAD * 2
 
-    -- ── root frame (full size, drag target + clamp) ──────────────────────
+    -- [ ROOT FRAME ] ----------------------------------------------------------
     local f = CreateFrame("Frame", "yaqolRaidToolsBar", UIParent)
     f:SetSize(contentW, barH)
     f:SetFrameStrata("MEDIUM")
@@ -169,11 +167,11 @@ local function MakePanel()
     f:SetScript("OnDragStart", f.StartMoving)
     f:SetScript("OnDragStop", function(self) self:StopMovingOrSizing(); SavePos() end)
 
-    -- ── single panel background ──────────────────────────────────────────
+    -- [ PANEL BACKGROUND ] ----------------------------------------------------
     local bg = ns.Theme:ApplyBg(f, "bg")
     bg:SetAlpha(0.70)
 
-    -- ── fade-on-hover logic ──────────────────────────────────────────────
+    -- [ FADE-ON-HOVER ] -------------------------------------------------------
     f:SetScript("OnEnter", function(self)
         local db = ns.Addon:Profile().raidTools
         if not db.fadeOut then return end
@@ -209,11 +207,11 @@ local function MakePanel()
         end
     end
 
-    -- ── layout cursor (x relative to root left) ──────────────────────────
+    -- [ LAYOUT CURSOR ] -------------------------------------------------------
     local cx   = PAD
     local actY = -PAD
 
-    -- ── helper: small action button ───────────────────────────────────────
+    -- [ ACTION BUTTON HELPER ] ------------------------------------------------
     local function ActionBtn(label, w, onClick, tooltip)
         local btn = CreateFrame("Button", nil, f)
         btn:SetSize(w, BTN_SZ)
@@ -250,7 +248,7 @@ local function MakePanel()
         return btn
     end
 
-    -- ── 8 world marker buttons ────────────────────────────────────────────
+    -- [ WORLD MARKER BUTTONS ] ------------------------------------------------
     local MARKER_NAMES = { "Star", "Circle", "Diamond", "Triangle", "Moon", "Square", "X", "Skull" }
     for i = 1, 8 do
         local btn = CreateFrame("Button", "yaqolMarkerBtn"..i, f, "SecureActionButtonTemplate")
@@ -300,7 +298,7 @@ local function MakePanel()
     end
     cx = cx - BTN_GAP  -- trim last gap
 
-    -- ── separator between markers and action buttons ──────────────────────
+    -- [ SEPARATOR ] -----------------------------------------------------------
     cx = cx + SEP_GAP
     do
         local s = f:CreateTexture(nil, "ARTWORK")
@@ -311,7 +309,7 @@ local function MakePanel()
     end
     cx = cx + SEP_W + SEP_GAP
 
-    -- ── Clear All ─────────────────────────────────────────────────────────
+    -- [ CLEAR ALL ] -----------------------------------------------------------
     do
         local btn = CreateFrame("Button", "yaqolMarkerBtnCLR", f, "SecureActionButtonTemplate")
         btn:SetSize(BTN_SZ, BTN_SZ)
@@ -344,7 +342,7 @@ local function MakePanel()
         cx = cx + BTN_SZ
     end
 
-    -- ── Ready Check ───────────────────────────────────────────────────────
+    -- [ READY CHECK ] ---------------------------------------------------------
     cx = cx + BTN_GAP
     do
         local btn = CreateFrame("Button", nil, f)
@@ -379,7 +377,7 @@ local function MakePanel()
         cx = cx + BTN_SZ
     end
 
-    -- ── Countdown buttons ─────────────────────────────────────────────────
+    -- [ COUNTDOWN BUTTONS ] ---------------------------------------------------
     cx = cx + BTN_GAP
     for i, secs in ipairs({ 3, 5, 10 }) do
         ActionBtn(secs .. "s", ACT_W_CD, function()

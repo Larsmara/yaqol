@@ -15,13 +15,11 @@ local function Notify(msg)
     print(ns.Theme.EscapeColor("accent") .. "yaqol:|r " .. msg)
 end
 
--- ============================================================================
--- AUTOMATE QUESTS
---   QUEST_DETAIL     – NPC just offered us a quest  → AcceptQuest()
---   QUEST_PROGRESS   – quest turn-in screen, items already given → CompleteQuest()
---   QUEST_COMPLETE   – reward-picker screen → GetQuestReward()  (auto only when
---                      there is exactly one reward or no choice needed)
--- ============================================================================
+-- [ AUTOMATE QUESTS ] ---------------------------------------------------------
+-- QUEST_DETAIL     – NPC just offered us a quest  → AcceptQuest()
+-- QUEST_PROGRESS   – quest turn-in screen, items already given → CompleteQuest()
+-- QUEST_COMPLETE   – reward-picker screen → GetQuestReward()  (auto only when
+--                    there is exactly one reward or no choice needed)
 -- Returns true when the player is holding the configured quest-skip modifier.
 local function QuestSkipHeld()
     local mod = cfg().questSkipModifier or "SHIFT"
@@ -58,14 +56,12 @@ local function OnQuestComplete()
     -- Multiple reward choices: leave it to the player
 end
 
--- ============================================================================
--- AUTOMATE GOSSIP
---   GOSSIP_SHOW / QUEST_GREETING – NPC gossip / quest list dialog
---   autoGossip: auto-click single-option gossip entries.
---   autoQuest:  auto-open/accept all available quests; auto-turn-in all active ones.
---   In modern WoW, NPCs with multiple quests fire GOSSIP_SHOW (not QUEST_GREETING),
---   so both quest and gossip automation must live here.
--- ============================================================================
+-- [ AUTOMATE GOSSIP ] ---------------------------------------------------------
+-- GOSSIP_SHOW / QUEST_GREETING – NPC gossip / quest list dialog
+-- autoGossip: auto-click single-option gossip entries.
+-- autoQuest:  auto-open/accept all available quests; auto-turn-in all active ones.
+-- In modern WoW, NPCs with multiple quests fire GOSSIP_SHOW (not QUEST_GREETING),
+-- so both quest and gossip automation must live here.
 local function OnGossipShow()
     if not cfg().autoGossip and not cfg().autoQuest then return end
     if QuestSkipHeld() then return end
@@ -131,12 +127,10 @@ local function OnQuestGreeting()
     end
 end
 
--- ============================================================================
--- ACCEPT SUMMON  (with a small safety delay)
---   CONFIRM_SUMMON fires when a party/raid member creates a summoning stone for us.
---   We wait SUMMON_DELAY seconds (≤ the 60-second window) then confirm – but only
---   if the summoner hasn't changed (i.e. the stone is still waiting for us).
--- ============================================================================
+-- [ ACCEPT SUMMON ] -----------------------------------------------------------
+-- CONFIRM_SUMMON fires when a party/raid member creates a summoning stone for us.
+-- We wait SUMMON_DELAY seconds (≤ the 60-second window) then confirm – but only
+-- if the summoner hasn't changed (i.e. the stone is still waiting for us).
 local SUMMON_DELAY = 5   -- seconds before auto-confirming
 
 local function OnConfirmSummon()
@@ -155,14 +149,12 @@ local function OnConfirmSummon()
     end)
 end
 
--- ============================================================================
--- ACCEPT RESURRECTION
---   RESURRECT_REQUEST fires when another player (or NPC) attempts to rez us.
---   arg1 = resurrecting unit name.
---   We only auto-accept if the resurrecter is an actual player character
---   (not a battle-res pylon or other object) and is NOT in combat
---   (to avoid accidentally accepting a combat rez mid-pull if that option is off).
--- ============================================================================
+-- [ ACCEPT RESURRECTION ] -----------------------------------------------------
+-- RESURRECT_REQUEST fires when another player (or NPC) attempts to rez us.
+-- arg1 = resurrecting unit name.
+-- We only auto-accept if the resurrecter is an actual player character
+-- (not a battle-res pylon or other object) and is NOT in combat
+-- (to avoid accidentally accepting a combat rez mid-pull if that option is off).
 local function OnResurrectRequest(raisingUnit)
     if not cfg().autoRez then return end
 
@@ -173,14 +165,12 @@ local function OnResurrectRequest(raisingUnit)
     StaticPopup_Hide("RESURRECT_NO_TIMER")
 end
 
--- ============================================================================
--- HOLD-TO-RELEASE  (require holding SHIFT for N seconds before button enables)
---   1. Dialog appears: button grayed, shows "Hold SHIFT to release"
---   2. Player holds SHIFT: countdown shown, button stays grayed
---   3. Countdown completes: button ENABLES, shows "Release" — player clicks to release
---      (or auto-releases if holdAutoRelease is true)
---   4. Releasing SHIFT before countdown: resets to step 1
--- ============================================================================
+-- [ HOLD-TO-RELEASE ] ---------------------------------------------------------
+-- 1. Dialog appears: button grayed, shows "Hold SHIFT to release"
+-- 2. Player holds SHIFT: countdown shown, button stays grayed
+-- 3. Countdown completes: button ENABLES, shows "Release" — player clicks to release
+--    (or auto-releases if holdAutoRelease is true)
+-- 4. Releasing SHIFT before countdown: resets to step 1
 local holdHooked    = false
 local holdStartTime = nil   -- when the player started holding; nil = not holding
 local holdReady     = false -- true once countdown completed; allows OnButton1 through
@@ -255,9 +245,7 @@ local function HookHoldToRelease()
     end
 end
 
--- ============================================================================
--- SELL JUNK  (grey quality items) on MERCHANT_SHOW
--- ============================================================================
+-- [ SELL JUNK ] ---------------------------------------------------------------
 local function SellJunk()
     if not cfg().sellJunk then return end
 
@@ -290,14 +278,12 @@ local function SellJunk()
     end
 end
 
--- ============================================================================
--- FASTER LOOTING
---   Suppresses the stock Blizzard loot window entirely by unregistering
---   LOOT_OPENED/LOOT_CLOSED from LootFrame, then calling LootSlot() for
---   every slot on LOOT_OPENED ourselves — the same technique used by Plumber.
---   The window never appears; loot goes straight to your bags.
---   Also sets autoLootDefault=1 so left-clicking a corpse triggers looting.
--- ============================================================================
+-- [ FASTER LOOTING ] ----------------------------------------------------------
+-- Suppresses the stock Blizzard loot window entirely by unregistering
+-- LOOT_OPENED/LOOT_CLOSED from LootFrame, then calling LootSlot() for
+-- every slot on LOOT_OPENED ourselves — the same technique used by Plumber.
+-- The window never appears; loot goes straight to your bags.
+-- Also sets autoLootDefault=1 so left-clicking a corpse triggers looting.
 local lootFrameMuted = false
 
 local function MuteLootFrame(mute)
@@ -340,9 +326,7 @@ local function ApplyFasterLooting()
     end
 end
 
--- ============================================================================
--- AUTO REPAIR on MERCHANT_SHOW
--- ============================================================================
+-- [ AUTO REPAIR ] -------------------------------------------------------------
 local function AutoRepair()
     if not cfg().autoRepair then return end
     if not CanMerchantRepair() then return end
@@ -369,29 +353,23 @@ local function AutoRepair()
         usedGuild and " (Guild funds)" or ""))
 end
 
--- ============================================================================
--- DECLINE DUEL
--- ============================================================================
+-- [ DECLINE DUEL ] ------------------------------------------------------------
 local function OnDuelRequested()
     if not cfg().declineDuel then return end
     DeclineDuel()
     StaticPopup_Hide("DUEL_REQUESTED")
 end
 
--- ============================================================================
--- DECLINE GUILD INVITE
--- ============================================================================
+-- [ DECLINE GUILD INVITE ] ----------------------------------------------------
 local function OnGuildInviteRequest()
     if not cfg().declineGuild then return end
     DeclineGuild()
     StaticPopup_Hide("GUILD_INVITE")
 end
 
--- ============================================================================
--- LOW DURABILITY WARNING
---   Fires on UPDATE_INVENTORY_DURABILITY.  Throttled to once per 60 s.
---   Shows a red on-screen text frame that fades out after 8 seconds.
--- ============================================================================
+-- [ LOW DURABILITY WARNING ] --------------------------------------------------
+-- Fires on UPDATE_INVENTORY_DURABILITY. Throttled to once per 60 s.
+-- Shows a red on-screen text frame that fades out after 8 seconds.
 local EQUIP_SLOTS = { 1,2,3,5,6,7,8,9,10,11,12,13,14,15,16,17 }
 local durWarnThrottle = 0
 local durFrame  -- on-screen warning frame, built lazily
@@ -488,9 +466,7 @@ function QOL.GetDurabilityFrame()
     return GetOrMakeDurFrame()
 end
 
--- ============================================================================
--- M+ AFFIX REMINDER  – on-screen frame shown on login/reload
--- ============================================================================
+-- [ M+ AFFIX REMINDER ] -------------------------------------------------------
 
 -- Milestone key levels at which new affixes are added.
 -- In Midnight Season 1 the schedule is: all keys (base), +4, +7.
@@ -690,12 +666,12 @@ local function ShowAffixFrame()
     end
 
     -- Always request fresh data from the server.
-    if C_MythicPlus and C_MythicPlus.RequestCurrentAffixes then
+    if C_MythicPlus.RequestCurrentAffixes then
         C_MythicPlus.RequestCurrentAffixes()
     end
 
     -- Populate from whatever is cached right now.
-    local affixList = C_MythicPlus and C_MythicPlus.GetCurrentAffixes and C_MythicPlus.GetCurrentAffixes()
+    local affixList = C_MythicPlus.GetCurrentAffixes and C_MythicPlus.GetCurrentAffixes()
     local hasData = affixList and #affixList > 0
     affixFrame:Populate(affixList)
 
@@ -712,7 +688,7 @@ end
 
 local function OnAffixUpdate()
     if not affixFrame then return end
-    local list = C_MythicPlus and C_MythicPlus.GetCurrentAffixes and C_MythicPlus.GetCurrentAffixes()
+    local list = C_MythicPlus.GetCurrentAffixes and C_MythicPlus.GetCurrentAffixes()
     -- Skip repopulate if data hasn't changed
     local sig = list and #list > 0 and table.concat((function() local t={} for _,a in ipairs(list) do t[#t+1]=a.id end return t end)(), ",") or ""
     if sig ~= "" and affixFrame._lastSig == sig then
@@ -734,7 +710,7 @@ local function MaybeShowAffixFrame()
 
     -- Data may not be ready immediately on login; request it and show
     -- once the MYTHIC_PLUS_CURRENT_AFFIX_UPDATE event fires
-    if C_MythicPlus and C_MythicPlus.RequestCurrentAffixes then
+    if C_MythicPlus.RequestCurrentAffixes then
         C_MythicPlus.RequestCurrentAffixes()
     end
     -- Small delay so the server response can arrive before we try to render
@@ -745,12 +721,10 @@ local function MaybeShowAffixFrame()
     end)
 end
 
--- ============================================================================
--- AUTO-SKIP CINEMATICS / CUTSCENES
---   Event-based: PLAY_MOVIE fires for pre-rendered movies, CINEMATIC_START
---   fires for in-world scripted cinematics.  Both events are reliable across
---   all WoW builds (unlike the old hook on MovieFrame:Play / CinematicFrame).
--- ============================================================================
+-- [ AUTO-SKIP CINEMATICS ] ----------------------------------------------------
+-- Event-based: PLAY_MOVIE fires for pre-rendered movies, CINEMATIC_START
+-- fires for in-world scripted cinematics. Both events are reliable across
+-- all WoW builds (unlike the old hook on MovieFrame:Play / CinematicFrame).
 local function OnPlayMovie()
     if not cfg().autoSkipCinematic then return end
     C_Timer.After(0.5, function()
@@ -775,11 +749,9 @@ local function OnCinematicStart()
     end)
 end
 
--- ============================================================================
--- AUTO-CONFIRM ITEM DELETION
---   DELETE_ITEM_CONFIRM fires when Blizzard shows the delete-confirmation
---   popup. We just hide the editbox and enable Button1 directly.
--- ============================================================================
+-- [ AUTO-CONFIRM ITEM DELETION ] ----------------------------------------------
+-- DELETE_ITEM_CONFIRM fires when Blizzard shows the delete-confirmation
+-- popup. We just hide the editbox and enable Button1 directly.
 local function OnDeleteItemConfirm()
     if not cfg().autoConfirmDelete then return end
     if StaticPopup1EditBox and StaticPopup1EditBox:IsShown() then
@@ -790,7 +762,7 @@ end
 
 
 
--- ============================================================================
+-- [ PET REMINDER ] ------------------------------------------------------------
 local PET_CLASSES = { HUNTER = true, WARLOCK = true }
 local LONE_WOLF_SPELL_ID    = 155228  -- Hunter MM passive: petless playstyle
 local GRIMOIRE_SACRIFICE_ID   = 108503  -- Warlock talent: sacrifice pet for buff
@@ -860,8 +832,8 @@ end
 
 -- Returns true when the Grimoire of Sacrifice buff is active on the player.
 local function HasSacrificeBuff()
-    local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, GRIMOIRE_SACRIFICE_BUFF)
-    return ok and aura ~= nil
+    local aura = C_UnitAuras.GetPlayerAuraBySpellID(GRIMOIRE_SACRIFICE_BUFF)
+    return aura ~= nil
 end
 
 local function CheckPetNow()
@@ -923,9 +895,7 @@ local function CheckPet(unit, extraDelay)
     end
 end
 
--- ============================================================================
--- EVENT DISPATCH
--- ============================================================================
+-- [ EVENT DISPATCH ] ----------------------------------------------------------
 local function OnEvent(self, event, arg1)
     if     event == "QUEST_DETAIL"               then OnQuestDetail()
     elseif event == "QUEST_PROGRESS"             then OnQuestProgress()
@@ -955,14 +925,10 @@ local function OnEvent(self, event, arg1)
     end
 end
 
--- ============================================================================
--- PUBLIC API
--- ============================================================================
+-- [ PUBLIC API ] --------------------------------------------------------------
 
--- ============================================================================
--- AUTO-SLOT KEYSTONE
---   When ChallengesKeystoneFrame opens, find the keystone in bags and slot it.
--- ============================================================================
+-- [ AUTO-SLOT KEYSTONE ] -----------------------------------------------------
+-- When ChallengesKeystoneFrame opens, find the keystone in bags and slot it.
 local keystoneHooked  = false
 local startTimer      = nil  -- C_Timer handle for the auto-start countdown
 local START_COUNTDOWN = 3    -- seconds between keystone slot and auto-start

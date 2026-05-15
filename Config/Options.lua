@@ -443,7 +443,7 @@ local function BuildGeneral(content, db, addon)
         function(v) return string.format("%.2f", v) end)
     y = y - dh - 14
 
-    -- ── GAME UI SCALE ─────────────────────────────────────────────────────
+    -- [ GAME UI SCALE ] ---------------------------------------------------
     -- Scale = 768 / (physicalHeight / dpiScaleFactor)
     -- 768 is WoW's original UI coordinate height (1024×768 era).
     -- Setting this value makes every UI unit equal exactly one physical pixel.
@@ -547,7 +547,7 @@ local function BuildGeneral(content, db, addon)
         function(v) db.minimap.hide = v; ns.MinimapButton.Refresh(addon) end, y)
     y = y - dh - 14
 
-    -- ── PERFORMANCE ───────────────────────────────────────────────────────
+    -- [ PERFORMANCE ] -----------------------------------------------------
     local hPerf = Label(content, "PERFORMANCE", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     hPerf:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
@@ -645,7 +645,7 @@ local function BuildClassBuffs(content, db, addon, startY)
     local r = db.reminder
     local _, dh
 
-    -- ── SELF / WEAPON BUFFS ───────────────────────────────────────────────
+    -- [ SELF / WEAPON BUFFS ] ---------------------------------------------
     local h1 = Label(content, "SELF & WEAPON BUFFS", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     h1:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
@@ -677,7 +677,7 @@ local function BuildClassBuffs(content, db, addon, startY)
 
     y = y - 10
 
-    -- ── PARTY / RAID BUFFS ────────────────────────────────────────────────
+    -- [ PARTY / RAID BUFFS ] ----------------------------------------------
     local h2 = Label(content, "PARTY & RAID BUFFS", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     h2:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
@@ -754,7 +754,7 @@ local function BuildReminder(content, db, addon)
         function(v) db.reminder.weaponOil = v; ns.AuraReminder.Refresh(addon) end, y)
     y = y - dh - 10
 
-    -- ── DURATION THRESHOLDS ───────────────────────────────────────────────
+    -- [ DURATION THRESHOLDS ] ---------------------------------------------
     y = y - 10
     local h3 = Label(content, "DURATION THRESHOLDS", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
@@ -786,7 +786,7 @@ local function BuildReminder(content, db, addon)
         function(v) db.reminder.partyBuffRangeCheck = v end, y)
     y = y - dh - 10
 
-    -- ── CONSUMABLE PREFERENCES ───────────────────────────────────────────
+    -- [ CONSUMABLE PREFERENCES ] ------------------------------------------
     local h4 = Label(content, "CONSUMABLE PREFERENCES", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     h4:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
@@ -826,7 +826,7 @@ local function BuildReminder(content, db, addon)
 
     y = BuildClassBuffs(content, db, addon, y - 10)
 
-    -- ── DISPLAY ───────────────────────────────────────────────────────────
+    -- [ DISPLAY ] ---------------------------------------------------------
     y = y - 10
     local hDisp = Label(content, "DISPLAY", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
@@ -911,7 +911,7 @@ local function BuildQOL(content, db, addon)
     local y   = -T.PAD
     local _, dh
 
-    -- ── RAID TOOLS ────────────────────────────────────────────────────────
+    -- [ RAID TOOLS ] ------------------------------------------------------
     local hRT = Label(content, "RAID TOOLS", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     hRT:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
@@ -951,7 +951,7 @@ local function BuildQOL(content, db, addon)
 
     y = y - 8
 
-    -- ── QUESTS & DIALOGUE ─────────────────────────────────────────────────
+    -- [ QUESTS & DIALOGUE ] -----------------------------------------------
     local h1 = Label(content, "QUESTS & DIALOGUE", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     h1:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
@@ -1030,7 +1030,7 @@ local function BuildQOL(content, db, addon)
         function(v) q.autoConfirmDelete = v; ns.QOL.Refresh(addon) end, y)
     y = y - dh - 14
 
-    -- ── SOCIAL / GROUP ────────────────────────────────────────────────────
+    -- [ SOCIAL / GROUP ] --------------------------------------------------
     local h2 = Label(content, "SOCIAL & GROUP", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     h2:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
@@ -1051,7 +1051,7 @@ local function BuildQOL(content, db, addon)
         function(v) q.declineGuild = v; ns.QOL.Refresh(addon) end, y)
     y = y - dh - 14
 
-    -- ── DEATH ─────────────────────────────────────────────────────────────
+    -- [ DEATH ] -----------------------------------------------------------
     local h3 = Label(content, "DEATH", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     h3:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
@@ -1101,7 +1101,7 @@ local function BuildQOL(content, db, addon)
 
     y = y - 8
 
-    -- ── LOOTING ───────────────────────────────────────────────────────────
+    -- [ LOOTING ] ---------------------------------------------------------
     local h4a = Label(content, "LOOTING", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     h4a:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
@@ -1112,7 +1112,7 @@ local function BuildQOL(content, db, addon)
         function(v) q.fasterLooting = v; ns.QOL.Refresh(addon) end, y)
     y = y - dh - 14
 
-    -- ── VENDOR ────────────────────────────────────────────────────────────
+    -- [ VENDOR ] ----------------------------------------------------------
     local h4 = Label(content, "VENDOR", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     h4:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
@@ -1148,7 +1148,7 @@ local function BuildQOL(content, db, addon)
 
     y = y - 6
 
-    -- ── GEAR ──────────────────────────────────────────────────────────────
+    -- [ GEAR ] ------------------------------------------------------------
     local h5 = Label(content, "GEAR", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     h5:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
@@ -1165,7 +1165,7 @@ local function BuildQOL(content, db, addon)
         function(v) return v .. "%%" end)
     y = y - dh - 14
 
-    -- ── MYTHIC PLUS ───────────────────────────────────────────────────────
+    -- [ MYTHIC PLUS ] -----------------------------------------------------
     local h6 = Label(content, "MYTHIC PLUS", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     h6:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
@@ -1192,7 +1192,7 @@ local function BuildQOL(content, db, addon)
         function(v) q.autoStartChallenge = v end, y)
     y = y - dh - 14
 
-    -- ── PETS ──────────────────────────────────────────────────────────────
+    -- [ PETS ] ------------------------------------------------------------
     local h7 = Label(content, "PETS", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     h7:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
@@ -1264,7 +1264,7 @@ local function BuildFriendList(content, db, addon)
         function(v) fl.enable = v; ns.FriendList.Refresh(addon) end, y)
     y = y - dh - 14
 
-    -- ── NAMES ─────────────────────────────────────────────────────────────
+    -- [ NAMES ] -----------------------------------------------------------
     local h2 = Label(content, "NAMES", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     h2:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
@@ -1287,7 +1287,7 @@ local function BuildFriendList(content, db, addon)
         function(v) fl.useNoteAsName = v; ns.FriendList.Refresh(addon) end, y)
     y = y - dh - 14
 
-    -- ── ICONS ─────────────────────────────────────────────────────────────
+    -- [ ICONS ] -----------------------------------------------------------
     local h3 = Label(content, "ICONS", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     h3:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
@@ -1347,7 +1347,7 @@ local function BuildFriendList(content, db, addon)
     end
     y = y - 32
 
-    -- ── FAVOURITES ────────────────────────────────────────────────────────
+    -- [ FAVOURITES ] ------------------------------------------------------
     local h4 = Label(content, "FAVOURITES", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     h4:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
@@ -1397,7 +1397,7 @@ local function BuildFriendList(content, db, addon)
     end
     y = y - 32
 
-    -- ── FACTION TINT ──────────────────────────────────────────────────────
+    -- [ FACTION TINT ] ----------------------------------------------------
     local h5 = Label(content, "FACTION TINT", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     h5:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
@@ -1423,7 +1423,7 @@ local function BuildMythicTimer(content, db, addon)
     local y  = -T.PAD
     local _, dh
 
-    -- ── GENERAL ───────────────────────────────────────────────────────────
+    -- [ GENERAL ] ---------------------------------------------------------
     local h1 = Label(content, "MYTHIC+ TIMER", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     h1:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
@@ -1459,7 +1459,7 @@ local function BuildMythicTimer(content, db, addon)
 
     y = y - 8
 
-    -- ── DISPLAY ───────────────────────────────────────────────────────────
+    -- [ DISPLAY ] ---------------------------------------------------------
     local h2 = Label(content, "DISPLAY", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     h2:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
@@ -1505,7 +1505,7 @@ local function BuildMythicTimer(content, db, addon)
 
     y = y - 8
 
-    -- ── POSITION ──────────────────────────────────────────────────────────
+    -- [ POSITION ] --------------------------------------------------------
     local h3 = Label(content, "POSITION", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     h3:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
@@ -1533,7 +1533,7 @@ local function BuildMythicTimer(content, db, addon)
 
     y = y - 8
 
-    -- ── TEST / DEMO ───────────────────────────────────────────────────────
+    -- [ TEST / DEMO ] -----------------------------------------------------
     local h4 = Label(content, "TEST", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     h4:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
@@ -1576,7 +1576,7 @@ local function BuildMythicTimer(content, db, addon)
 
     y = y - 8
 
-    -- ── COMPLETION MESSAGE ────────────────────────────────────────────────
+    -- [ COMPLETION MESSAGE ] ----------------------------------------------
     local hMsg = Label(content, "COMPLETION MESSAGE", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     hMsg:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22

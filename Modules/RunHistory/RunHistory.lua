@@ -24,11 +24,11 @@ local COL = {
 }
 
 -- Upgrade colours
-local COL_PLUS3  = { 0.2,  0.85, 0.35 }  -- green
-local COL_PLUS2  = { 0.3,  0.75, 0.95 }  -- blue
-local COL_PLUS1  = { 0.9,  0.82, 0.1  }  -- yellow
-local COL_TIMED  = { 0.7,  0.7,  0.7  }  -- grey  (0-upgrade but timed)
-local COL_DEPLETE = { 0.9, 0.25, 0.25 }  -- red
+local COL_PLUS3  = { r = 0.2,  g = 0.85, b = 0.35 }  -- green
+local COL_PLUS2  = { r = 0.3,  g = 0.75, b = 0.95 }  -- blue
+local COL_PLUS1  = { r = 0.9,  g = 0.82, b = 0.1  }  -- yellow
+local COL_TIMED  = { r = 0.7,  g = 0.7,  b = 0.7  }  -- grey  (0-upgrade but timed)
+local COL_DEPLETE = { r = 0.9, g = 0.25, b = 0.25 }  -- red
 
 -- [ STATE ] -------------------------------------------------------------------
 local panel         -- main frame
@@ -393,7 +393,7 @@ local function RebuildRows(charKey)
         deltaF:SetText(FmtDelta(r.elapsed, r.timeLimit))
         x = x + COL.delta
 
-        AddCell(upg,                     COL.upgrade,  col[1], col[2], col[3])
+        AddCell(upg,                     COL.upgrade,  col.r, col.g, col.b)
         AddCell(tostring(r.deaths or 0), COL.deaths)
         AddCell(FmtDate(r.date),         COL.date,    T.textDim[1], T.textDim[2], T.textDim[3])
 
@@ -763,119 +763,5 @@ function RunHistory.Toggle()
     else
         RebuildRows(CharKey())
         panel:Show()
-    end
-end
-
--- Debug: dump C_DamageMeter state to chat so we can see the actual API shape.
-function RunHistory.DumpDamageMeter()
-    local P = function(msg) print("|cff33ccffyaqol dmtest|r " .. msg) end
-    if not C_DamageMeter then P("C_DamageMeter namespace does NOT exist."); return end
-
-    local avail = C_DamageMeter.IsDamageMeterAvailable and C_DamageMeter.IsDamageMeterAvailable()
-    P("IsDamageMeterAvailable() = " .. tostring(avail))
-
-    local ok, sessions = pcall(C_DamageMeter.GetAvailableCombatSessions)
-    if not ok then P("GetAvailableCombatSessions() errored: " .. tostring(sessions)); return end
-    if not sessions or #sessions == 0 then P("No sessions available."); return end
-    P(#sessions .. " sessions. Using first: sessionID=" .. tostring(sessions[1].sessionID) .. " name=" .. tostring(sessions[1].name))
-
-    local sid = sessions[1].sessionID
-    local myGUID = UnitGUID("player")
-    P("Player GUID: " .. tostring(myGUID))
-
-    -- Helper to dump a table
-    local function DumpTable(tbl, indent)
-        indent = indent or "  "
-        if type(tbl) ~= "table" then P(indent .. "raw=" .. tostring(tbl) .. " (" .. type(tbl) .. ")"); return end
-        for fk, fv in pairs(tbl) do
-            if type(fv) == "table" then
-                local sub = {}
-                local n = 0
-                for sk, sv in pairs(fv) do
-                    n = n + 1
-                    sub[#sub + 1] = tostring(sk) .. "=" .. tostring(sv)
-                    if n >= 8 then sub[#sub + 1] = "..."; break end
-                end
-                P(indent .. "." .. tostring(fk) .. " = {" .. table.concat(sub, ", ") .. "}")
-            else
-                P(indent .. "." .. tostring(fk) .. " = " .. tostring(fv) .. " (" .. type(fv) .. ")")
-            end
-        end
-    end
-
-    -- Probe GetCombatSessionFromID(sessionID, type) with type 0-5
-    P("--- GetCombatSessionFromID(sid, type) ---")
-    for t = 0, 5 do
-        local sOk, sData = pcall(C_DamageMeter.GetCombatSessionFromID, sid, t)
-        if sOk and sData then
-            P("type=" .. t .. " returned:")
-            DumpTable(sData, "    ")
-        elseif sOk then
-            P("type=" .. t .. " returned nil")
-        else
-            P("type=" .. t .. " errored: " .. tostring(sData))
-        end
-    end
-
-    -- Probe GetCombatSessionSourceFromID(sessionID, type, sourceGUID)
-    P("--- GetCombatSessionSourceFromID(sid, type, myGUID) ---")
-    for t = 0, 5 do
-        local sOk, sData = pcall(C_DamageMeter.GetCombatSessionSourceFromID, sid, t, myGUID)
-        if sOk and sData then
-            P("type=" .. t .. " returned:")
-            DumpTable(sData, "    ")
-        elseif sOk then
-            P("type=" .. t .. " returned nil")
-        else
-            P("type=" .. t .. " errored: " .. tostring(sData))
-        end
-    end
-
-    -- Probe GetCombatSessionSourceFromID without GUID (just sid, type)
-    P("--- GetCombatSessionSourceFromID(sid, type) [no GUID] ---")
-    for t = 0, 5 do
-        local sOk, sData = pcall(C_DamageMeter.GetCombatSessionSourceFromID, sid, t)
-        if sOk and sData then
-            P("type=" .. t .. " returned:")
-            if type(sData) == "table" then
-                -- might be array of entries
-                local isArr = (#sData > 0)
-                if isArr then
-                    P("    (array of " .. #sData .. " entries)")
-                    for i = 1, math.min(3, #sData) do
-                        P("    [" .. i .. "]:")
-                        DumpTable(sData[i], "      ")
-                    end
-                else
-                    DumpTable(sData, "    ")
-                end
-            else
-                P("    raw=" .. tostring(sData))
-            end
-        elseif sOk then
-            P("type=" .. t .. " returned nil")
-        else
-            P("type=" .. t .. " errored: " .. tostring(sData))
-        end
-    end
-
-    -- Probe GetSessionDurationSeconds
-    if C_DamageMeter.GetSessionDurationSeconds then
-        local dOk, dur = pcall(C_DamageMeter.GetSessionDurationSeconds, sid)
-        P("GetSessionDurationSeconds(" .. sid .. ") = " .. (dOk and tostring(dur) or ("error: " .. tostring(dur))))
-    end
-
-    -- Probe GetCombatSessionFromType(sessionType, type)
-    P("--- GetCombatSessionFromType(sessionType, type) ---")
-    for st = 0, 3 do
-        for t = 0, 3 do
-            local tOk, tData = pcall(C_DamageMeter.GetCombatSessionFromType, st, t)
-            if tOk and tData then
-                P("sessionType=" .. st .. " type=" .. t .. " returned:")
-                DumpTable(tData, "    ")
-            elseif not tOk and not tostring(tData):find("Usage:") then
-                P("sessionType=" .. st .. " type=" .. t .. " errored: " .. tostring(tData))
-            end
-        end
     end
 end

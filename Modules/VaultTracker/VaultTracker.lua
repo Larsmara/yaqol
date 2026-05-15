@@ -41,12 +41,13 @@ local TRACKS = {
 }
 
 -- Slot indicator colours
-local COL_COMPLETE = { 0.15, 0.95, 0.40 }   -- vivid green — slot unlocked
-local COL_PARTIAL  = { 0.9,  0.65, 0.1  }   -- amber  — in progress
-local COL_EMPTY    = { 0.18, 0.18, 0.18 }   -- dark grey — not started
+local COL_COMPLETE = { r = 0.15, g = 0.95, b = 0.40 }   -- vivid green — slot unlocked
+local COL_PARTIAL  = { r = 0.9,  g = 0.65, b = 0.1  }   -- amber  — in progress
+local COL_EMPTY    = { r = 0.18, g = 0.18, b = 0.18 }   -- dark grey — not started
 
 -- [ STATE ] -------------------------------------------------------------------
 local anchor, popup
+local closeTimer
 
 -- [ HELPERS ] -----------------------------------------------------------------
 local function cfg() return ns.Addon:Profile().vaultTracker end
@@ -55,13 +56,13 @@ local function IlvlFromLink(link)
     if not link then return nil end
     -- Attempt 1: GetDetailedItemLevelInfo reads bonus IDs without cache (12.0+)
     if GetDetailedItemLevelInfo then
-        local ok, ilvl = pcall(GetDetailedItemLevelInfo, link)
-        if ok and ilvl and ilvl > 0 then return ilvl end
+        local ilvl = GetDetailedItemLevelInfo(link)
+        if ilvl and ilvl > 0 then return ilvl end
     end
     -- Attempt 2: GetItemInfo — returns name, link, rarity, ilvl, ...
     -- Vault example-reward items are usually cached so this often works.
-    local ok, _, _, _, ilvl = pcall(GetItemInfo, link)
-    if ok and ilvl and ilvl > 0 then return ilvl end
+    local _, _, _, ilvl = GetItemInfo(link)
+    if ilvl and ilvl > 0 then return ilvl end
     -- Can't determine ilvl; caller will show "? ilvl"
     return nil
 end
@@ -201,7 +202,7 @@ local function BuildPopup()
             local box = f:CreateTexture(nil, "ARTWORK")
             box:SetSize(SLOT_BOX, SLOT_BOX)
             box:SetPoint("TOPLEFT", f, "TOPLEFT", slotX, rowY)
-            box:SetColorTexture(COL_EMPTY[1], COL_EMPTY[2], COL_EMPTY[3], 0.9)
+            box:SetColorTexture(COL_EMPTY.r, COL_EMPTY.g, COL_EMPTY.b, 0.9)
             slot.box = box
 
             -- Thin border around box — must use BORDER layer (below ARTWORK)
@@ -257,11 +258,11 @@ local function RefreshPopupData()
 
             -- Slot indicator colour
             if unlocked then
-                slotUI.box:SetColorTexture(COL_COMPLETE[1], COL_COMPLETE[2], COL_COMPLETE[3], 0.85)
+                slotUI.box:SetColorTexture(COL_COMPLETE.r, COL_COMPLETE.g, COL_COMPLETE.b, 0.85)
             elseif progress > 0 then
-                slotUI.box:SetColorTexture(COL_PARTIAL[1], COL_PARTIAL[2], COL_PARTIAL[3], 0.85)
+                slotUI.box:SetColorTexture(COL_PARTIAL.r, COL_PARTIAL.g, COL_PARTIAL.b, 0.85)
             else
-                slotUI.box:SetColorTexture(COL_EMPTY[1], COL_EMPTY[2], COL_EMPTY[3], 0.85)
+                slotUI.box:SetColorTexture(COL_EMPTY.r, COL_EMPTY.g, COL_EMPTY.b, 0.85)
             end
 
             -- ilvl (only when slot is unlocked)
@@ -279,7 +280,7 @@ local function RefreshPopupData()
                 slotUI.countLbl:SetText("")
             elseif progress > 0 then
                 slotUI.countLbl:SetText(progress .. "/" .. threshold)
-                slotUI.countLbl:SetTextColor(COL_PARTIAL[1], COL_PARTIAL[2], COL_PARTIAL[3])
+                slotUI.countLbl:SetTextColor(COL_PARTIAL.r, COL_PARTIAL.g, COL_PARTIAL.b)
             else
                 slotUI.countLbl:SetText("0/" .. threshold)
                 slotUI.countLbl:SetTextColor(ns.Theme.textDim[1], ns.Theme.textDim[2], ns.Theme.textDim[3])

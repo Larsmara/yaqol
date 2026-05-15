@@ -2,14 +2,12 @@ local ADDON_NAME, ns = ...
 ns.SkyridingHUD = {}
 local SkyridingHUD = ns.SkyridingHUD
 
--- ============================================================================
--- SKYRIDING HUD  (Midnight 12.0 — vigor removed in 11.2.7)
---   Surge Forward (372608) and Skyward Ascent (372610) share a pool of
---   up to 6 charges, each recharging in 15 seconds.
---   HUD rows:
---     • Charge pips     — filled squares for ready charges, partial for recharging
---     • Whirling Surge  — cooldown bar (hidden when ready), spell 361584
--- ============================================================================
+-- [ SKYRIDING HUD ] -----------------------------------------------------------
+-- Surge Forward (372608) and Skyward Ascent (372610) share a pool of
+-- up to 6 charges, each recharging in 15 seconds.
+-- HUD rows:
+--   Charge pips     — filled squares for ready charges, partial for recharging
+--   Whirling Surge  — cooldown bar (hidden when ready), spell 361584
 
 -- [ CONSTANTS ] ---------------------------------------------------------------
 local SPELL_SURGE_FORWARD  = 372608  -- shared charge pool with Skyward Ascent 372610
@@ -40,8 +38,7 @@ end
 
 -- Returns SpellChargeInfo or nil.
 local function GetCharges()
-    local ok, info = pcall(C_Spell.GetSpellCharges, SPELL_SURGE_FORWARD)
-    if not ok or not info then return nil end
+    local info = C_Spell.GetSpellCharges(SPELL_SURGE_FORWARD)
     return info
 end
 
@@ -51,8 +48,8 @@ local function ShouldShow()
     if not IsMounted() then return false end
     -- Surge Forward is only usable when actively on a skyriding mount in Skyriding
     -- mode (not Steady Flight). This is the most direct mount-style check available.
-    local ok, isUsable = pcall(C_Spell.IsSpellUsable, SPELL_SURGE_FORWARD)
-    return ok and isUsable == true
+    local isUsable = C_Spell.IsSpellUsable(SPELL_SURGE_FORWARD)
+    return isUsable == true
 end
 
 local function HideHUD()
@@ -97,8 +94,8 @@ local function UpdateCharges()
 end
 
 local function UpdateWhirlingSurge()
-    local ok, info = pcall(C_Spell.GetSpellCooldown, SPELL_WHIRLING_SURGE)
-    if not ok or not info or info.startTime == 0 or info.duration <= 1.5 then
+    local info = C_Spell.GetSpellCooldown(SPELL_WHIRLING_SURGE)
+    if not info or info.startTime == 0 or info.duration <= 1.5 then
         surgeRow:Hide()
         return
     end
@@ -147,7 +144,7 @@ local function BuildPanel()
 
     local y = -6
 
-    -- ── CHARGES ──────────────────────────────────────────────────────────
+    -- [ CHARGES ] ---------------------------------------------------------
     local chargeLbl = f:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     chargeLbl:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
     chargeLbl:SetText("Charges")
@@ -177,7 +174,7 @@ local function BuildPanel()
     end
     y = y - PIP_H - ROW_GAP
 
-    -- ── WHIRLING SURGE CD ─────────────────────────────────────────────────
+    -- [ WHIRLING SURGE CD ] ----------------------------------------------
     surgeRow = CreateFrame("Frame", nil, f)
     surgeRow:SetSize(HUD_W + PAD * 2, LABEL_H + 2 + BAR_H)
     surgeRow:SetPoint("TOPLEFT", f, "TOPLEFT", 0, y)
@@ -207,7 +204,7 @@ local function BuildPanel()
 
     surgeRow:Hide()
 
-    -- ── POSITION ─────────────────────────────────────────────────────────
+    -- [ POSITION ] --------------------------------------------------------
     f:ClearAllPoints()
     f:SetPoint(d.point or "CENTER", UIParent, d.relPoint or "CENTER", d.x or 0, d.y or -250)
 

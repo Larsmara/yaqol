@@ -78,7 +78,7 @@ A small draggable icon showing the shared combat resurrection charge pool.
 
 - Displays current charges with a cooldown swipe showing the recharge progress
 - Visible in raids and in Mythic+ (configurable minimum key level)
-- Uses `GetSpellCharges(Rebirth)` — works for all classes' battle-rez spells
+- Uses `C_Spell.GetSpellCharges` — works for all classes' battle-rez spells
 
 ### 🛡️ Raid Tools
 A compact collapsible toolbar for raid leads and assistants.

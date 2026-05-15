@@ -165,7 +165,7 @@ local function BuildSearchContent(scrollChild)
     local d = cfg()
     local y = -PAD
 
-    -- ── REQUIRE ───────────────────────────────────────────────────────────
+    -- [ REQUIRE ] ---------------------------------------------------------
     y = y - MakeSectionHeader(scrollChild, "REQUIRE", y)
     local availTank, availHealer, availDPS = C_LFGList.GetAvailableRoles()
     if availTank then
@@ -194,7 +194,7 @@ local function BuildSearchContent(scrollChild)
         function(v) cfg().hasHealer = v end, y)
     y = y - SECT_GAP
 
-    -- ── DUNGEONS (current season + expansion, max level only) ─────────────
+    -- [ DUNGEONS ] --------------------------------------------------------
     if IsPlayerAtEffectiveMaxLevel() then
         y = y - MakeSectionHeader(scrollChild, "DUNGEONS", y)
         local seasonGroups = C_LFGList.GetAvailableActivityGroups(
@@ -214,7 +214,7 @@ local function BuildSearchContent(scrollChild)
         y = y - SECT_GAP
     end
 
-    -- ── MIN RATING ────────────────────────────────────────────────────────
+    -- [ MIN RATING ] ------------------------------------------------------
     if IsPlayerAtEffectiveMaxLevel() then
         y = y - MakeSectionHeader(scrollChild, "MIN RATING", y)
         local eb = CreateFrame("EditBox", nil, scrollChild)
@@ -246,7 +246,7 @@ local function BuildSearchContent(scrollChild)
         y = y - 26 - SECT_GAP
     end
 
-    -- ── DIFFICULTY ────────────────────────────────────────────────────────
+    -- [ DIFFICULTY ] -------------------------------------------------------
     y = y - MakeSectionHeader(scrollChild, "DIFFICULTY", y)
     y = y - MakeToggleRow(scrollChild, "Normal",
         function() return cfg().difficultyNormal end,
@@ -262,7 +262,7 @@ local function BuildSearchContent(scrollChild)
         function(v) cfg().difficultyMythicPlus = v end, y)
     y = y - SECT_GAP
 
-    -- ── PLAYSTYLE ─────────────────────────────────────────────────────────
+    -- [ PLAYSTYLE ] --------------------------------------------------------
     y = y - MakeSectionHeader(scrollChild, "PLAYSTYLE", y)
     y = y - MakeToggleRow(scrollChild, "Learning",
         function() return cfg().playstyle1 end,

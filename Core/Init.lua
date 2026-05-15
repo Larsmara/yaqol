@@ -189,8 +189,6 @@ function yaqol:OnSlashCommand(input)
         end
     elseif input == "history" then
         ns.RunHistory.Toggle()
-    elseif input == "dmtest" then
-        ns.RunHistory.DumpDamageMeter()
     else
         ns.Config.Toggle()
     end

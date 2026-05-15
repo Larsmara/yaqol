@@ -16,7 +16,7 @@ local BOSS_LINE_H     = 18    -- height per vertical boss entry
 local HDR_Y           = -16   -- center of header content row
 local TIME_BAR_Y      = -36   -- top of time progress bar
 local BOSS_LIST_Y     = -58   -- top of first boss entry (below time bar)
-local BORDER_COLOR    = { 0.133, 0.133, 0.133 }  -- #222222
+local BORDER_COLOR    = { r = 0.133, g = 0.133, b = 0.133 }  -- #222222
 local T = ns.Theme  -- populated by Theme.Init() before GetOrMakeFrame runs
 
 -- [ LOCAL STATE ] -------------------------------------------------------------
@@ -119,7 +119,7 @@ local function EnsureBackdrop(f)
     bg:SetAllPoints()
     bg:SetColorTexture(0, 0, 0, 0.7)
     f.bgTex = bg
-    local r, g, b = BORDER_COLOR[1], BORDER_COLOR[2], BORDER_COLOR[3]
+    local r, g, b = BORDER_COLOR.r, BORDER_COLOR.g, BORDER_COLOR.b
     f.borderTop = f:CreateTexture(nil, "BACKGROUND", nil, 1)
     f.borderTop:SetHeight(1); f.borderTop:SetPoint("TOPLEFT"); f.borderTop:SetPoint("TOPRIGHT")
     f.borderTop:SetColorTexture(r, g, b, 1)
@@ -168,7 +168,7 @@ local function GetOrMakeFrame()
     -- HUD element: no background by default, no borders, no header chrome.
     -- Content floats directly over the game world.
 
-    -- ── HEADER ROW ──────────────────────────────────────────────────────
+    -- [ HEADER ROW ] ---------------------------------------------------------
     -- Key level indicator (large, bold)
     local levelText = f:CreateFontString(nil, "OVERLAY", "SystemFont_Huge1")
     levelText:SetPoint("LEFT", f, "TOPLEFT", 10, HDR_Y)
@@ -202,7 +202,7 @@ local function GetOrMakeFrame()
     TagBaseSize(affixText)
     f.affixText = affixText
 
-    -- ── TIME BAR (elapsed time as fraction of time limit) ───────────────
+    -- [ TIME BAR ] ------------------------------------------------------------
     local barW = FRAME_W - 20
     local timeBarBg = f:CreateTexture(nil, "ARTWORK")
     timeBarBg:SetSize(barW, TIME_BAR_H)
@@ -244,7 +244,7 @@ local function GetOrMakeFrame()
     TagBaseSize(nextUpgradeText)
     f.nextUpgradeText = nextUpgradeText
 
-    -- ── FORCES BAR (enemy forces percentage — positioned dynamically below boss list)
+    -- [ FORCES BAR ] ---------------------------------------------------------
     local forcesBarBg = f:CreateTexture(nil, "ARTWORK")
     forcesBarBg:SetSize(barW, FORCES_BAR_H)
     ns.Theme:ApplyBarBg(forcesBarBg)
@@ -263,7 +263,7 @@ local function GetOrMakeFrame()
     TagBaseSize(forcesText)
     f.forcesText = forcesText
 
-    -- ── BOSS LIST (vertical, one entry per boss) ──────────────────────
+    -- [ BOSS LIST ] -----------------------------------------------------------
     f.bossFrames = {}
 
     f:SetPoint(
@@ -441,10 +441,10 @@ local function UpdateDisplay()
     end
     local remaining = timeLimit - elapsed
 
-    -- ── HEADER: key level ───────────────────────────────────────────────
+    -- [ HEADER: KEY LEVEL ] --------------------------------------------------
     f.levelText:SetText(format("%s+%d|r", ns.Theme.EscapeColor("accent"), keystoneLevel))
 
-    -- ── HEADER: death count ─────────────────────────────────────────────
+    -- [ HEADER: DEATH COUNT ] ------------------------------------------------
     if deathCount > 0 then
         f.deathIcon:Show()
         f.deathText:SetText(format("|cffee2222%d  -%s|r", deathCount, FormatTime(timeLost)))
@@ -453,7 +453,7 @@ local function UpdateDisplay()
         f.deathText:SetText("")
     end
 
-    -- ── COMPLETION STATE (text swap in timer area) ──────────────────────
+    -- [ COMPLETION STATE ] ----------------------------------------------------
     if dungeonCompleted then
         local upgrades
         if     elapsed <= timeLimit * PLUS_3_FRACTION then upgrades = 3
@@ -484,7 +484,7 @@ local function UpdateDisplay()
             ns.Theme:PaintFill(f.timeBarFill, T.barFill)
         end
     else
-        -- ── ACTIVE TIMER ────────────────────────────────────────────────
+        -- [ ACTIVE TIMER ] ----------------------------------------------------
         local colour = ColourTime(remaining, timeLimit)
         f.timerText:SetText(colour .. FormatTime(remaining) .. "|r")
 
@@ -518,7 +518,7 @@ local function UpdateDisplay()
     f.mark2:SetPoint("TOPLEFT", f.timeBarBg, "TOPLEFT", PLUS_2_FRACTION * barW, 0)
     f.mark2:Show()
 
-    -- ── BOSS LIST (vertical, one per line) ─────────────────────────────
+    -- [ BOSS LIST ] -----------------------------------------------------------
     EnsureBossFrames(numBosses)
     local showKT = d.showKillTimes
     local bossIdx = 0
@@ -551,7 +551,7 @@ local function UpdateDisplay()
         end
     end
 
-    -- ── FORCES BAR (enemy forces %, positioned below boss list) ──────────
+    -- [ FORCES BAR ] ---------------------------------------------------------
     local forcesY = bossListY - numBosses * bossLineH - math.ceil(6 * scale)
     f.forcesBarBg:ClearAllPoints()
     f.forcesBarBg:SetPoint("TOPLEFT", f, "TOPLEFT", 10, forcesY)
@@ -606,7 +606,7 @@ local function ActivateTimer(worldTimerID, worldElapsed, limit)
     affixIDs = affixes or {}
 
     -- Populate affix names in the header text
-    local currentAffixes = C_MythicPlus.GetCurrentAffixes and C_MythicPlus.GetCurrentAffixes() or {}
+    local currentAffixes = C_MythicPlus.GetCurrentAffixes() or {}
     local f = GetOrMakeFrame()
     local affixNames = {}
     for _, affixInfo in ipairs(currentAffixes) do

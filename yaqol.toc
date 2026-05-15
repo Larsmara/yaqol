@@ -3,7 +3,7 @@
 ## Notes: Yet Another Quality Of Life — M+ Teleports, Buff Reminders & QoL automation
 ## IconTexture: YAQOL
 ## Author: Lars
-## Version: 1.1.2
+## Version: 1.2.0
 ## X-Curse-Project-ID: 1502405
 ## SavedVariables: yaqolDB
 
@@ -15,6 +15,7 @@ Libs/AceAddon-3.0/AceAddon-3.0.xml
 Libs/AceConsole-3.0/AceConsole-3.0.xml
 Libs/AceEvent-3.0/AceEvent-3.0.xml
 Libs/AceDB-3.0/AceDB-3.0.xml
+Libs/LibCustomGlow/LibCustomGlow-1.0.lua
 
 ## Addon
 CHANGELOG.lua
@@ -26,6 +27,7 @@ Core/MinimapButton.lua
 Core/LayoutMode.lua
 Modules/Teleport/Teleport.lua
 Modules/AuraReminder/AuraList.lua
+Modules/AuraReminder/AuraGlow.lua
 Modules/AuraReminder/AuraReminder.lua
 Modules/QOL/QOL.lua
 Modules/MythicTimer/MythicTimer.lua
@@ -37,4 +39,5 @@ Modules/CombatRess/CombatRess.lua
 Modules/VaultTracker/VaultTracker.lua
 Modules/RunHistory/RunHistory.lua
 Modules/MouseTracker/MouseTracker.lua
+Modules/GroupFilter/GroupFilter.lua
 Config/Options.lua

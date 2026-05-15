@@ -67,23 +67,69 @@ local function CanReadAuras()
     return cmpOk
 end
 
+-- [ PRE-COMBAT CACHE ] --------------------------------------------------------
+-- Snapshot of tracked aura states taken at ENCOUNTER_START / PLAYER_REGEN_DISABLED.
+-- Keys: spellID (or "weaponEnchant"), values: true (present) or nil (absent).
+-- Used as fallback when live aura API is locked by Midnight's secret-value system.
+local _preCombatCache = {}
+local _preCombatCacheValid = false
+
 -- Minimum seconds remaining for a buff to count as "present".
 -- Set by GetMissing() from db.reminder.buffMinRemaining before each scan.
 -- Default 60 s is used when helpers are called outside of a scan context.
 local scanMinRemaining = 60
 
+-- Duration threshold for "expiring soon" detection, set per-scan from db.
+-- Separate from scanMinRemaining (which is "minimum seconds to count as present").
+-- This is "show reminder when remaining < threshold AND total duration > threshold".
+local scanDurationThreshold = 0  -- 0 = disabled
+
 -- Safe player aura query.
 -- Returns true only if the buff is present AND has meaningful time remaining.
 -- expirationTime == 0 means permanent (no expiry) — always counts.
+-- Falls back to pre-combat snapshot when the live API is locked during combat.
 local function PlayerHasAura(spellID)
+    -- Try live API first
     local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, spellID)
-    if not ok or aura == nil then return false end
-    -- Guard the spellId field itself against tainting
+    if ok and aura ~= nil then
+        -- Guard the spellId field itself against tainting
+        if IsSecret(aura.spellId) then
+            -- Live value is secret — fall back to cache if in combat
+            if InCombatLockdown() and _preCombatCacheValid then
+                return _preCombatCache[spellID] == true
+            end
+            -- OOC: GetPlayerAuraBySpellID returned a non-nil aura, so the buff
+            -- IS present even though the spellId field is tainted.  Trust the
+            -- existence of the return value rather than the unreadable field.
+            return true
+        end
+        -- Check expiry — guard the expirationTime field too
+        if IsSecret(aura.expirationTime) then return true end  -- secret expiry = treat as permanent
+        if aura.expirationTime == 0 then return true end       -- permanent buff
+        return (aura.expirationTime - GetTime()) >= scanMinRemaining
+    end
+    -- API failed or aura not present — fall back to cache in combat
+    if not ok and InCombatLockdown() and _preCombatCacheValid then
+        return _preCombatCache[spellID] == true
+    end
+    return false
+end
+
+-- Returns true if the buff exists but will expire within scanDurationThreshold.
+-- Only triggers if the buff's total duration exceeds the threshold (avoids
+-- flagging short-duration buffs like 30s proc effects).
+local function IsExpiringSoon(spellID)
+    if scanDurationThreshold <= 0 then return false end
+    local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, spellID)
+    if not ok or not aura then return false end
     if IsSecret(aura.spellId) then return false end
-    -- Check expiry — guard the expirationTime field too
-    if IsSecret(aura.expirationTime) then return true end  -- secret expiry = treat as permanent
-    if aura.expirationTime == 0 then return true end       -- permanent buff
-    return (aura.expirationTime - GetTime()) >= scanMinRemaining
+    if IsSecret(aura.expirationTime) then return false end
+    if aura.expirationTime == 0 then return false end  -- permanent buff, never expires
+    local remaining = aura.expirationTime - GetTime()
+    local duration = aura.duration or 0
+    -- Only flag if total duration is longer than threshold (skip short buffs)
+    if duration <= scanDurationThreshold then return false end
+    return remaining > 0 and remaining < scanDurationThreshold
 end
 
 -- Fallback: scan all player auras by name. Used for categories like food where
@@ -146,22 +192,24 @@ local function Known(spellID)
 end
 
 -- [ CATEGORY META ] -----------------------------------------------------------
--- Each category = { key, label, required }
--- required = true  → reminder fires if NONE of the list spells are active
--- required = false → optional; shown but does not block "all good"
+-- Kept for external reference; consumable data is now hardcoded above.
 AuraList.Categories = {
-    { key = "flasks",       label = "Flask",           required = true  },
-    { key = "food",         label = "Food",            required = true  },
-    { key = "augmentRunes", label = "Augment Rune",    required = true  },
-    { key = "weaponBuffs",  label = "Weapon Buff",     required = false },
-    { key = "custom",       label = "Custom",          required = true  },
+    { key = "flasks",       label = "Flask",        required = true  },
+    { key = "food",         label = "Food",         required = true  },
+    { key = "augmentRunes", label = "Augment Rune", required = true  },
 }
 
 -- Returns true if the player has any temporary weapon enchant on their main-hand.
 -- Oils / whetstones / weightstones all show as temp enchants, not player auras.
+-- Falls back to pre-combat snapshot during combat lockdown.
 local function HasWeaponOil()
     local hasMainHandEnchant = GetWeaponEnchantInfo()
-    return hasMainHandEnchant == true
+    if hasMainHandEnchant == true then return true end
+    -- Fallback to cache in combat
+    if InCombatLockdown() and _preCombatCacheValid then
+        return _preCombatCache["weaponEnchant"] == true
+    end
+    return false
 end
 
 -- [ CLASS BUFF DATA ] ---------------------------------------------------------
@@ -210,14 +258,14 @@ local CLASS_BUFFS = {
     -- WARRIOR -------------------------------------------------------------
     WARRIOR = {
         { label = "Defensive Stance",  required = false, castSpell = 386208,
-          buffIDs = { 386208 } },
+          buffIDs = { 386208 }, specs = { 3 } },            -- Protection only
         { label = "Berserker Stance",  required = false, castSpell = 386196,
-          buffIDs = { 386196 } },
+          buffIDs = { 386196 }, specs = { 1, 2 } },         -- Arms, Fury
     },
     -- PRIEST --------------------------------------------------------------
     PRIEST = {
         { label = "Shadowform", required = false, castSpell = 232698,
-          buffIDs = { 232698, 194249 } },
+          buffIDs = { 232698, 194249 }, specs = { 3 } },    -- Shadow only
     },
     -- EVOKER --------------------------------------------------------------
     EVOKER = {
@@ -240,6 +288,15 @@ local CLASS_BUFFS = {
 -- buffIDs: all aura variants that count as the buff being present.
 --   • Blessing of the Bronze has 13 variants (one per class).
 --   • Mark of the Wild / Arcane Intellect have a Midnight alt-ID variant.
+
+-- Range-aware party buff scanning: set by AuraReminder via SetInRangeUnits().
+-- nil = range check disabled/not available; table = unit-token keyed set.
+local _inRangeUnits = nil
+
+function AuraList.SetInRangeUnits(units)
+    _inRangeUnits = units
+end
+
 local PARTY_BUFFS = {
     { key = "fort",   class = "PRIEST",  castSpell = 21562,  label = "Power Word: Fortitude",
       buffIDs = { 21562 } },
@@ -265,6 +322,7 @@ local function GetMissingPartyBuffs(db)
     local cfg = db.partyBuffs or {}
     local inRaid  = IsInRaid()
     local inGroup = inRaid or IsInGroup()
+    local rangeCheck = db.partyBuffRangeCheck and _inRangeUnits
 
     -- Build unit list and scan each unit's auras ONCE.
     -- auraCache[unit] = spellID-keyed set; built lazily below.
@@ -304,18 +362,26 @@ local function GetMissingPartyBuffs(db)
                 end
                 if not playerHas then missing_count = 1 end
                 for _, u in ipairs(units) do
-                    total = total + 1
-                    local set = cachedSet(u)
-                    local has = false
-                    for _, id in ipairs(def.buffIDs) do
-                        if set[id] then has = true; break end
+                    -- Skip out-of-range units when range checking is enabled
+                    if rangeCheck and not _inRangeUnits[u] then
+                        -- Treat as "has all buffs" — we can't reach them
+                    else
+                        total = total + 1
+                        local set = cachedSet(u)
+                        local has = false
+                        for _, id in ipairs(def.buffIDs) do
+                            if set[id] then has = true; break end
+                        end
+                        if not has then missing_count = missing_count + 1 end
                     end
-                    if not has then missing_count = missing_count + 1 end
                 end
                 if missing_count > 0 then
                     missing[#missing+1] = { label=def.label, spellID=def.castSpell,
                         icon=SpellIcon(def.castSpell), required=true,
-                        partyMissingCount=missing_count, partyTotalCount=total }
+                        partyMissingCount=missing_count, partyTotalCount=total,
+                        actionType  = "spell",
+                        actionValue = def.castSpell,
+                        dismissKey  = "party:" .. def.key }
                 end
             end
         elseif inGroup then
@@ -334,7 +400,10 @@ local function GetMissingPartyBuffs(db)
             end
             if not anyoneHas then
                 missing[#missing+1] = { label=def.label, spellID=def.castSpell,
-                    icon=SpellIcon(def.castSpell), required=false, missingFromGroup=true }
+                    icon=SpellIcon(def.castSpell), required=false, missingFromGroup=true,
+                    actionType  = "texture",
+                    actionValue = nil,
+                    dismissKey  = "group:" .. def.key }
             end
         end
     end
@@ -347,6 +416,123 @@ end
 -- "Hearty Well Fed" to handle foods not in the configured list.
 local WELL_FED_IDS = { 455369, 462187 }  -- Midnight primary Well Fed spell IDs
 local WELL_FED_NAMES = { "Well Fed", "Hearty Well Fed" }
+
+-- Hardcoded consumable data (Midnight Season 1 + legacy variants)
+-- itemIDs used to count how many the player has in bags for the badge.
+local FLASKS = {
+    { spellID = 1235110, itemIDs = { 241324, 241325, 245931, 245930 } },  -- Flask of the Blood Knights
+    { spellID = 1235108, itemIDs = { 241322, 241323, 245933, 245932 } },  -- Flask of the Magisters
+    { spellID = 1235111, itemIDs = { 241326, 241327, 245929, 245928 } },  -- Flask of the Shattered Sun
+    { spellID = 1235057, itemIDs = { 241320, 241321, 245926, 245927 } },  -- Flask of Thalassian Resistance
+    { spellID = 1239355, itemIDs = { 241334 } },                          -- Vicious Thalassian Flask of Honor
+    { spellID = 1235113 }, { spellID = 1235114 },  -- PvP-morphed variants (detection only)
+    { spellID = 1235115 }, { spellID = 1235116 },
+}
+local AUGMENT_RUNES = {
+    { spellID = 1264426, itemIDs = { 259085  } },  -- Augment Rune (Void-Touched)
+    { spellID = 453250,  itemIDs = { 243191  } },  -- Augment Rune (Ethereal)
+    { spellID = 1234969 }, { spellID = 1242347 },  -- Midnight variants
+    { spellID = 393438,  itemIDs = { 189192  } },  -- Crystallized Augment Rune (TWW)
+    { spellID = 347901  },                         -- legacy
+}
+-- Flask lookup by preference key (for consumable preference dropdowns).
+local FLASK_BY_KEY = {
+    blood_knights         = FLASKS[1],
+    magisters             = FLASKS[2],
+    shattered_sun         = FLASKS[3],
+    thalassian_resistance = FLASKS[4],
+    pvp                   = FLASKS[5],
+}
+-- Exported for Options.lua dropdown choices.
+AuraList.FLASK_CHOICES = {
+    { value = "auto",                  label = "Auto (first in bags)" },
+    { value = "blood_knights",         label = "Flask of the Blood Knights" },
+    { value = "magisters",             label = "Flask of the Magisters" },
+    { value = "shattered_sun",         label = "Flask of the Shattered Sun" },
+    { value = "thalassian_resistance", label = "Flask of Thalassian Resistance" },
+    { value = "pvp",                   label = "Vicious Thalassian Flask of Honor" },
+}
+
+-- Midnight S1 consumable food items, grouped by category.
+-- Each category is scanned in order; hearty variants listed first within each.
+local FOOD_CAT = {
+    primary_hearty = {
+        268679, 267000, 242747, 242746, 242757, 242756, 242755, 242754,
+        242753, 242758, 242752, 242759,
+    },
+    primary = {
+        255847, 255848, 242275, 242274, 242285, 242284, 242283, 242282,
+        242281, 242286, 242280, 242287,
+    },
+    secondary_hearty = { 242750, 242749, 242748 },
+    secondary        = { 242278, 242277, 242276 },
+    utility = {
+        -- hearty utility first
+        242765, 242767, 242763, 242766, 242764, 242768,
+        242762, 242760, 242761,
+        -- regular utility
+        242293, 242295, 242291, 242294, 242292, 242296,
+        242290, 242288, 242289,
+    },
+    basic = {
+        -- hearty basic first
+        242771, 242772, 242774, 242775, 242770, 242773, 242776, 242769,
+        -- regular basic
+        242304, 242305, 242307, 242308, 242303, 242306, 242309, 242302,
+    },
+    feast = {
+        266996, 266985, 242744, 242745,  -- hearty feasts
+        255846, 255845, 242272, 242273,  -- regular feasts
+    },
+}
+-- Category scan order for auto mode (best to worst).
+local FOOD_CAT_ORDER = {
+    "primary_hearty", "primary", "secondary_hearty", "secondary",
+    "utility", "basic", "feast",
+}
+-- Flat list for auto mode and bag counting (built from categories).
+local FOOD_ITEMS = {}
+for _, cat in ipairs(FOOD_CAT_ORDER) do
+    for _, iid in ipairs(FOOD_CAT[cat]) do
+        FOOD_ITEMS[#FOOD_ITEMS + 1] = iid
+    end
+end
+-- Exported for Options.lua dropdown choices.
+AuraList.FOOD_CHOICES = {
+    { value = "auto",             label = "Auto (first in bags)" },
+    { value = "primary_hearty",   label = "Primary Stat (Hearty)" },
+    { value = "primary",          label = "Primary Stat" },
+    { value = "secondary_hearty", label = "Secondary Stat (Hearty)" },
+    { value = "secondary",        label = "Secondary Stat" },
+    { value = "utility",          label = "Utility" },
+    { value = "basic",            label = "Basic" },
+    { value = "feast",            label = "Feast" },
+}
+
+-- Weapon oil / whetstone / weightstone / ammo items for click-to-use.
+-- Applied via macro: "/use item:<id>\n/use 16" (main-hand slot).
+local WEAPON_ENCHANT_ITEMS = {
+    -- Midnight oils
+    243733, 243734, -- Thalassian Phoenix Oil
+    243735, 243736, -- Oil of Dawn
+    243737, 243738, -- Smuggler's Enchanted Edge
+    -- Midnight whetstones
+    237370, 237371, -- Refulgent Whetstone
+    -- Midnight weightstones
+    237367, 237369, -- Refulgent Weightstone
+    -- Midnight ammo
+    257749, 257750, -- Laced Zoomshots
+    257751, 257752, -- Weighted Boomshots
+    -- TWW oils
+    224107, 224106, 224105, -- Algari Mana Oil
+    224113, 224112, 224111, -- Oil of Deep Toxins
+    224110, 224109, 224108, -- Oil of Beledar's Grace
+    -- TWW whetstones / weightstones
+    222504, 222503, 222502, -- Ironclaw Whetstone
+    222510, 222509, 222508, -- Ironclaw Weightstone
+    220156, -- Bubbling Wax
+}
+
 local function HasFoodBuff(foodList)
     -- 1. Primary Midnight Well Fed spell IDs (fast path)
     for _, id in ipairs(WELL_FED_IDS) do
@@ -363,6 +549,81 @@ local function HasFoodBuff(foodList)
         if PlayerHasAuraByName(name) then return true end
     end
     return false
+end
+-- [ PREFERRED ITEM RESOLUTION ] -----------------------------------------------
+-- Resolves which flask item to use for click-to-buff.
+-- Checks db.flaskRaid or db.flaskDungeon based on instance type.
+-- Falls back to auto (first available) if the chosen flask isn't in bags.
+local function ResolveFlaskItem(db, iType)
+    local key = (iType == "raid") and (db.flaskRaid or "auto")
+                                   or (db.flaskDungeon or "auto")
+
+    if key ~= "auto" then
+        local def = FLASK_BY_KEY[key]
+        if def and def.itemIDs then
+            for _, iid in ipairs(def.itemIDs) do
+                if (GetItemCount(iid) or 0) > 0 then return iid end
+            end
+        end
+        -- Chosen flask not in bags — fall through to auto
+    end
+
+    for _, f in ipairs(FLASKS) do
+        if f.itemIDs then
+            for _, iid in ipairs(f.itemIDs) do
+                if (GetItemCount(iid) or 0) > 0 then return iid end
+            end
+        end
+    end
+    return nil
+end
+
+-- Resolves which augment rune item to use for click-to-buff.
+local function ResolveRuneItem()
+    for _, r in ipairs(AUGMENT_RUNES) do
+        if r.itemIDs then
+            for _, iid in ipairs(r.itemIDs) do
+                if (GetItemCount(iid) or 0) > 0 then return iid end
+            end
+        end
+    end
+    return nil
+end
+
+-- Resolves which food item to use for click-to-eat.
+-- Checks db.foodRaid or db.foodDungeon based on instance type.
+-- Falls back to auto (first available) if the chosen category is empty.
+local function ResolveFoodItem(db, iType)
+    local key = (iType == "raid") and (db.foodRaid or "auto")
+                                   or (db.foodDungeon or "auto")
+
+    if key ~= "auto" then
+        local catItems = FOOD_CAT[key]
+        if catItems then
+            for _, iid in ipairs(catItems) do
+                if (GetItemCount(iid) or 0) > 0 then return iid end
+            end
+        end
+        -- Category empty — fall through to auto
+    end
+
+    for _, iid in ipairs(FOOD_ITEMS) do
+        if (GetItemCount(iid) or 0) > 0 then return iid end
+    end
+    return nil
+end
+
+-- Resolves a weapon oil/stone macro for click-to-apply.
+-- Oils require a two-step action: use the item, then target a weapon slot.
+-- Returns macroText (string) or nil if no oil found in bags.
+-- Slot 16 = main hand, 17 = off-hand.
+local function ResolveOilMacro()
+    for _, iid in ipairs(WEAPON_ENCHANT_ITEMS) do
+        if (GetItemCount(iid) or 0) > 0 then
+            return "/use item:" .. iid .. "\n/use 16"
+        end
+    end
+    return nil
 end
 
 -- [ CLASS BUFF CHECKER ] ------------------------------------------------------
@@ -385,6 +646,8 @@ local function GetMissingClassBuffs(db)
         local cfgKey = def.castSpell and tostring(def.castSpell) or def.label
         if cfg[cfgKey] == false then
             -- explicitly disabled by user
+        elseif def.specs and not tContains(def.specs, GetSpecialization() or 0) then
+            -- wrong spec, skip
         elseif def.isRuneforge then
             -- Death Knight: check weapon enchant instead of aura
             local hasMH = GetWeaponEnchantInfo()
@@ -394,6 +657,9 @@ local function GetMissingClassBuffs(db)
                     spellID  = 0,
                     icon     = 135957,   -- runeforging icon
                     required = def.required,
+                    actionType  = "texture",
+                    actionValue = nil,
+                    dismissKey  = "class:runeforge",
                 }
             end
         elseif def.castSpell and not Known(def.castSpell) then
@@ -425,6 +691,9 @@ local function GetMissingClassBuffs(db)
                     spellID  = def.castSpell or 0,
                     icon     = SpellIcon(def.castSpell),
                     required = def.required,
+                    actionType  = def.castSpell and "spell" or "texture",
+                    actionValue = def.castSpell,
+                    dismissKey  = "class:" .. (def.castSpell and tostring(def.castSpell) or def.label),
                 }
             end
         end
@@ -432,17 +701,104 @@ local function GetMissingClassBuffs(db)
     return missing
 end
 
+-- [ SNAPSHOT API ] ------------------------------------------------------------
+-- Called before combat lockdown to record what tracked auras are currently active.
+-- PlayerHasAura/HasWeaponOil fall back to this cache when the live API is locked.
+
+function AuraList.SnapshotAuras()
+    wipe(_preCombatCache)
+    _preCombatCacheValid = false
+
+    -- Bail if auras aren't readable right now (shouldn't happen pre-combat, but guard)
+    if not CanReadAuras() then return end
+
+    -- Snapshot all flask IDs
+    for _, f in ipairs(FLASKS) do
+        _preCombatCache[f.spellID] = PlayerHasAura(f.spellID) or nil
+    end
+
+    -- Snapshot all augment rune IDs
+    for _, r in ipairs(AUGMENT_RUNES) do
+        _preCombatCache[r.spellID] = PlayerHasAura(r.spellID) or nil
+    end
+
+    -- Snapshot Well Fed IDs
+    for _, id in ipairs(WELL_FED_IDS) do
+        _preCombatCache[id] = PlayerHasAura(id) or nil
+    end
+
+    -- Snapshot class buffs for the player's class
+    local _, playerClass = UnitClass("player")
+    local defs = playerClass and CLASS_BUFFS[playerClass] or {}
+    for _, def in ipairs(defs) do
+        if def.buffIDs then
+            for _, id in ipairs(def.buffIDs) do
+                _preCombatCache[id] = PlayerHasAura(id) or nil
+            end
+        end
+    end
+
+    -- Snapshot raid/party buff IDs on the player
+    for _, def in ipairs(PARTY_BUFFS) do
+        for _, id in ipairs(def.buffIDs) do
+            _preCombatCache[id] = PlayerHasAura(id) or nil
+        end
+    end
+
+    -- Snapshot weapon enchant state
+    local hasMH = GetWeaponEnchantInfo()
+    _preCombatCache["weaponEnchant"] = hasMH == true or nil
+
+    _preCombatCacheValid = true
+end
+
+function AuraList.ClearSnapshot()
+    wipe(_preCombatCache)
+    _preCombatCacheValid = false
+end
+
+function AuraList.HasSnapshot()
+    return _preCombatCacheValid
+end
+
+-- [ DISMISS STATE ] -----------------------------------------------------------
+-- Keys dismissed by middle-click this session. Cleared on PLAYER_ENTERING_WORLD.
+local _dismissedKeys = {}
+
+function AuraList.Dismiss(key)
+    if key then _dismissedKeys[key] = true end
+end
+
+function AuraList.ClearDismissed()
+    wipe(_dismissedKeys)
+end
+
+function AuraList.IsDismissed(key)
+    return key and _dismissedKeys[key] == true
+end
+
 -- [ CHECK ] -------------------------------------------------------------------
 -- Returns a list of { label, spellID, icon, required } for each missing category
 -- plus any missing class-specific buffs for the current player class.
 function AuraList.GetMissing(db)
-    -- If the aura API is locked (inside M+ or PvP combat) and the caller didn't
-    -- already bail via onlyOutOfCombat, return empty so we don't flash false alerts.
-    if not CanReadAuras() then return {} end
+    -- If the aura API is locked (inside M+ or PvP combat) and we have no snapshot,
+    -- return empty so we don't flash false alerts. If we DO have a snapshot,
+    -- proceed — PlayerHasAura/HasWeaponOil will use the cache as fallback.
+    if not CanReadAuras() and not _preCombatCacheValid then return {} end
 
     -- Set the expiry threshold for this scan from the live db value.
     -- 0 = disabled (any time remaining counts). Default 60 s.
     scanMinRemaining = (db.buffMinRemaining ~= nil) and db.buffMinRemaining or 60
+
+    -- Determine duration threshold based on instance type
+    local _, iType = GetInstanceInfo()
+    local thresholdMinutes = 0
+    if iType == "party" then
+        thresholdMinutes = db.showUnderDurationDungeon or 0
+    elseif iType == "raid" then
+        thresholdMinutes = db.showUnderDurationRaid or 0
+    end
+    scanDurationThreshold = thresholdMinutes * 60  -- convert to seconds
 
     -- Consumables (flask, food, augment rune, weapon oil) are only relevant at
     -- max level. Suppress them entirely while the player is still leveling.
@@ -450,83 +806,133 @@ function AuraList.GetMissing(db)
 
     local missing = {}
 
-    -- Standard consumable/custom categories (skipped while leveling)
+    -- Standard consumables (only at max level, hardcoded lists)
     if atMaxLevel then
-        for _, cat in ipairs(AuraList.Categories) do
-            local list = db[cat.key]
-            -- Food uses HasFoodBuff() which works even with an empty/absent list.
-            if cat.key == "food" and db.food ~= nil then
-                if not HasFoodBuff(list) then
-                    local itemCount = 0
-                    if list then
-                        for _, entry in ipairs(list) do
-                            if entry.itemIDs then
-                                for _, itemID in ipairs(entry.itemIDs) do
-                                    itemCount = itemCount + (GetItemCount(itemID, true) or 0)
-                                end
-                            end
-                        end
-                    end
-                    local icon = 133971  -- default food icon
-                    if list then
-                        for _, entry in ipairs(list) do
-                            local tex = SpellIcon(entry.spellID)
-                            if tex then icon = tex; break end
-                        end
-                    end
-                    missing[#missing + 1] = {
-                        label     = cat.label,
-                        spellID   = (list and list[1] and list[1].spellID) or WELL_FED_IDS[1],
-                        icon      = icon,
-                        required  = cat.required,
-                        itemCount = itemCount,
-                    }
-                end
-            elseif list and #list > 0 then
-                local found = false
-                for _, entry in ipairs(list) do
-                    if PlayerHasAura(entry.spellID) then
-                        found = true; break
-                    end
-                end
-                if not found then
-                    -- Sum item counts across all itemIDs listed in every entry in this category.
-                    local itemCount = 0
-                    for _, entry in ipairs(list) do
-                        if entry.itemIDs then
-                            for _, itemID in ipairs(entry.itemIDs) do
-                                itemCount = itemCount + (GetItemCount(itemID, true) or 0)
-                            end
-                        end
-                    end
-                    -- Use the icon from the first entry that has a valid texture,
-                    -- rather than always forcing list[1] (which may have a wrong/generic icon).
-                    local icon = nil
-                    for _, entry in ipairs(list) do
-                        local tex = SpellIcon(entry.spellID)
-                        if tex then icon = tex; break end
-                    end
-                    missing[#missing + 1] = {
-                        label     = cat.label,
-                        spellID   = list[1].spellID,
-                        icon      = icon,
-                        required  = cat.required,
-                        itemCount = itemCount > 0 and itemCount or nil,
-                    }
-                end
+        -- Flask
+        local hasFlask = false
+        local expiringFlask = false
+        for _, f in ipairs(FLASKS) do
+            if PlayerHasAura(f.spellID) then
+                hasFlask = true
+                if IsExpiringSoon(f.spellID) then expiringFlask = true end
+                break
             end
         end
-
-        -- Weapon oil / temp enchant check (enabled when db.weaponOil == true)
-        if db.weaponOil then
-            if not HasWeaponOil() then
-                missing[#missing + 1] = {
-                    label    = "Weapon Oil",
-                    spellID  = 0,
-                    icon     = 134096,  -- generic weapon enchant icon
-                    required = false,
-                }
+        if not hasFlask or expiringFlask then
+            local flaskKey = (iType == "raid") and (db.flaskRaid or "auto")
+                                                or (db.flaskDungeon or "auto")
+            local count = 0
+            if flaskKey ~= "auto" then
+                -- Count only the chosen flask type
+                local def = FLASK_BY_KEY[flaskKey]
+                if def and def.itemIDs then
+                    for _, iid in ipairs(def.itemIDs) do
+                        count = count + (GetItemCount(iid, true) or 0)
+                    end
+                end
+            else
+                -- Auto: count all flasks
+                for _, f in ipairs(FLASKS) do
+                    if f.itemIDs then
+                        for _, iid in ipairs(f.itemIDs) do
+                            count = count + (GetItemCount(iid, true) or 0)
+                        end
+                    end
+                end
             end
+            local flaskItemID = ResolveFlaskItem(db, iType)
+            local flaskLabel = "Flask"
+            if flaskItemID then
+                flaskLabel = C_Item.GetItemNameByID(flaskItemID) or "Flask"
+            end
+            if expiringFlask then flaskLabel = flaskLabel .. " (expiring)" end
+            missing[#missing+1] = { label=flaskLabel,
+                spellID=FLASKS[1].spellID,
+                icon=flaskItemID and GetItemIcon(flaskItemID) or SpellIcon(FLASKS[1].spellID),
+                required=true,
+                itemCount=count > 0 and count or nil,
+                expiring=expiringFlask or nil,
+                actionType = flaskItemID and "item" or "texture",
+                actionValue = flaskItemID,
+                dismissKey = "flask" }
+        end
+
+        -- Food
+        if not HasFoodBuff(nil) then
+            local foodKey = (iType == "raid") and (db.foodRaid or "auto")
+                                               or (db.foodDungeon or "auto")
+            local foodCount = 0
+            if foodKey ~= "auto" then
+                -- Count only the chosen food category
+                local catItems = FOOD_CAT[foodKey]
+                if catItems then
+                    for _, iid in ipairs(catItems) do
+                        foodCount = foodCount + (GetItemCount(iid, true) or 0)
+                    end
+                end
+            else
+                -- Auto: count all food
+                for _, iid in ipairs(FOOD_ITEMS) do
+                    foodCount = foodCount + (GetItemCount(iid, true) or 0)
+                end
+            end
+            local foodItemID = ResolveFoodItem(db, iType)
+            local foodLabel = "Food"
+            if foodItemID then
+                foodLabel = C_Item.GetItemNameByID(foodItemID) or "Food"
+            end
+            missing[#missing+1] = { label=foodLabel, spellID=WELL_FED_IDS[1],
+                icon=foodItemID and GetItemIcon(foodItemID) or 133971,
+                required=true,
+                itemCount=foodCount > 0 and foodCount or nil,
+                actionType = foodItemID and "item" or "texture",
+                actionValue = foodItemID,
+                dismissKey = "food" }
+        end
+
+        -- Augment Rune
+        local hasRune = false
+        local expiringRune = false
+        for _, r in ipairs(AUGMENT_RUNES) do
+            if PlayerHasAura(r.spellID) then
+                hasRune = true
+                if IsExpiringSoon(r.spellID) then expiringRune = true end
+                break
+            end
+        end
+        if not hasRune or expiringRune then
+            local count = 0
+            for _, r in ipairs(AUGMENT_RUNES) do
+                if r.itemIDs then
+                    for _, iid in ipairs(r.itemIDs) do
+                        count = count + (GetItemCount(iid, true) or 0)
+                    end
+                end
+            end
+            local runeItemID = ResolveRuneItem()
+            missing[#missing+1] = { label=expiringRune and "Augment Rune (expiring)" or "Augment Rune",
+                spellID=AUGMENT_RUNES[1].spellID,
+                icon=SpellIcon(AUGMENT_RUNES[1].spellID), required=true,
+                itemCount=count > 0 and count or nil,
+                expiring=expiringRune or nil,
+                actionType = runeItemID and "item" or "texture",
+                actionValue = runeItemID,
+                dismissKey = "rune" }
+        end
+
+        -- Weapon oil / temp enchant
+        if db.weaponOil and not HasWeaponOil() then
+            local oilCount = 0
+            for _, iid in ipairs(WEAPON_ENCHANT_ITEMS) do
+                oilCount = oilCount + (GetItemCount(iid, true) or 0)
+            end
+            local oilMacro = ResolveOilMacro()
+            missing[#missing+1] = { label="Weapon Oil", spellID=0,
+                icon=134096, required=false,
+                itemCount=oilCount > 0 and oilCount or nil,
+                actionType = oilMacro and "macro" or "texture",
+                actionValue = oilMacro,
+                dismissKey = "oil" }
         end
     end -- atMaxLevel
 
@@ -546,7 +952,14 @@ function AuraList.GetMissing(db)
         end
     end
 
-    return missing
+    -- Filter out dismissed reminders
+    local filtered = {}
+    for _, m in ipairs(missing) do
+        if not _dismissedKeys[m.dismissKey] then
+            filtered[#filtered + 1] = m
+        end
+    end
+    return filtered
 end
 
 -- [ GET ALL ] -----------------------------------------------------------------
@@ -554,65 +967,48 @@ end
 -- with present = true so the UI can show them dimmed instead of blinking.
 -- Used when db.showAllBuffs is true.
 function AuraList.GetAll(db)
-    if not CanReadAuras() then return AuraList.GetMissing(db) end
+    if not CanReadAuras() and not _preCombatCacheValid then return AuraList.GetMissing(db) end
 
     -- Start with missing entries
     local missing = AuraList.GetMissing(db)
-    -- Build a set of labels already in missing so we don't double-add
+    -- Build a set of dismissKeys already in missing so we don't double-add
     local inMissing = {}
-    for _, m in ipairs(missing) do inMissing[m.label] = true end
+    for _, m in ipairs(missing) do
+        if m.dismissKey then inMissing[m.dismissKey] = true end
+    end
 
     scanMinRemaining = (db.buffMinRemaining ~= nil) and db.buffMinRemaining or 60
     local atMaxLevel = UnitLevel("player") >= GetMaxPlayerLevel()
     local all = {}
 
-    -- Consumable / custom categories
+    -- Consumables (hardcoded, present = shown dimmed)
     if atMaxLevel then
-        for _, cat in ipairs(AuraList.Categories) do
-            local list = db[cat.key]
-            if cat.key == "food" and db.food ~= nil then
-                if not inMissing[cat.label] then
-                    local icon = 133971
-                    if list then
-                        for _, entry in ipairs(list) do
-                            local tex = SpellIcon(entry.spellID)
-                            if tex then icon = tex; break end
-                        end
-                    end
-                    all[#all+1] = {
-                        label    = cat.label,
-                        spellID  = (list and list[1] and list[1].spellID) or WELL_FED_IDS[1],
-                        icon     = icon,
-                        required = cat.required,
-                        present  = true,
-                    }
-                end
-            elseif list and #list > 0 then
-                if not inMissing[cat.label] then
-                    local icon = nil
-                    for _, entry in ipairs(list) do
-                        local tex = SpellIcon(entry.spellID)
-                        if tex then icon = tex; break end
-                    end
-                    all[#all+1] = {
-                        label    = cat.label,
-                        spellID  = list[1].spellID,
-                        icon     = icon,
-                        required = cat.required,
-                        present  = true,
-                    }
-                end
-            end
+        local hasFlask = false
+        for _, f in ipairs(FLASKS) do if PlayerHasAura(f.spellID) then hasFlask = true; break end end
+        if not inMissing["flask"] then
+            all[#all+1] = { label="Flask", spellID=FLASKS[1].spellID,
+                icon=SpellIcon(FLASKS[1].spellID), required=true, present=hasFlask,
+                actionType = "texture", actionValue = nil, dismissKey = "flask" }
         end
 
-        if db.weaponOil and not inMissing["Weapon Oil"] then
-            all[#all+1] = {
-                label    = "Weapon Oil",
-                spellID  = 0,
-                icon     = 134096,
-                required = false,
-                present  = true,
-            }
+        if not inMissing["food"] then
+            all[#all+1] = { label="Food", spellID=WELL_FED_IDS[1],
+                icon=133971, required=true, present=HasFoodBuff(nil),
+                actionType = "texture", actionValue = nil, dismissKey = "food" }
+        end
+
+        local hasRune = false
+        for _, r in ipairs(AUGMENT_RUNES) do if PlayerHasAura(r.spellID) then hasRune = true; break end end
+        if not inMissing["rune"] then
+            all[#all+1] = { label="Augment Rune", spellID=AUGMENT_RUNES[1].spellID,
+                icon=SpellIcon(AUGMENT_RUNES[1].spellID), required=true, present=hasRune,
+                actionType = "texture", actionValue = nil, dismissKey = "rune" }
+        end
+
+        if db.weaponOil and not inMissing["oil"] then
+            all[#all+1] = { label="Weapon Oil", spellID=0, icon=134096,
+                required=false, present=HasWeaponOil(),
+                actionType = "texture", actionValue = nil, dismissKey = "oil" }
         end
     end
 
@@ -623,14 +1019,19 @@ function AuraList.GetAll(db)
         local cfg = db.classBuffs or {}
         for _, def in ipairs(defs) do
             local cfgKey = def.castSpell and tostring(def.castSpell) or def.label
-            if cfg[cfgKey] ~= false and not inMissing[def.label] then
+            local dKey = def.isRuneforge and "class:runeforge"
+                or ("class:" .. (def.castSpell and tostring(def.castSpell) or def.label))
+            if cfg[cfgKey] ~= false and not inMissing[dKey]
+                and (not def.specs or tContains(def.specs, GetSpecialization() or 0)) then
                 if def.isRuneforge then
                     -- present (has runeforge)
                     all[#all+1] = { label=def.label, spellID=0, icon=135957,
-                        required=def.required, present=true }
+                        required=def.required, present=true,
+                        actionType = "texture", actionValue = nil, dismissKey = dKey }
                 elseif def.castSpell and Known(def.castSpell) then
                     all[#all+1] = { label=def.label, spellID=def.castSpell,
-                        icon=SpellIcon(def.castSpell), required=def.required, present=true }
+                        icon=SpellIcon(def.castSpell), required=def.required, present=true,
+                        actionType = "texture", actionValue = nil, dismissKey = dKey }
                 end
             end
         end

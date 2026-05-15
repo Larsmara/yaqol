@@ -72,13 +72,11 @@ function MinimapButton.Init(addon)
         if button == "LeftButton" then
             ns.Teleport.Toggle()
         elseif button == "RightButton" then
-            local menu = {
-                { text = "|cffffcc00yaqol|r", isTitle = true, notCheckable = true },
-                { text = "Options",     notCheckable = true, func = function() ns.Config.Toggle() end },
-                { text = "Run History", notCheckable = true, func = function() ns.RunHistory.Toggle() end },
-                { text = "Cancel",      notCheckable = true, func = function() end },
-            }
-            EasyMenu(menu, CreateFrame("Frame", "yaqolMinimapMenuAnchor", UIParent), "cursor", 0, 0, "MENU")
+            MenuUtil.CreateContextMenu(btn, function(_, rootDescription)
+                rootDescription:CreateTitle("|cffffcc00yaqol|r")
+                rootDescription:CreateButton("Options",     function() ns.Config.Toggle() end)
+                rootDescription:CreateButton("Run History", function() ns.RunHistory.Toggle() end)
+            end)
         end
     end)
     btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")

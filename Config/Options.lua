@@ -9,7 +9,7 @@ local T = setmetatable({
     PANEL_W     = 700,
     PANEL_H     = 550,
     TAB_H       = 34,
-    HEADER_H    = 39,   -- matches DiamondMetal art height so content centres in the art band
+    HEADER_H    = 39,   -- title bar height
     ROW_H       = 28,
     PAD         = 14,
     CONTENT_W   = 544,  -- PANEL_W - SIDEBAR_W(140) - scrollbar area(16)
@@ -25,7 +25,7 @@ local function Bg(parent, r, g, b, a)
 end
 
 local function Label(parent, text, font, r, g, b, a)
-    local fs = parent:CreateFontString(nil, "OVERLAY", font or "GameFontNormal")
+    local fs = parent:CreateFontString(nil, "OVERLAY", font or "SystemFont_Med1")
     fs:SetText(text)
     fs:SetTextColor(r or T.text[1], g or T.text[2], b or T.text[3], a or T.text[4])
     return fs
@@ -36,7 +36,7 @@ local function Divider(parent, yOff)
     t:SetHeight(1)
     t:SetPoint("TOPLEFT",  parent, "TOPLEFT",  T.PAD,  yOff)
     t:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -T.PAD, yOff)
-    t:SetColorTexture(T.border[1], T.border[2], T.border[3], T.border[4])
+    t:SetColorTexture(T.textDim[1], T.textDim[2], T.textDim[3], 0.15)
     return t
 end
 
@@ -54,7 +54,7 @@ local function MakeToggle(parent, label, getValue, setValue, yOff)
     local thumb = pill:CreateTexture(nil, "OVERLAY")
     thumb:SetSize(14, 14); pill.thumb = thumb
 
-    local lbl = Label(row, label, "GameFontNormal")
+    local lbl = Label(row, label, "SystemFont_Med1")
     lbl:SetPoint("LEFT", pill, "RIGHT", 8, 0)
 
     local function Refresh()
@@ -82,10 +82,10 @@ local function MakeSlider(parent, label, min, max, step, getValue, setValue, yOf
     row:SetSize(T.CONTENT_W - T.PAD*2, T.ROW_H + 14)
     row:SetPoint("TOPLEFT", parent, "TOPLEFT", T.PAD, yOff)
 
-    local lbl = Label(row, label, "GameFontNormalSmall")
+    local lbl = Label(row, label, "SystemFont_Small")
     lbl:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
 
-    local val = Label(row, "", "GameFontNormalSmall", T.accentDim[1], T.accentDim[2], T.accentDim[3])
+    local val = Label(row, "", "SystemFont_Small", T.accentDim[1], T.accentDim[2], T.accentDim[3])
     val:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, 0)
     val:SetWidth(80)
     val:SetJustifyH("RIGHT")
@@ -93,12 +93,12 @@ local function MakeSlider(parent, label, min, max, step, getValue, setValue, yOf
     local trackBg = row:CreateTexture(nil, "BACKGROUND")
     trackBg:SetSize(SLIDER_W, 4); trackBg:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, 4)
     trackBg:SetTexture("Interface/Buttons/WHITE8X8")
-    trackBg:SetVertexColor(T.bgRow[1], T.bgRow[2], T.bgRow[3], 1)
+    trackBg:SetVertexColor(T.barBg[1], T.barBg[2], T.barBg[3], T.barBg[4])
 
     local fill = row:CreateTexture(nil, "BORDER")
     fill:SetSize(0, 4); fill:SetPoint("LEFT", trackBg, "LEFT", 0, 0)
     fill:SetTexture("Interface/Buttons/WHITE8X8")
-    fill:SetVertexColor(T.accent[1], T.accent[2], T.accent[3], 1)
+    fill:SetVertexColor(T.accentDim[1], T.accentDim[2], T.accentDim[3], 1)
 
     local thumb = CreateFrame("Button", nil, row)
     thumb:SetSize(12, 12)
@@ -146,7 +146,7 @@ local function MakeButton(parent, label, onClick, w, h)
     local btn = CreateFrame("Button", nil, parent)
     btn:SetSize(w, h)
     ns.Theme:StyleButton(btn, w, h)
-    local lbl = Label(btn, label, "GameFontNormalSmall"); lbl:SetPoint("CENTER")
+    local lbl = Label(btn, label, "SystemFont_Small"); lbl:SetPoint("CENTER")
     btn:SetScript("OnClick", onClick)
     return btn
 end
@@ -156,13 +156,13 @@ local function MakeInput(parent, placeholder, onEnter, w, h)
     w, h = w or 140, h or 22
     local eb = CreateFrame("EditBox", nil, parent)
     eb:SetSize(w, h); eb:SetAutoFocus(false); eb:SetMaxLetters(12)
-    eb:SetNumeric(true); eb:SetFontObject("GameFontNormalSmall")
+    eb:SetNumeric(true); eb:SetFontObject("SystemFont_Small")
     eb:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
     Bg(eb, T.bgInput[1], T.bgInput[2], T.bgInput[3], T.bgInput[4])
     local border = eb:CreateTexture(nil, "BORDER")
     border:SetSize(w, 1); border:SetPoint("BOTTOM")
-    border:SetColorTexture(T.border[1], T.border[2], T.border[3], T.border[4])
-    local ph = eb:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    border:SetColorTexture(T.textDim[1], T.textDim[2], T.textDim[3], 0.15)
+    local ph = eb:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     ph:SetPoint("LEFT", eb, "LEFT", 4, 0); ph:SetText(placeholder or "")
     ph:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], T.textDim[4])
     eb:SetScript("OnTextChanged", function(self) ph:SetShown(self:GetText() == "") end)
@@ -173,68 +173,142 @@ local function MakeInput(parent, placeholder, onEnter, w, h)
     return eb
 end
 
--- [ SPELL LIST WIDGET ] -------------------------------------------------------
-local spellRebuildFns = {}
+-- [ DROPDOWN WIDGET ] ---------------------------------------------------------
+-- Inline button-row dropdown matching the existing toggle/slider style.
+-- choices = { { value="...", label="..." }, ... }
+-- Returns the row frame and its height.
+local function MakeDropdown(parent, label, choices, getValue, setValue, yOff)
+    local row = CreateFrame("Frame", nil, parent)
+    row:SetSize(T.CONTENT_W - T.PAD*2, T.ROW_H + 6)
+    row:SetPoint("TOPLEFT", parent, "TOPLEFT", T.PAD, yOff)
 
-local function MakeSpellList(parent, db, key, startY)
-    if not db[key] then db[key] = {} end
-    local CONTENT_W = T.CONTENT_W - T.PAD * 2
-    local y = startY
+    local lbl = Label(row, label, "SystemFont_Small")
+    lbl:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
 
-    local addInput = MakeInput(parent, "Add Spell ID…", function(val)
-        local id = tonumber(val); if not id then return end
-        local name = C_Spell.GetSpellName(id) or ("SpellID "..id)
-        table.insert(db[key], { spellID = id, label = name }); Config.Refresh()
-    end, 130, 22)
-    addInput:SetPoint("TOPLEFT", parent, "TOPLEFT", T.PAD, y)
-    y = y - 28
+    -- Build button row for each choice
+    local btns = {}
+    local bx = 0
+    for _, choice in ipairs(choices) do
+        local mb = CreateFrame("Button", nil, row)
+        local btnW = math.max(80, #choice.label * 7 + 16)
+        mb:SetSize(btnW, 18)
+        mb:SetPoint("TOPLEFT", row, "TOPLEFT", bx, -18)
+        bx = bx + btnW + 4
+        local mbBg = mb:CreateTexture(nil, "BACKGROUND"); mbBg:SetAllPoints()
+        local mbHl = mb:CreateTexture(nil, "HIGHLIGHT"); mbHl:SetAllPoints()
+        mbHl:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.15)
+        local mbLbl = mb:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
+        mbLbl:SetPoint("CENTER"); mbLbl:SetText(choice.label)
+        btns[#btns+1] = { value = choice.value, bg = mbBg, lbl = mbLbl }
+    end
 
-    local rowPool = {}
-    local listAnchorY = y
-
-    local function RebuildRows()
-        for _, r in ipairs(rowPool) do r:Hide() end
-        rowPool = {}
-        local ry = listAnchorY
-        for i, entry in ipairs(db[key]) do
-            local row = CreateFrame("Frame", nil, parent)
-            row:SetSize(CONTENT_W, 26)
-            row:SetPoint("TOPLEFT", parent, "TOPLEFT", T.PAD, ry - (i-1)*28)
-            Bg(row, T.bgRow[1], T.bgRow[2], T.bgRow[3], 0.6)
-            local icon = row:CreateTexture(nil, "ARTWORK")
-            icon:SetSize(18, 18); icon:SetPoint("LEFT", row, "LEFT", 8, 0)
-            icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-            icon:SetTexture(C_Spell.GetSpellTexture(entry.spellID))
-            local name = Label(row, entry.label, "GameFontNormal")
-            name:SetPoint("LEFT", icon, "RIGHT", 8, 0)
-            
-            -- Delete Button (X) — plain button; UIPanelCloseButton's
-            -- oversized hit-rect bleeds outside the scroll frame.
-            local delBtn = CreateFrame("Button", nil, row)
-            delBtn:SetSize(20, 20)
-            delBtn:SetPoint("RIGHT", row, "RIGHT", -4, 0)
-            delBtn:SetFrameLevel(row:GetFrameLevel() + 5)
-            local delLbl = delBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            delLbl:SetPoint("CENTER"); delLbl:SetText("✕")
-            delLbl:SetTextColor(0.85, 0.30, 0.30, 1)
-            delBtn:SetScript("OnEnter", function() delLbl:SetTextColor(1, 0.45, 0.45, 1) end)
-            delBtn:SetScript("OnLeave", function() delLbl:SetTextColor(0.85, 0.30, 0.30, 1) end)
-            delBtn:SetScript("OnClick", function()
-                table.remove(db[key], i)
-                Config.Refresh()
-            end)
-
-            local sid = Label(row, tostring(entry.spellID), "GameFontNormal",
-                T.textDim[1], T.textDim[2], T.textDim[3])
-            sid:SetPoint("RIGHT", delBtn, "LEFT", -8, 0)
-            rowPool[i] = row
+    local function RefreshBtns()
+        local cur = getValue()
+        for _, b in ipairs(btns) do
+            if b.value == cur then
+                b.bg:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.35)
+                b.lbl:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
+            else
+                b.bg:SetColorTexture(T.bgRow[1], T.bgRow[2], T.bgRow[3], 1)
+                b.lbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
+            end
         end
     end
-    RebuildRows()
-    spellRebuildFns[key] = RebuildRows
+    RefreshBtns()
 
-    local totalH = 28 + (#db[key] > 0 and #db[key]*28 or 0) + 8
-    return totalH
+    -- Wire click handlers
+    for i, choice in ipairs(choices) do
+        local val = choice.value
+        local btnFrame = btns[i].bg:GetParent()
+        btnFrame:SetScript("OnClick", function()
+            setValue(val)
+            RefreshBtns()
+        end)
+    end
+
+    row.Refresh = RefreshBtns
+    return row, T.ROW_H + 26
+end
+
+-- [ COLOR PICKER WIDGET ] ----------------------------------------------------
+-- Small color swatch + label. Clicking opens the WoW color picker.
+-- getter() -> r, g, b, a
+-- setter(r, g, b, a) called on change and cancel-restore
+local function MakeColorPicker(parent, label, getter, setter, yOff)
+    local row = CreateFrame("Frame", nil, parent)
+    row:SetSize(T.CONTENT_W - T.PAD*2, T.ROW_H)
+    row:SetPoint("TOPLEFT", parent, "TOPLEFT", T.PAD, yOff)
+
+    local lbl = Label(row, label, "SystemFont_Small")
+    lbl:SetPoint("LEFT", row, "LEFT", 24, 0)
+
+    local swatch = CreateFrame("Button", nil, row)
+    swatch:SetSize(16, 16)
+    swatch:SetPoint("LEFT", row, "LEFT", 0, 0)
+    local swatchTex = swatch:CreateTexture(nil, "ARTWORK")
+    swatchTex:SetAllPoints()
+
+    local function RefreshSwatch()
+        local r, g, b, a = getter()
+        swatchTex:SetColorTexture(r or 1, g or 1, b or 1, a or 1)
+    end
+    RefreshSwatch()
+
+    swatch:SetScript("OnClick", function()
+        local pr, pg, pb, pa = getter()
+        ColorPickerFrame:SetupColorPickerAndShow({
+            r = pr, g = pg, b = pb,
+            hasOpacity = true,
+            opacity = 1 - (pa or 1),
+            swatchFunc = function()
+                local r, g, b = ColorPickerFrame:GetColorRGB()
+                local a = 1 - ColorPickerFrame:GetColorAlpha()
+                setter(r, g, b, a)
+                RefreshSwatch()
+            end,
+            cancelFunc = function()
+                setter(pr, pg, pb, pa)
+                RefreshSwatch()
+            end,
+        })
+    end)
+
+    row.Refresh = RefreshSwatch
+    return row, T.ROW_H + 4
+end
+
+-- [ SELECT DROPDOWN WIDGET ] --------------------------------------------------
+-- Uses the native Blizzard WowStyle1DropdownTemplate for reliable interaction.
+-- choices = { { value = "key", label = "Display Text" }, ... }
+local function MakeSelectDropdown(parent, labelText, choices, getValue, setValue, yOff)
+    local DDW = 220
+    local ROW_H = 44  -- label + dropdown button
+    local row = CreateFrame("Frame", nil, parent)
+    row:SetSize(T.CONTENT_W - T.PAD*2, ROW_H)
+    row:SetPoint("TOPLEFT", parent, "TOPLEFT", T.PAD, yOff)
+
+    local lbl = Label(row, labelText, "SystemFont_Small")
+    lbl:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
+
+    local dropdown = CreateFrame("DropdownButton", nil, row, "WowStyle1DropdownTemplate")
+    dropdown:SetPoint("TOPLEFT", row, "TOPLEFT", -16, -14)
+    dropdown:SetWidth(DDW)
+    dropdown:SetupMenu(function(_, rootDescription)
+        for _, choice in ipairs(choices) do
+            rootDescription:CreateRadio(
+                choice.label,
+                function(data) return getValue() == data end,
+                function(data) setValue(data) end,
+                choice.value
+            )
+        end
+    end)
+
+    function row.Refresh()
+        dropdown:Update()
+    end
+
+    return row, ROW_H
 end
 
 -- [ FPS / PERFORMANCE CVARS ] -------------------------------------------------
@@ -350,129 +424,14 @@ end
 -- [ TAB CONTENT BUILDERS ] ----------------------------------------------------
 local tabRebuildFns = {}
 local tabPreviewFns = {}  -- key → { show=fn, hide=fn } for live frame preview on tab switch
-local BuildSpells, BuildClassBuffs
+local BuildClassBuffs
 
 local function BuildGeneral(content, db, addon)
     local y = -T.PAD
     local _, dh
 
-    -- ── THEME ─────────────────────────────────────────────────────────────
-    local THEMES_LIST = {
-        { key = "mellow",   label = "Mellow",   desc = "Soft steel-blue on dark-grey"  },
-        { key = "blizzard", label = "Blizzard",  desc = "Gold accents on warm marble"   },
-    }
-    local TILE_H, TILE_GAP = 48, 8
-    -- Each tile takes an equal share of the usable content width (50% when there are 2 themes).
-    local TILE_W = math.floor((T.CONTENT_W - T.PAD * 2 - (# THEMES_LIST - 1) * TILE_GAP) / #THEMES_LIST)
-
-    local hTheme = Label(content, "THEME", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
-    hTheme:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
-    Divider(content, y); y = y - 12
-
-    local reloadRow  -- forward-declare; shown when selection changes
-    local themeTiles = {}
-
-    local function RefreshTiles()
-        local active = ns.Addon.db.global.theme or "mellow"
-        for _, tile in ipairs(themeTiles) do
-            if tile.key == active then
-                tile.bg:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.30)
-                tile.checkmark:Show()
-                tile.lbl:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
-            else
-                tile.bg:SetColorTexture(T.bgRow[1], T.bgRow[2], T.bgRow[3], 1)
-                tile.checkmark:Hide()
-                tile.lbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
-            end
-        end
-    end
-
-    for i, theme in ipairs(THEMES_LIST) do
-        local tx = T.PAD + (i - 1) * (TILE_W + TILE_GAP)
-        local btn = CreateFrame("Button", nil, content)
-        btn:SetSize(TILE_W, TILE_H)
-        btn:SetPoint("TOPLEFT", content, "TOPLEFT", tx, y)
-
-        local tileBg = btn:CreateTexture(nil, "BACKGROUND")
-        tileBg:SetAllPoints()
-        tileBg:SetColorTexture(T.bgRow[1], T.bgRow[2], T.bgRow[3], 1)
-
-        local tileHl = btn:CreateTexture(nil, "HIGHLIGHT")
-        tileHl:SetAllPoints()
-        tileHl:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.12)
-
-        -- Active checkmark (top-right corner)
-        local check = btn:CreateTexture(nil, "OVERLAY")
-        check:SetSize(12, 12)
-        check:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -4, -4)
-        check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
-        check:SetVertexColor(T.accent[1], T.accent[2], T.accent[3], 1)
-        check:Hide()
-
-        -- Colour swatch (left strip)
-        local swatch = btn:CreateTexture(nil, "BORDER")
-        swatch:SetWidth(5)
-        swatch:SetPoint("TOPLEFT",    btn, "TOPLEFT",    0, 0)
-        swatch:SetPoint("BOTTOMLEFT", btn, "BOTTOMLEFT", 0, 0)
-        if theme.key == "mellow" then
-            swatch:SetColorTexture(0.42, 0.62, 0.88, 1)  -- steel blue
-        else
-            swatch:SetColorTexture(0.84, 0.68, 0.28, 1)  -- gold
-        end
-
-        local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        lbl:SetPoint("TOPLEFT", btn, "TOPLEFT", 12, -10)
-        lbl:SetText(theme.label)
-
-        local desc = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        desc:SetPoint("TOPLEFT", btn, "TOPLEFT", 12, -26)
-        desc:SetText(theme.desc)
-        desc:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
-
-        themeTiles[i] = { key = theme.key, bg = tileBg, checkmark = check, lbl = lbl }
-
-        btn:SetScript("OnClick", function()
-            if ns.Addon.db.global.theme == theme.key then return end
-            ns.Addon.db.global.theme = theme.key
-            RefreshTiles()
-            reloadRow:Show()
-        end)
-    end
-    y = y - TILE_H - 12
-
-    -- Reload prompt row (hidden until a tile is clicked)
-    reloadRow = CreateFrame("Frame", nil, content)
-    reloadRow:SetSize(T.CONTENT_W - T.PAD*2, T.ROW_H)
-    reloadRow:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
-    reloadRow:Hide()
-
-    local reloadMsg = reloadRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    reloadMsg:SetPoint("LEFT", reloadRow, "LEFT", 0, 0)
-    reloadMsg:SetText("Reload the UI to apply the new theme.")
-    reloadMsg:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
-
-    local reloadBtn = CreateFrame("Button", nil, reloadRow)
-    reloadBtn:SetSize(100, 22)
-    reloadBtn:SetPoint("RIGHT", reloadRow, "RIGHT", 0, 0)
-    local rbBg = reloadBtn:CreateTexture(nil, "BACKGROUND")
-    rbBg:SetAllPoints()
-    rbBg:SetColorTexture(T.accent[1]*0.20, T.accent[2]*0.20, T.accent[3]*0.20, 1)
-    local rbHl = reloadBtn:CreateTexture(nil, "HIGHLIGHT")
-    rbHl:SetAllPoints()
-    rbHl:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.18)
-    local rbLbl = reloadBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    rbLbl:SetPoint("CENTER")
-    rbLbl:SetText("Reload Now")
-    rbLbl:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
-    reloadBtn:SetScript("OnClick", function() ReloadUI() end)
-
-    y = y - T.ROW_H - 14
-
-    RefreshTiles()
-
-    local h0 = Label(content, "GENERAL", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    local h0 = Label(content, "GENERAL", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h0:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
     _, dh = MakeSlider(content, "Options Window Scale", 0.5, 2.0, 0.05,
@@ -484,7 +443,7 @@ local function BuildGeneral(content, db, addon)
         function(v) return string.format("%.2f", v) end)
     y = y - dh - 14
 
-    -- ── GAME UI SCALE ─────────────────────────────────────────────────────
+    -- [ GAME UI SCALE ] ---------------------------------------------------
     -- Scale = 768 / (physicalHeight / dpiScaleFactor)
     -- 768 is WoW's original UI coordinate height (1024×768 era).
     -- Setting this value makes every UI unit equal exactly one physical pixel.
@@ -501,8 +460,8 @@ local function BuildGeneral(content, db, addon)
         { "Default","1.00",  1.0      },  -- explicit 1.0
     }
 
-    local uiScaleLabel = Label(content, "Game UI Scale", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    local uiScaleLabel = Label(content, "Game UI Scale", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     uiScaleLabel:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
     y = y - 20
 
@@ -552,10 +511,10 @@ local function BuildGeneral(content, db, addon)
         mbLine:SetColorTexture(T.accentDim[1], T.accentDim[2], T.accentDim[3], 0.4)
 
         local stepVal = preset[3]
-        local l1 = mb:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local l1 = mb:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
         l1:SetPoint("TOP", mb, "TOP", 0, -5)
         l1:SetText(preset[1])
-        local l2 = mb:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local l2 = mb:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
         l2:SetPoint("BOTTOM", mb, "BOTTOM", 0, 5)
         l2:SetText(preset[1] == "Default" and preset[2] or
                    (preset[2] .. "  " .. string.format("%.4f", stepVal)))
@@ -566,6 +525,7 @@ local function BuildGeneral(content, db, addon)
             SetCVar("useUiScale", "1")
             SetCVar("uiScale", string.format("%.4f", stepVal))
             UIParent:SetScale(stepVal)
+            db.gameUIScale = stepVal
             RefreshUIScaleBtns()
         end)
     end
@@ -578,8 +538,8 @@ local function BuildGeneral(content, db, addon)
 
     y = y - 4
 
-    local h1 = Label(content, "MINIMAP BUTTON", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    local h1 = Label(content, "MINIMAP BUTTON", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h1:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
     _, dh = MakeToggle(content, "Hide Minimap Button",
@@ -587,16 +547,16 @@ local function BuildGeneral(content, db, addon)
         function(v) db.minimap.hide = v; ns.MinimapButton.Refresh(addon) end, y)
     y = y - dh - 14
 
-    -- ── PERFORMANCE ───────────────────────────────────────────────────────
-    local hPerf = Label(content, "PERFORMANCE", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    -- [ PERFORMANCE ] -----------------------------------------------------
+    local hPerf = Label(content, "PERFORMANCE", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     hPerf:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
     local infoBtn = CreateFrame("Button", nil, content)
     infoBtn:SetSize(16, 16)
     infoBtn:SetPoint("LEFT", hPerf, "RIGHT", 6, 0)
-    local infoLbl = infoBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local infoLbl = infoBtn:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     infoLbl:SetPoint("CENTER")
     infoLbl:SetText("[?]")
     infoBtn:SetScript("OnEnter", function()
@@ -655,8 +615,8 @@ end
 local function BuildTeleport(content, db, addon)
     local y = -T.PAD
     local _, dh
-    local h1 = Label(content, "TELEPORT PANEL", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    local h1 = Label(content, "TELEPORT PANEL", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h1:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
     _, dh = MakeToggle(content, "Enable Teleport Panel",
@@ -680,34 +640,14 @@ local function BuildTeleport(content, db, addon)
     return y - 30
 end
 
-local function BuildSpells(content, db, startY)
-    local y = startY or -T.PAD
-    local cats = {
-        { key="flasks",       label="Flasks / Phials"        },
-        { key="food",         label="Food"          },
-        { key="augmentRunes", label="Augment Runes" },
-        { key="weaponBuffs",  label="Weapon Buffs"  },
-        { key="custom",       label="Custom"        },
-    }
-    for _, cat in ipairs(cats) do
-        local h = Label(content, cat.label:upper(), "GameFontNormalSmall",
-            T.textHeader[1], T.textHeader[2], T.textHeader[3])
-        h:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
-        Divider(content, y); y = y - 10
-        local totalH = MakeSpellList(content, db, cat.key, y)
-        y = y - totalH - 10
-    end
-    return y
-end
-
 local function BuildClassBuffs(content, db, addon, startY)
     local y = startY or -T.PAD
     local r = db.reminder
     local _, dh
 
-    -- ── SELF / WEAPON BUFFS ───────────────────────────────────────────────
-    local h1 = Label(content, "SELF & WEAPON BUFFS", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    -- [ SELF / WEAPON BUFFS ] ---------------------------------------------
+    local h1 = Label(content, "SELF & WEAPON BUFFS", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h1:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
@@ -731,21 +671,21 @@ local function BuildClassBuffs(content, db, addon, startY)
             y = y - dh - 6
         end
     else
-        local none = Label(content, "  (none for your class)", "GameFontNormalSmall", 0.5, 0.5, 0.5)
+        local none = Label(content, "  (none for your class)", "SystemFont_Small", 0.5, 0.5, 0.5)
         none:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     end
 
     y = y - 10
 
-    -- ── PARTY / RAID BUFFS ────────────────────────────────────────────────
-    local h2 = Label(content, "PARTY & RAID BUFFS", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    -- [ PARTY / RAID BUFFS ] ----------------------------------------------
+    local h2 = Label(content, "PARTY & RAID BUFFS", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h2:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
     local noteP = Label(content,
         "Reminds you to cast group-wide buffs when anyone in your party/raid is missing them.",
-        "GameFontNormalSmall", 0.7, 0.7, 0.7)
+        "SystemFont_Small", 0.7, 0.7, 0.7)
     noteP:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
     noteP:SetWidth(T.PANEL_W - T.PAD*2 - 16)
     noteP:SetJustifyH("LEFT")
@@ -769,7 +709,7 @@ local function BuildClassBuffs(content, db, addon, startY)
             y = y - dh - 6
         end
     else
-        local none2 = Label(content, "  (none for your class)", "GameFontNormalSmall", 0.5, 0.5, 0.5)
+        local none2 = Label(content, "  (none for your class)", "SystemFont_Small", 0.5, 0.5, 0.5)
         none2:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
     end
     return y - 10
@@ -777,13 +717,16 @@ end
 local function BuildReminder(content, db, addon)
     local y = -T.PAD
     local _, dh
-    local h1 = Label(content, "BEHAVIOUR", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    local h1 = Label(content, "BEHAVIOUR", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h1:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
     local toggles = {
         { "Enable Buff Reminders",                 function() return db.reminder.enabled end,            function(v) db.reminder.enabled = v; ns.AuraReminder.Refresh(addon) end },
         { "Re-trigger if Buff Falls Off Mid-Run",  function() return db.reminder.remindOnBuffLost end,   function(v) db.reminder.remindOnBuffLost = v end },
+        { "Show Reminders During Combat  |cff888888(visual only, not clickable)|r",
+          function() return db.reminder.showInCombat end,
+          function(v) db.reminder.showInCombat = v end },
         { "Show Tooltip on Hover",                 function()
             if db.reminder.showTooltip == nil then db.reminder.showTooltip = true end
             return db.reminder.showTooltip
@@ -810,8 +753,156 @@ local function BuildReminder(content, db, addon)
         function() return db.reminder.weaponOil end,
         function(v) db.reminder.weaponOil = v; ns.AuraReminder.Refresh(addon) end, y)
     y = y - dh - 10
-    y = BuildSpells(content, db.reminder, y - 10)
+
+    -- [ DURATION THRESHOLDS ] ---------------------------------------------
+    y = y - 10
+    local h3 = Label(content, "DURATION THRESHOLDS", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
+    h3:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    local noteD = Label(content,
+        "Show reminders when a buff is about to expire, even if it's still active.",
+        "SystemFont_Small", 0.7, 0.7, 0.7)
+    noteD:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
+    noteD:SetWidth(T.PANEL_W - T.PAD*2 - 16)
+    noteD:SetJustifyH("LEFT")
+    y = y - 30
+
+    _, dh = MakeSlider(content, "Dungeon / M+ Threshold (minutes)", 0, 60, 5,
+        function() return db.reminder.showUnderDurationDungeon or 0 end,
+        function(v) db.reminder.showUnderDurationDungeon = v end, y,
+        function(v) return v == 0 and "Off" or string.format("%d min", v) end)
+    y = y - dh - 8
+
+    _, dh = MakeSlider(content, "Raid Threshold (minutes)", 0, 60, 5,
+        function() return db.reminder.showUnderDurationRaid or 0 end,
+        function(v) db.reminder.showUnderDurationRaid = v end, y,
+        function(v) return v == 0 and "Off" or string.format("%d min", v) end)
+    y = y - dh - 8
+
+    _, dh = MakeToggle(content, "Only show party missing for members in range (~28yd)",
+        function() return db.reminder.partyBuffRangeCheck end,
+        function(v) db.reminder.partyBuffRangeCheck = v end, y)
+    y = y - dh - 10
+
+    -- [ CONSUMABLE PREFERENCES ] ------------------------------------------
+    local h4 = Label(content, "CONSUMABLE PREFERENCES", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
+    h4:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    local noteC = Label(content,
+        "Choose which flask or food to use when you left-click a reminder icon. "
+        .. "Separate settings for raids vs dungeons/open world. Falls back to Auto if chosen item is not in bags.",
+        "SystemFont_Small", 0.7, 0.7, 0.7)
+    noteC:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
+    noteC:SetWidth(T.PANEL_W - T.PAD*2 - 16)
+    noteC:SetJustifyH("LEFT")
+    y = y - 44
+
+    local flaskChoices = ns.AuraList.FLASK_CHOICES
+    local foodChoices  = ns.AuraList.FOOD_CHOICES
+
+    _, dh = MakeSelectDropdown(content, "Flask (Raid)", flaskChoices,
+        function() return db.reminder.flaskRaid or "auto" end,
+        function(v) db.reminder.flaskRaid = v end, y)
+    y = y - dh - 4
+
+    _, dh = MakeSelectDropdown(content, "Flask (Dungeon / Open World)", flaskChoices,
+        function() return db.reminder.flaskDungeon or "auto" end,
+        function(v) db.reminder.flaskDungeon = v end, y)
+    y = y - dh - 4
+
+    _, dh = MakeSelectDropdown(content, "Food (Raid)", foodChoices,
+        function() return db.reminder.foodRaid or "auto" end,
+        function(v) db.reminder.foodRaid = v end, y)
+    y = y - dh - 4
+
+    _, dh = MakeSelectDropdown(content, "Food (Dungeon / Open World)", foodChoices,
+        function() return db.reminder.foodDungeon or "auto" end,
+        function(v) db.reminder.foodDungeon = v end, y)
+    y = y - dh - 10
+
     y = BuildClassBuffs(content, db, addon, y - 10)
+
+    -- [ DISPLAY ] ---------------------------------------------------------
+    y = y - 10
+    local hDisp = Label(content, "DISPLAY", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
+    hDisp:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    -- Glow Type dropdown
+    local glowChoices = {
+        { value = "NONE",     label = "None" },
+        { value = "BLIZZARD", label = "Blizzard Glow" },
+        { value = "PIXEL",    label = "Pixel Glow" },
+        { value = "AUTOCAST", label = "Autocast Shine" },
+        { value = "PULSE",    label = "Alpha Pulse" },
+    }
+    _, dh = MakeDropdown(content, "Glow Style", glowChoices,
+        function() return db.reminder.glowType or "BLIZZARD" end,
+        function(v) db.reminder.glowType = v; ns.AuraReminder.Refresh(addon) end, y)
+    y = y - dh - 8
+
+    -- Glow Color picker
+    _, dh = MakeColorPicker(content, "Glow Color",
+        function()
+            local c = db.reminder.glowColor or { r = 1, g = 0.8, b = 0, a = 1 }
+            return c.r, c.g, c.b, c.a
+        end,
+        function(r, g, b, a)
+            db.reminder.glowColor = { r = r, g = g, b = b, a = a or 1 }
+            ns.AuraReminder.Refresh(addon)
+        end, y)
+    y = y - dh - 8
+
+    -- Show Text toggle
+    _, dh = MakeToggle(content, "Show Text Labels Below Icons",
+        function() return db.reminder.showText end,
+        function(v) db.reminder.showText = v; ns.AuraReminder.Refresh(addon) end, y)
+    y = y - dh - 2
+
+    -- Text Size slider
+    _, dh = MakeSlider(content, "Text Size", 6, 18, 1,
+        function() return db.reminder.textSize or 10 end,
+        function(v) db.reminder.textSize = v; ns.AuraReminder.Refresh(addon) end, y,
+        function(v) return tostring(v) end)
+    y = y - dh - 8
+
+    -- Icon Spacing slider
+    _, dh = MakeSlider(content, "Icon Spacing", 0, 20, 1,
+        function() return db.reminder.iconSpacing or 4 end,
+        function(v) db.reminder.iconSpacing = v; ns.AuraReminder.Refresh(addon) end, y,
+        function(v) return string.format("%dpx", v) end)
+    y = y - dh - 8
+
+    -- Opacity slider
+    _, dh = MakeSlider(content, "Base Opacity", 0.1, 1.0, 0.05,
+        function() return db.reminder.opacity or 0.7 end,
+        function(v) db.reminder.opacity = v; ns.AuraReminder.Refresh(addon) end, y,
+        function(v) return string.format("%.0f%%", v * 100) end)
+    y = y - dh - 8
+
+    -- Frame Strata dropdown
+    local strataChoices = {
+        { value = "MEDIUM", label = "Medium" },
+        { value = "HIGH",   label = "High" },
+        { value = "DIALOG", label = "Dialog" },
+    }
+    _, dh = MakeDropdown(content, "Frame Strata", strataChoices,
+        function() return db.reminder.frameStrata or "HIGH" end,
+        function(v) db.reminder.frameStrata = v; ns.AuraReminder.Refresh(addon) end, y)
+    y = y - dh - 10
+
+    -- Open World toggle
+    _, dh = MakeToggle(content,
+        "Show Reminders in Open World  |cff888888(outside instances)|r",
+        function() return db.reminder.showNonInstanced end,
+        function(v) db.reminder.showNonInstanced = v; ns.AuraReminder.Refresh(addon) end, y)
+    y = y - dh - 10
+
     return y - 20
 end
 
@@ -820,9 +911,9 @@ local function BuildQOL(content, db, addon)
     local y   = -T.PAD
     local _, dh
 
-    -- ── RAID TOOLS ────────────────────────────────────────────────────────
-    local hRT = Label(content, "RAID TOOLS", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    -- [ RAID TOOLS ] ------------------------------------------------------
+    local hRT = Label(content, "RAID TOOLS", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     hRT:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
@@ -831,10 +922,15 @@ local function BuildQOL(content, db, addon)
         function(v) db.raidTools.enabled = v; ns.RaidTools.Refresh(addon) end, y)
     y = y - dh - 4
 
+    _, dh = MakeToggle(content, "Fade out when not hovered",
+        function() return db.raidTools.fadeOut end,
+        function(v) db.raidTools.fadeOut = v; ns.RaidTools.Refresh(addon) end, y)
+    y = y - dh - 4
+
     local rtNote = Label(content,
-        "Always-visible bar with world markers, ready check and countdown buttons. "
+        "Compact bar with world markers, ready check and countdown buttons. "
         .."Drag to reposition. Actions require party leader or assistant.",
-        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+        "SystemFont_Small", T.textDim[1], T.textDim[2], T.textDim[3])
     rtNote:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
     rtNote:SetWidth(T.PANEL_W - T.PAD*2 - 48)
     rtNote:SetJustifyH("LEFT")
@@ -847,7 +943,7 @@ local function BuildQOL(content, db, addon)
 
     local crNote = Label(content,
         "Shows available combat resurrection charges and recharge timer. Only visible in raids and M+. Use /yaqol layout to position it.",
-        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+        "SystemFont_Small", T.textDim[1], T.textDim[2], T.textDim[3])
     crNote:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
     crNote:SetWidth(T.PANEL_W - T.PAD*2 - 48)
     crNote:SetJustifyH("LEFT")
@@ -855,9 +951,9 @@ local function BuildQOL(content, db, addon)
 
     y = y - 8
 
-    -- ── QUESTS & DIALOGUE ─────────────────────────────────────────────────
-    local h1 = Label(content, "QUESTS & DIALOGUE", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    -- [ QUESTS & DIALOGUE ] -----------------------------------------------
+    local h1 = Label(content, "QUESTS & DIALOGUE", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h1:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
@@ -868,14 +964,14 @@ local function BuildQOL(content, db, addon)
 
     local noteQ = Label(content,
         "Single-reward quests are collected automatically. Multi-reward quests pause for your choice.",
-        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+        "SystemFont_Small", T.textDim[1], T.textDim[2], T.textDim[3])
     noteQ:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
     noteQ:SetWidth(T.PANEL_W - T.PAD*2 - 48)
     noteQ:SetJustifyH("LEFT")
     y = y - 26
 
     -- Quest skip modifier row (belongs with auto-quest, not gossip)
-    local qModLabel = Label(content, "  Hold to skip auto-quest:", "GameFontNormalSmall",
+    local qModLabel = Label(content, "  Hold to skip auto-quest:", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     qModLabel:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
     local QMODS = { "NONE", "ALT", "SHIFT", "CTRL" }
@@ -887,7 +983,7 @@ local function BuildQOL(content, db, addon)
         mb:SetPoint("LEFT", content, "TOPLEFT", qBtnX, y + 9)
         qBtnX = qBtnX + 56
         local mbBg = mb:CreateTexture(nil, "BACKGROUND"); mbBg:SetAllPoints()
-        local mbLbl = mb:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local mbLbl = mb:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
         mbLbl:SetPoint("CENTER"); mbLbl:SetText(mod)
         qModBtns[mod] = { btn = mb, bg = mbBg, lbl = mbLbl }
         local function RefreshQMod()
@@ -934,9 +1030,9 @@ local function BuildQOL(content, db, addon)
         function(v) q.autoConfirmDelete = v; ns.QOL.Refresh(addon) end, y)
     y = y - dh - 14
 
-    -- ── SOCIAL / GROUP ────────────────────────────────────────────────────
-    local h2 = Label(content, "SOCIAL & GROUP", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    -- [ SOCIAL / GROUP ] --------------------------------------------------
+    local h2 = Label(content, "SOCIAL & GROUP", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h2:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
@@ -955,9 +1051,9 @@ local function BuildQOL(content, db, addon)
         function(v) q.declineGuild = v; ns.QOL.Refresh(addon) end, y)
     y = y - dh - 14
 
-    -- ── DEATH ─────────────────────────────────────────────────────────────
-    local h3 = Label(content, "DEATH", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    -- [ DEATH ] -----------------------------------------------------------
+    local h3 = Label(content, "DEATH", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h3:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
@@ -978,7 +1074,7 @@ local function BuildQOL(content, db, addon)
 
     local noteR = Label(content,
         "Prevents accidental spirit release. Hold SHIFT for the required time, then click Release.",
-        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+        "SystemFont_Small", T.textDim[1], T.textDim[2], T.textDim[3])
     noteR:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
     noteR:SetWidth(T.PANEL_W - T.PAD*2 - 48)
     noteR:SetJustifyH("LEFT")
@@ -997,7 +1093,7 @@ local function BuildQOL(content, db, addon)
 
     local noteAR = Label(content,
         "When enabled, releasing fires automatically — no click needed.",
-        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+        "SystemFont_Small", T.textDim[1], T.textDim[2], T.textDim[3])
     noteAR:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
     noteAR:SetWidth(T.PANEL_W - T.PAD*2 - 48)
     noteAR:SetJustifyH("LEFT")
@@ -1005,9 +1101,9 @@ local function BuildQOL(content, db, addon)
 
     y = y - 8
 
-    -- ── LOOTING ───────────────────────────────────────────────────────────
-    local h4a = Label(content, "LOOTING", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    -- [ LOOTING ] ---------------------------------------------------------
+    local h4a = Label(content, "LOOTING", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h4a:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
@@ -1016,9 +1112,9 @@ local function BuildQOL(content, db, addon)
         function(v) q.fasterLooting = v; ns.QOL.Refresh(addon) end, y)
     y = y - dh - 14
 
-    -- ── VENDOR ────────────────────────────────────────────────────────────
-    local h4 = Label(content, "VENDOR", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    -- [ VENDOR ] ----------------------------------------------------------
+    local h4 = Label(content, "VENDOR", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h4:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
@@ -1044,7 +1140,7 @@ local function BuildQOL(content, db, addon)
 
     local mNote = Label(content,
         "Re-open the vendor window after toggling.",
-        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+        "SystemFont_Small", T.textDim[1], T.textDim[2], T.textDim[3])
     mNote:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 32, y)
     mNote:SetWidth(T.PANEL_W - T.PAD*2 - 32)
     mNote:SetJustifyH("LEFT")
@@ -1052,9 +1148,9 @@ local function BuildQOL(content, db, addon)
 
     y = y - 6
 
-    -- ── GEAR ──────────────────────────────────────────────────────────────
-    local h5 = Label(content, "GEAR", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    -- [ GEAR ] ------------------------------------------------------------
+    local h5 = Label(content, "GEAR", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h5:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
@@ -1069,9 +1165,9 @@ local function BuildQOL(content, db, addon)
         function(v) return v .. "%%" end)
     y = y - dh - 14
 
-    -- ── MYTHIC PLUS ───────────────────────────────────────────────────────
-    local h6 = Label(content, "MYTHIC PLUS", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    -- [ MYTHIC PLUS ] -----------------------------------------------------
+    local h6 = Label(content, "MYTHIC PLUS", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h6:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
@@ -1089,11 +1185,16 @@ local function BuildQOL(content, db, addon)
     _, dh = MakeToggle(content, "Auto-slot keystone when opening the Keystone UI",
         function() return q.autoSlotKeystone end,
         function(v) q.autoSlotKeystone = v end, y)
+    y = y - dh - 4
+
+    _, dh = MakeToggle(content, "Auto-start dungeon after keystone is slotted (3-second countdown)",
+        function() return q.autoStartChallenge end,
+        function(v) q.autoStartChallenge = v end, y)
     y = y - dh - 14
 
-    -- ── PETS ──────────────────────────────────────────────────────────────
-    local h7 = Label(content, "PETS", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    -- [ PETS ] ------------------------------------------------------------
+    local h7 = Label(content, "PETS", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h7:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
@@ -1104,7 +1205,7 @@ local function BuildQOL(content, db, addon)
 
     local petNote = Label(content,
         "Shows a fading on-screen warning when your pet is dead or dismissed.",
-        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+        "SystemFont_Small", T.textDim[1], T.textDim[2], T.textDim[3])
     petNote:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
     petNote:SetWidth(T.PANEL_W - T.PAD*2 - 48)
     petNote:SetJustifyH("LEFT")
@@ -1117,8 +1218,8 @@ local function BuildMerchant(content, db, addon)
     local m = db.merchant
     local y = -T.PAD
 
-    local h1 = Label(content, "MERCHANT WINDOW", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    local h1 = Label(content, "MERCHANT WINDOW", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h1:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
     y = y - 20
 
@@ -1131,7 +1232,7 @@ local function BuildMerchant(content, db, addon)
     local note = Label(content,
         "Doubles the default 10-item page to 20 by adding a second pair of columns.\n" ..
         "Requires a UI reload or re-opening the merchant to take effect after toggling.",
-        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+        "SystemFont_Small", T.textDim[1], T.textDim[2], T.textDim[3])
     note:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 32, y)
     note:SetWidth(content:GetWidth() - T.PAD * 2 - 32)
     note:SetJustifyH("LEFT")
@@ -1145,14 +1246,14 @@ local function BuildFriendList(content, db, addon)
     local y   = -T.PAD
     local _, dh
 
-    local h1 = Label(content, "FRIEND LIST STYLING", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    local h1 = Label(content, "FRIEND LIST STYLING", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h1:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
     local note = Label(content,
         "Class-colors friend names, adds custom status icons, and cleans up the Blizzard Friends list.",
-        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+        "SystemFont_Small", T.textDim[1], T.textDim[2], T.textDim[3])
     note:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
     note:SetWidth(T.PANEL_W - T.PAD*2 - 16)
     note:SetJustifyH("LEFT")
@@ -1163,9 +1264,9 @@ local function BuildFriendList(content, db, addon)
         function(v) fl.enable = v; ns.FriendList.Refresh(addon) end, y)
     y = y - dh - 14
 
-    -- ── NAMES ─────────────────────────────────────────────────────────────
-    local h2 = Label(content, "NAMES", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    -- [ NAMES ] -----------------------------------------------------------
+    local h2 = Label(content, "NAMES", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h2:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
@@ -1186,9 +1287,9 @@ local function BuildFriendList(content, db, addon)
         function(v) fl.useNoteAsName = v; ns.FriendList.Refresh(addon) end, y)
     y = y - dh - 14
 
-    -- ── ICONS ─────────────────────────────────────────────────────────────
-    local h3 = Label(content, "ICONS", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    -- [ ICONS ] -----------------------------------------------------------
+    local h3 = Label(content, "ICONS", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h3:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
@@ -1202,7 +1303,7 @@ local function BuildFriendList(content, db, addon)
     y = y - dh - 10
 
     -- Status icon pack selector
-    local siLabel = Label(content, "Status icons:", "GameFontNormalSmall",
+    local siLabel = Label(content, "Status icons:", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     siLabel:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
     y = y - 20
@@ -1215,7 +1316,7 @@ local function BuildFriendList(content, db, addon)
         mb:SetPoint("TOPLEFT", content, "TOPLEFT", siBtnX, y)
         siBtnX = siBtnX + 64
         local mbBg = mb:CreateTexture(nil, "BACKGROUND"); mbBg:SetAllPoints()
-        local mbLbl = mb:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local mbLbl = mb:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
         mbLbl:SetPoint("CENTER"); mbLbl:SetText(pack.label)
         siBtns[pack.k] = { btn = mb, bg = mbBg, lbl = mbLbl }
         local function RefreshSI()
@@ -1246,13 +1347,13 @@ local function BuildFriendList(content, db, addon)
     end
     y = y - 32
 
-    -- ── FAVOURITES ────────────────────────────────────────────────────────
-    local h4 = Label(content, "FAVOURITES", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    -- [ FAVOURITES ] ------------------------------------------------------
+    local h4 = Label(content, "FAVOURITES", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h4:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
-    local favLabel = Label(content, "Favourite style:", "GameFontNormalSmall",
+    local favLabel = Label(content, "Favourite style:", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     favLabel:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
     y = y - 20
@@ -1265,7 +1366,7 @@ local function BuildFriendList(content, db, addon)
         mb:SetPoint("TOPLEFT", content, "TOPLEFT", favBtnX, y)
         favBtnX = favBtnX + 80
         local mbBg = mb:CreateTexture(nil, "BACKGROUND"); mbBg:SetAllPoints()
-        local mbLbl = mb:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local mbLbl = mb:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
         mbLbl:SetPoint("CENTER"); mbLbl:SetText(style.label)
         favBtns[style.k] = { btn = mb, bg = mbBg, lbl = mbLbl }
         local function RefreshFav()
@@ -1296,9 +1397,9 @@ local function BuildFriendList(content, db, addon)
     end
     y = y - 32
 
-    -- ── FACTION TINT ──────────────────────────────────────────────────────
-    local h5 = Label(content, "FACTION TINT", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    -- [ FACTION TINT ] ----------------------------------------------------
+    local h5 = Label(content, "FACTION TINT", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h5:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
@@ -1322,9 +1423,9 @@ local function BuildMythicTimer(content, db, addon)
     local y  = -T.PAD
     local _, dh
 
-    -- ── GENERAL ───────────────────────────────────────────────────────────
-    local h1 = Label(content, "MYTHIC+ TIMER", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    -- [ GENERAL ] ---------------------------------------------------------
+    local h1 = Label(content, "MYTHIC+ TIMER", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h1:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
@@ -1334,9 +1435,9 @@ local function BuildMythicTimer(content, db, addon)
     y = y - dh - 4
 
     local note1 = Label(content,
-        "A cleaner, more readable M+ timer with +2 / +3 cutoffs, pull count, "
-        .. "boss progress and death counter. Drag to reposition.",
-        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+        "Compact M+ timer HUD: time bar with +2/+3 markers, forces bar, "
+        .. "vertical boss list, affix names, and death counter. Drag to reposition.",
+        "SystemFont_Small", T.textDim[1], T.textDim[2], T.textDim[3])
     note1:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
     note1:SetWidth(T.PANEL_W - T.PAD*2 - 48)
     note1:SetJustifyH("LEFT")
@@ -1350,7 +1451,7 @@ local function BuildMythicTimer(content, db, addon)
     local note2 = Label(content,
         "Hides the built-in Challenge Mode timer block and the entire objective "
         .. "tracker (quest list) while inside a Mythic+ key — restores on completion.",
-        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+        "SystemFont_Small", T.textDim[1], T.textDim[2], T.textDim[3])
     note2:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
     note2:SetWidth(T.PANEL_W - T.PAD*2 - 48)
     note2:SetJustifyH("LEFT")
@@ -1358,38 +1459,62 @@ local function BuildMythicTimer(content, db, addon)
 
     y = y - 8
 
-    -- ── DISPLAY INFO ──────────────────────────────────────────────────────
-    local h2 = Label(content, "DISPLAY", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    -- [ DISPLAY ] ---------------------------------------------------------
+    local h2 = Label(content, "DISPLAY", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h2:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
+    _, dh = MakeToggle(content, "Show backdrop (semi-transparent black panel)",
+        function() return mt.showBackdrop end,
+        function(v) mt.showBackdrop = v; ns.MythicTimer.Refresh(addon) end, y)
+    y = y - dh - 4
+
+    _, dh = MakeToggle(content, "Show per-boss kill timestamps",
+        function() return mt.showKillTimes end,
+        function(v) mt.showKillTimes = v; ns.MythicTimer.Refresh(addon) end, y)
+    y = y - dh - 4
+
+    local note3 = Label(content,
+        "Kill timestamps widen the frame to show the elapsed time when each boss died.",
+        "SystemFont_Small", T.textDim[1], T.textDim[2], T.textDim[3])
+    note3:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
+    note3:SetWidth(T.PANEL_W - T.PAD*2 - 48)
+    note3:SetJustifyH("LEFT")
+    y = y - 22
+
+    _, dh = MakeSlider(content, "Font Size", 0.7, 1.5, 0.05,
+        function() return mt.fontScale end,
+        function(v) mt.fontScale = v; ns.MythicTimer.Refresh(addon) end, y,
+        function(v) return format("%d px", math.floor(12 * v + 0.5)) end)
+    y = y - dh - 4
+
     local info = Label(content,
         "The overlay shows:|n"
-        .. Accent() .. "•|r  Remaining time (colour-coded by pace)|n"
-        .. Accent() .. "•|r  +2 and +3 time cutoffs|n"
+        .. Accent() .. "•|r  Key level and death counter in the header|n"
         .. Accent() .. "•|r  Time progress bar with +2 / +3 markers|n"
-        .. Accent() .. "•|r  Death count with time penalty|n"
-        .. Accent() .. "•|r  Enemy forces (pull count) percentage|n"
-        .. Accent() .. "•|r  Boss kill progress with checkmarks",
-        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+        .. Accent() .. "•|r  Remaining time and next upgrade countdown|n"
+        .. Accent() .. "•|r  Enemy forces bar with percentage|n"
+        .. Accent() .. "•|r  Affix names in the header|n"
+        .. Accent() .. "•|r  Vertical boss kill list",
+        "SystemFont_Small", T.textDim[1], T.textDim[2], T.textDim[3])
     info:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
     info:SetWidth(T.PANEL_W - T.PAD*2)
     info:SetJustifyH("LEFT")
-    y = y - 110
+    y = y - 100
 
     y = y - 8
 
-    -- ── POSITION ──────────────────────────────────────────────────────────
-    local h3 = Label(content, "POSITION", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    -- [ POSITION ] --------------------------------------------------------
+    local h3 = Label(content, "POSITION", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h3:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
     local posNote = Label(content,
         "Use the Arrange button in the header bar to drag the timer frame "
         .. "to your preferred position, or drag it during a live M+ run.",
-        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+        "SystemFont_Small", T.textDim[1], T.textDim[2], T.textDim[3])
     posNote:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
     posNote:SetWidth(T.PANEL_W - T.PAD*2)
     posNote:SetJustifyH("LEFT")
@@ -1408,16 +1533,16 @@ local function BuildMythicTimer(content, db, addon)
 
     y = y - 8
 
-    -- ── TEST / DEMO ───────────────────────────────────────────────────────
-    local h4 = Label(content, "TEST", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    -- [ TEST / DEMO ] -----------------------------------------------------
+    local h4 = Label(content, "TEST", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h4:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
     local demoNote = Label(content,
         "Run a simulated dungeon to preview the timer. "
         .. "Plays a scripted +12 key at 30× speed and loops continuously until stopped.",
-        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+        "SystemFont_Small", T.textDim[1], T.textDim[2], T.textDim[3])
     demoNote:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
     demoNote:SetWidth(T.PANEL_W - T.PAD*2)
     demoNote:SetJustifyH("LEFT")
@@ -1427,7 +1552,7 @@ local function BuildMythicTimer(content, db, addon)
     local startBtn, stopBtn
 
     -- Grays out whichever button is not applicable for the current demo state.
-    -- Disable/Enable hooks in each skin's StyleButton handle the visual appearance;
+    -- Disable/Enable hooks in StyleButton handle the visual appearance;
     -- no extra SetAlpha needed.
     local function RefreshDemoBtns()
         local active = ns.MythicTimer.IsDemoActive()
@@ -1451,9 +1576,9 @@ local function BuildMythicTimer(content, db, addon)
 
     y = y - 8
 
-    -- ── COMPLETION MESSAGE ────────────────────────────────────────────────
-    local hMsg = Label(content, "COMPLETION MESSAGE", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    -- [ COMPLETION MESSAGE ] ----------------------------------------------
+    local hMsg = Label(content, "COMPLETION MESSAGE", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     hMsg:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
@@ -1463,7 +1588,7 @@ local function BuildMythicTimer(content, db, addon)
     y = y - dh - 8
 
     -- Channel selector buttons
-    local chanLbl = Label(content, "Channel:", "GameFontNormalSmall",
+    local chanLbl = Label(content, "Channel:", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     chanLbl:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
     local channels = { "PARTY", "SAY", "YELL" }
@@ -1474,7 +1599,7 @@ local function BuildMythicTimer(content, db, addon)
         btn:SetSize(52, 18)
         btn:SetPoint("TOPLEFT", content, "TOPLEFT", bx, y)
         ns.Theme:StyleButton(btn, 52, 18)
-        local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local lbl = btn:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
         lbl:SetAllPoints(); lbl:SetJustifyH("CENTER"); lbl:SetText(ch)
         local function UpdateHighlight()
             if mt.completionMsgChannel == ch then
@@ -1495,7 +1620,7 @@ local function BuildMythicTimer(content, db, addon)
     y = y - 26
 
     -- Message text EditBox
-    local ebLbl = Label(content, "Message:", "GameFontNormalSmall",
+    local ebLbl = Label(content, "Message:", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     ebLbl:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
 
@@ -1505,13 +1630,13 @@ local function BuildMythicTimer(content, db, addon)
     eb:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y - 20)
     eb:SetAutoFocus(false)
     eb:SetMaxLetters(255)
-    eb:SetFontObject("GameFontNormalSmall")
+    eb:SetFontObject("SystemFont_Small")
     eb:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
     eb:SetText(mt.completionMsgText or "")
     Bg(eb, T.bgInput[1], T.bgInput[2], T.bgInput[3], T.bgInput[4])
     local ebBorder = eb:CreateTexture(nil, "BORDER")
     ebBorder:SetSize(ebW, 1); ebBorder:SetPoint("BOTTOM")
-    ebBorder:SetColorTexture(T.border[1], T.border[2], T.border[3], T.border[4])
+    ebBorder:SetColorTexture(T.textDim[1], T.textDim[2], T.textDim[3], 0.15)
     eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
     eb:SetScript("OnEnterPressed", function(self)
         mt.completionMsgText = self:GetText()
@@ -1524,7 +1649,7 @@ local function BuildMythicTimer(content, db, addon)
 
     local tokenHelp = Label(content,
         "Tokens: {dungeon}  {level}  {time}  {overtime}  {deaths}  {upgrades}",
-        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+        "SystemFont_Small", T.textDim[1], T.textDim[2], T.textDim[3])
     tokenHelp:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
     tokenHelp:SetWidth(ebW)
     tokenHelp:SetJustifyH("LEFT")
@@ -1538,8 +1663,8 @@ local function BuildSkyriding(content, db, addon)
     local y   = -T.PAD
     local _, dh
 
-    local h1 = Label(content, "SKYRIDING HUD", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    local h1 = Label(content, "SKYRIDING HUD", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h1:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
@@ -1553,7 +1678,7 @@ local function BuildSkyriding(content, db, addon)
         .. "Skyward Ascent charges (6 max, 15 s recharge each), "
         .. "current speed as a filled bar, and a recharge countdown when charges aren't full. "
         .. "Drag to reposition.",
-        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+        "SystemFont_Small", T.textDim[1], T.textDim[2], T.textDim[3])
     note:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
     note:SetWidth(T.PANEL_W - T.PAD*2 - 48)
     note:SetJustifyH("LEFT")
@@ -1561,8 +1686,8 @@ local function BuildSkyriding(content, db, addon)
 
     y = y - 8
 
-    local h2 = Label(content, "DISPLAY", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    local h2 = Label(content, "DISPLAY", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h2:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
@@ -1571,7 +1696,7 @@ local function BuildSkyriding(content, db, addon)
         .. Accent() .. "•|r  Charge pips — up to 6 squares, shared between Surge Forward & Skyward Ascent|n"
         .. Accent() .. "•|r  Speed bar — 0–3000%% of base run speed as a fill bar|n"
         .. Accent() .. "•|r  Next charge countdown — green bar + time, hidden when all charges are full",
-        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+        "SystemFont_Small", T.textDim[1], T.textDim[2], T.textDim[3])
     info:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
     info:SetWidth(T.PANEL_W - T.PAD*2 - 16)
     info:SetJustifyH("LEFT")
@@ -1585,8 +1710,8 @@ local function BuildVaultTracker(content, db, addon)
     local y   = -T.PAD
     local _, dh
 
-    local h1 = Label(content, "VAULT TRACKER", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    local h1 = Label(content, "VAULT TRACKER", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h1:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
@@ -1598,15 +1723,15 @@ local function BuildVaultTracker(content, db, addon)
     local note = Label(content,
         "Hover the VAULT anchor to see your Great Vault progress — pips per slot, "
         .. "completions needed, and estimated item level for unlocked slots. Drag to reposition.",
-        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+        "SystemFont_Small", T.textDim[1], T.textDim[2], T.textDim[3])
     note:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
     note:SetWidth(T.PANEL_W - T.PAD*2 - 48)
     note:SetJustifyH("LEFT")
     y = y - 42
 
     y = y - 8
-    local h2 = Label(content, "TRACKS", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    local h2 = Label(content, "TRACKS", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h2:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
@@ -1630,8 +1755,8 @@ local function BuildVaultTracker(content, db, addon)
         function(v) d.showPvP = v; ns.VaultTracker.Refresh(addon) end, y)
     y = y - dh - 8
 
-    local h3 = Label(content, "DISPLAY", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    local h3 = Label(content, "DISPLAY", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h3:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
@@ -1680,8 +1805,8 @@ local function BuildMouseTracker(content, db, addon)
     end
 
     -- Header
-    local h1 = Label(content, "MOUSE TRACKER", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    local h1 = Label(content, "MOUSE TRACKER", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h1:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
@@ -1692,7 +1817,7 @@ local function BuildMouseTracker(content, db, addon)
 
     local note = Label(content,
         "Draws indicators around your cursor. Useful for streaming, presentations, or just finding your mouse.",
-        "GameFontNormalSmall", T.textDim[1], T.textDim[2], T.textDim[3])
+        "SystemFont_Small", T.textDim[1], T.textDim[2], T.textDim[3])
     note:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
     note:SetWidth(T.PANEL_W - T.PAD*2 - 48)
     note:SetJustifyH("LEFT")
@@ -1700,8 +1825,8 @@ local function BuildMouseTracker(content, db, addon)
 
     -- Ring section ------------------------------------------------------------
     y = y - 4
-    local h2 = Label(content, "RING", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    local h2 = Label(content, "RING", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h2:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
@@ -1729,8 +1854,8 @@ local function BuildMouseTracker(content, db, addon)
     y = y - dh - 8
 
     -- Dot section -------------------------------------------------------------
-    local hDot = Label(content, "DOT", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    local hDot = Label(content, "DOT", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     hDot:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
@@ -1746,8 +1871,8 @@ local function BuildMouseTracker(content, db, addon)
     y = y - dh - 8
 
     -- Crosshair section -------------------------------------------------------
-    local hCross = Label(content, "CROSSHAIR", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    local hCross = Label(content, "CROSSHAIR", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     hCross:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
@@ -1775,8 +1900,8 @@ local function BuildMouseTracker(content, db, addon)
     y = y - dh - 8
 
     -- Color section -----------------------------------------------------------
-    local h3 = Label(content, "COLOR", "GameFontNormalSmall",
-        T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    local h3 = Label(content, "COLOR", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
     h3:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
     Divider(content, y); y = y - 10
 
@@ -1795,14 +1920,14 @@ local function BuildMouseTracker(content, db, addon)
     swatch:SetPoint("LEFT", pickerBtn, "LEFT", 6, 0)
     swatch:SetColorTexture(d.r, d.g, d.b, 1)
     activeSwatch = swatch
-    local pickerLbl = pickerBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local pickerLbl = pickerBtn:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     pickerLbl:SetPoint("LEFT", swatch, "RIGHT", 5, 0)
     pickerLbl:SetText("Custom Color")
     pickerBtn:SetScript("OnClick", PickColor)
     y = y - 28
 
     -- Quick color presets
-    local presetLbl = Label(content, "Presets:", "GameFontNormalSmall",
+    local presetLbl = Label(content, "Presets:", "SystemFont_Small",
         T.textDim[1], T.textDim[2], T.textDim[3])
     presetLbl:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
     local presets = {
@@ -1823,7 +1948,7 @@ local function BuildMouseTracker(content, db, addon)
         ps:SetSize(10, 10)
         ps:SetPoint("LEFT", btn, "LEFT", 4, 0)
         ps:SetColorTexture(pr, pg, pb, 1)
-        local plbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local plbl = btn:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
         plbl:SetPoint("LEFT", ps, "RIGHT", 4, 0)
         plbl:SetText(p.label)
         btn:SetScript("OnClick", function()
@@ -1839,6 +1964,61 @@ local function BuildMouseTracker(content, db, addon)
     return y - 20
 end
 
+-- [ GROUP FILTER ] ------------------------------------------------------------
+local function BuildGroupFilter(content, db, addon)
+    local d  = db.groupFilter
+    local y  = -T.PAD
+    local _, dh
+
+    local h1 = Label(content, "GROUP FILTER", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
+    h1:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    _, dh = MakeToggle(content, "Enable Group Filter panel",
+        function() return d.enabled end,
+        function(v) d.enabled = v; ns.GroupFilter.Refresh(addon) end, y)
+    y = y - dh - 4
+
+    local note = Label(content,
+        "Attaches a companion panel to the right of the Group Finder with all filters "
+        .. "permanently visible — Require, Dungeons, Min Rating, Difficulty, and Playstyle. "
+        .. "Role/difficulty/dungeon filters apply on the Dungeons tab only.",
+        "SystemFont_Small", T.textDim[1], T.textDim[2], T.textDim[3])
+    note:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD + 44, y)
+    note:SetWidth(T.PANEL_W - T.PAD*2 - 48)
+    note:SetJustifyH("LEFT")
+    y = y - 50
+
+    local h2 = Label(content, "DEFAULT REQUIRE FILTERS", "SystemFont_Small",
+        T.textDim[1], T.textDim[2], T.textDim[3])
+    h2:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y); y = y - 22
+    Divider(content, y); y = y - 10
+
+    local note2 = Label(content, "Applied when the Group Finder opens. Toggled live in the panel.",
+        "SystemFont_Small", T.textDim[1], T.textDim[2], T.textDim[3])
+    note2:SetPoint("TOPLEFT", content, "TOPLEFT", T.PAD, y)
+    note2:SetWidth(T.PANEL_W - T.PAD*2); note2:SetJustifyH("LEFT")
+    y = y - 28
+
+    _, dh = MakeToggle(content, "Needs Tank",
+        function() return d.needTank end,
+        function(v) d.needTank = v; ns.GroupFilter.Refresh(addon) end, y)
+    y = y - dh - 4
+
+    _, dh = MakeToggle(content, "Needs Healer",
+        function() return d.needHealer end,
+        function(v) d.needHealer = v; ns.GroupFilter.Refresh(addon) end, y)
+    y = y - dh - 4
+
+    _, dh = MakeToggle(content, "Needs DPS",
+        function() return d.needDps end,
+        function(v) d.needDps = v; ns.GroupFilter.Refresh(addon) end, y)
+    y = y - dh - 8
+
+    return y - 20
+end
+
 -- [ MAIN PANEL ] --------------------------------------------------------------
 local panel
 local TABS = {
@@ -1850,7 +2030,8 @@ local TABS = {
     { key="skyriding",    label="Skyriding"     },
     { key="friendlist",   label="Friend List"   },
     { key="vaulttracker", label="Vault Tracker"  },
-    { key="mousetracker", label="Mouse Tracker"  },
+    { key="mousetracker",  label="Mouse Tracker"  },
+    { key="groupfilter",   label="Group Filter"   },
 }
 
 local function BuildPanel(addon)
@@ -1874,24 +2055,17 @@ local function BuildPanel(addon)
     end)
     f:SetClampedToScreen(true); f:Hide()
     ns.Theme:ApplyBg(f)
-    ns.Theme:ApplyBorder(f)
 
-    -- left teal stripe
-    local stripe = f:CreateTexture(nil, "BORDER")
-    stripe:SetSize(3, H); stripe:SetPoint("TOPLEFT")
-    stripe:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 1)
-
-    -- header
+    -- header (title bar, no chrome)
     local header = CreateFrame("Frame", nil, f)
     header:SetSize(W, T.HEADER_H); header:SetPoint("TOPLEFT")
-    ns.Theme:ApplyHeader(header)
 
-    local titleLbl = header:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local titleLbl = header:CreateFontString(nil, "OVERLAY", "SystemFont_Large")
     titleLbl:SetPoint("LEFT", header, "LEFT", 14, 0)
     titleLbl:SetText(Accent() .. "ya|rqol")
     titleLbl:SetTextColor(T.text[1], T.text[2], T.text[3], 1)
 
-    local verLbl = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local verLbl = header:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     verLbl:SetPoint("LEFT", titleLbl, "RIGHT", 8, -1)
     local _ver = C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version") or "dev"
     if _ver:match("^@") then _ver = "dev" end  -- strip @project-version@ CurseForge placeholder
@@ -1903,12 +2077,12 @@ local function BuildPanel(addon)
     closeBtn:SetPoint("RIGHT", header, "RIGHT", -10, 0)
     closeBtn:SetScript("OnClick", function() f:Hide() end)
 
-    -- "What's New" changelog button — styled via active theme (gold art for Blizzard, flat for Mellow)
+    -- "What's New" changelog button
     local changelogBtn = CreateFrame("Button", nil, header)
     changelogBtn:SetSize(90, 22)
     changelogBtn:SetPoint("RIGHT", closeBtn, "LEFT", -6, 0)
     ns.Theme:StyleButton(changelogBtn, 90, 22)
-    local clLbl = changelogBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local clLbl = changelogBtn:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     clLbl:SetPoint("CENTER")
     clLbl:SetText(Accent() .. "What's New|r")
     changelogBtn:SetScript("OnEnter", function()
@@ -1925,7 +2099,7 @@ local function BuildPanel(addon)
     historyBtn:SetSize(90, 22)
     historyBtn:SetPoint("RIGHT", changelogBtn, "LEFT", -6, 0)
     ns.Theme:StyleButton(historyBtn, 90, 22)
-    local histLbl = historyBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local histLbl = historyBtn:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     histLbl:SetPoint("CENTER")
     histLbl:SetText(Accent() .. "Run History|r")
     historyBtn:SetScript("OnEnter", function()
@@ -1946,7 +2120,7 @@ local function BuildPanel(addon)
     layoutIcon:SetSize(14, 14)
     layoutIcon:SetPoint("LEFT", layoutBtn, "LEFT", 6, 0)
     layoutIcon:SetTexture("Interface\\Cursor\\Move")
-    local layoutLbl = layoutBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local layoutLbl = layoutBtn:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     layoutLbl:SetPoint("LEFT", layoutIcon, "RIGHT", 4, 0)
     layoutLbl:SetText(Accent() .. "Arrange|r")
     layoutBtn:SetScript("OnEnter", function()
@@ -1966,13 +2140,7 @@ local function BuildPanel(addon)
 
     local tabRightLine = f:CreateTexture(nil, "BORDER")
     tabRightLine:SetSize(1, H - T.HEADER_H); tabRightLine:SetPoint("TOPLEFT", f, "TOPLEFT", SIDEBAR_W, -T.HEADER_H)
-    tabRightLine:SetColorTexture(T.border[1], T.border[2], T.border[3], T.border[4])
-
-    -- sliding tab indicator
-    local indicator = tabBar:CreateTexture(nil, "OVERLAY")
-    indicator:SetSize(3, T.TAB_H); indicator:SetPoint("TOPRIGHT", tabBar, "TOPRIGHT")
-    indicator:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 1)
-    ns.Theme:InitTabBar(indicator)
+    tabRightLine:SetColorTexture(T.textDim[1], T.textDim[2], T.textDim[3], 0.15)
 
     -- scrollable content
     local CONTENT_Y = T.HEADER_H
@@ -2012,7 +2180,6 @@ local function BuildPanel(addon)
         local maxVal = select(2, scrollBar:GetMinMaxValues())
         scrollBar:SetValue(math.max(0, math.min(cur - delta * 40, maxVal)))
     end)
-    ns.Theme:ApplyInset(scrollFrame)
 
     -- build tab frames
     local tabFrames, tabBtns = {}, {}
@@ -2023,7 +2190,7 @@ local function BuildPanel(addon)
         local btn = CreateFrame("Button", nil, tabBar)
         btn:SetSize(totalTabW, T.TAB_H)
         btn:SetPoint("TOPLEFT", tabBar, "TOPLEFT", 0, -(i-1)*T.TAB_H)
-        local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local lbl = btn:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
         lbl:SetPoint("LEFT", btn, "LEFT", 12, 0); lbl:SetText(tab.label)
         btn.lbl = lbl; btn.tabH = T.TAB_H; btn.tabY = -(i-1)*T.TAB_H
         ns.Theme:StyleTab(btn)
@@ -2044,6 +2211,7 @@ local function BuildPanel(addon)
         if tab.key == "merchant"   then finalY = BuildMerchant(tf, db, addon)         end
         if tab.key == "vaulttracker" then finalY = BuildVaultTracker(tf, db, addon)   end
         if tab.key == "mousetracker" then finalY = BuildMouseTracker(tf, db, addon)   end
+        if tab.key == "groupfilter"  then finalY = BuildGroupFilter(tf, db, addon)    end
         tabHeights[tab.key] = math.abs(finalY)
     end
 
@@ -2068,12 +2236,13 @@ local function BuildPanel(addon)
             if ns.MythicTimer and ns.MythicTimer.GetFrame and not ns.MythicTimer.IsDemoActive() then
                 local f = ns.MythicTimer.GetFrame()
                 if f then
-                    f.title:SetText(ns.Theme.EscapeColor("accent") .. "[+12]|r The Stonevault")
-                    f.timerText:SetText("|cff44ee4422:15|r")
-                    if f.paceText then f.paceText:SetText("|cff44ee44+3 18:30|r       |cffeeee44+2 24:40|r") end
+                    if f.levelText then f.levelText:SetText(ns.Theme.EscapeColor("accent") .. "+12|r") end
+                    if f.affixText then f.affixText:SetText("Tyrannical · Storming · Sanguine") end
+                    if f.timerText then f.timerText:SetText("|cff44ee4422:15|r") end
+                    if f.nextUpgradeText then f.nextUpgradeText:SetText("|cff44ee44+3  18:30|r") end
                     if f.deathIcon then f.deathIcon:Show() end
-                    if f.deathText then f.deathText:SetText("|cffee22222|r  |cff999999(-0:10)|r") end
-                    if f.pullText  then f.pullText:SetText("|cffcccccc85%|r  (272/320)") end
+                    if f.deathText then f.deathText:SetText("|cffee22222  -0:10|r") end
+                    if f.forcesText then f.forcesText:SetText("|cffcccccc85.00%|r") end
                     f:SetAlpha(1)
                     f:Show()
                 end
@@ -2106,11 +2275,6 @@ local function BuildPanel(addon)
         end
         for k, btn in pairs(tabBtns) do
             ns.Theme:SetTabActive(btn, k == key)
-            if k == key then
-                indicator:SetSize(3, btn.tabH)
-                indicator:ClearAllPoints()
-                indicator:SetPoint("TOPRIGHT", tabBar, "TOPRIGHT", 0, btn.tabY)
-            end
         end
         if tabRebuildFns[key] then tabRebuildFns[key]() end
         if tabRebuildFns[key.."_fps"] then tabRebuildFns[key.."_fps"]() end
@@ -2154,5 +2318,4 @@ function Config.Toggle()
 end
 
 function Config.Refresh()
-    for _, fn in pairs(spellRebuildFns) do fn() end
 end

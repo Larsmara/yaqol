@@ -15,13 +15,11 @@ local function Notify(msg)
     print(ns.Theme.EscapeColor("accent") .. "yaqol:|r " .. msg)
 end
 
--- ============================================================================
--- AUTOMATE QUESTS
---   QUEST_DETAIL     – NPC just offered us a quest  → AcceptQuest()
---   QUEST_PROGRESS   – quest turn-in screen, items already given → CompleteQuest()
---   QUEST_COMPLETE   – reward-picker screen → GetQuestReward()  (auto only when
---                      there is exactly one reward or no choice needed)
--- ============================================================================
+-- [ AUTOMATE QUESTS ] ---------------------------------------------------------
+-- QUEST_DETAIL     – NPC just offered us a quest  → AcceptQuest()
+-- QUEST_PROGRESS   – quest turn-in screen, items already given → CompleteQuest()
+-- QUEST_COMPLETE   – reward-picker screen → GetQuestReward()  (auto only when
+--                    there is exactly one reward or no choice needed)
 -- Returns true when the player is holding the configured quest-skip modifier.
 local function QuestSkipHeld()
     local mod = cfg().questSkipModifier or "SHIFT"
@@ -58,14 +56,12 @@ local function OnQuestComplete()
     -- Multiple reward choices: leave it to the player
 end
 
--- ============================================================================
--- AUTOMATE GOSSIP
---   GOSSIP_SHOW / QUEST_GREETING – NPC gossip / quest list dialog
---   autoGossip: auto-click single-option gossip entries.
---   autoQuest:  auto-open/accept all available quests; auto-turn-in all active ones.
---   In modern WoW, NPCs with multiple quests fire GOSSIP_SHOW (not QUEST_GREETING),
---   so both quest and gossip automation must live here.
--- ============================================================================
+-- [ AUTOMATE GOSSIP ] ---------------------------------------------------------
+-- GOSSIP_SHOW / QUEST_GREETING – NPC gossip / quest list dialog
+-- autoGossip: auto-click single-option gossip entries.
+-- autoQuest:  auto-open/accept all available quests; auto-turn-in all active ones.
+-- In modern WoW, NPCs with multiple quests fire GOSSIP_SHOW (not QUEST_GREETING),
+-- so both quest and gossip automation must live here.
 local function OnGossipShow()
     if not cfg().autoGossip and not cfg().autoQuest then return end
     if QuestSkipHeld() then return end
@@ -131,12 +127,10 @@ local function OnQuestGreeting()
     end
 end
 
--- ============================================================================
--- ACCEPT SUMMON  (with a small safety delay)
---   CONFIRM_SUMMON fires when a party/raid member creates a summoning stone for us.
---   We wait SUMMON_DELAY seconds (≤ the 60-second window) then confirm – but only
---   if the summoner hasn't changed (i.e. the stone is still waiting for us).
--- ============================================================================
+-- [ ACCEPT SUMMON ] -----------------------------------------------------------
+-- CONFIRM_SUMMON fires when a party/raid member creates a summoning stone for us.
+-- We wait SUMMON_DELAY seconds (≤ the 60-second window) then confirm – but only
+-- if the summoner hasn't changed (i.e. the stone is still waiting for us).
 local SUMMON_DELAY = 5   -- seconds before auto-confirming
 
 local function OnConfirmSummon()
@@ -155,14 +149,12 @@ local function OnConfirmSummon()
     end)
 end
 
--- ============================================================================
--- ACCEPT RESURRECTION
---   RESURRECT_REQUEST fires when another player (or NPC) attempts to rez us.
---   arg1 = resurrecting unit name.
---   We only auto-accept if the resurrecter is an actual player character
---   (not a battle-res pylon or other object) and is NOT in combat
---   (to avoid accidentally accepting a combat rez mid-pull if that option is off).
--- ============================================================================
+-- [ ACCEPT RESURRECTION ] -----------------------------------------------------
+-- RESURRECT_REQUEST fires when another player (or NPC) attempts to rez us.
+-- arg1 = resurrecting unit name.
+-- We only auto-accept if the resurrecter is an actual player character
+-- (not a battle-res pylon or other object) and is NOT in combat
+-- (to avoid accidentally accepting a combat rez mid-pull if that option is off).
 local function OnResurrectRequest(raisingUnit)
     if not cfg().autoRez then return end
 
@@ -173,14 +165,12 @@ local function OnResurrectRequest(raisingUnit)
     StaticPopup_Hide("RESURRECT_NO_TIMER")
 end
 
--- ============================================================================
--- HOLD-TO-RELEASE  (require holding SHIFT for N seconds before button enables)
---   1. Dialog appears: button grayed, shows "Hold SHIFT to release"
---   2. Player holds SHIFT: countdown shown, button stays grayed
---   3. Countdown completes: button ENABLES, shows "Release" — player clicks to release
---      (or auto-releases if holdAutoRelease is true)
---   4. Releasing SHIFT before countdown: resets to step 1
--- ============================================================================
+-- [ HOLD-TO-RELEASE ] ---------------------------------------------------------
+-- 1. Dialog appears: button grayed, shows "Hold SHIFT to release"
+-- 2. Player holds SHIFT: countdown shown, button stays grayed
+-- 3. Countdown completes: button ENABLES, shows "Release" — player clicks to release
+--    (or auto-releases if holdAutoRelease is true)
+-- 4. Releasing SHIFT before countdown: resets to step 1
 local holdHooked    = false
 local holdStartTime = nil   -- when the player started holding; nil = not holding
 local holdReady     = false -- true once countdown completed; allows OnButton1 through
@@ -255,9 +245,7 @@ local function HookHoldToRelease()
     end
 end
 
--- ============================================================================
--- SELL JUNK  (grey quality items) on MERCHANT_SHOW
--- ============================================================================
+-- [ SELL JUNK ] ---------------------------------------------------------------
 local function SellJunk()
     if not cfg().sellJunk then return end
 
@@ -290,14 +278,12 @@ local function SellJunk()
     end
 end
 
--- ============================================================================
--- FASTER LOOTING
---   Suppresses the stock Blizzard loot window entirely by unregistering
---   LOOT_OPENED/LOOT_CLOSED from LootFrame, then calling LootSlot() for
---   every slot on LOOT_OPENED ourselves — the same technique used by Plumber.
---   The window never appears; loot goes straight to your bags.
---   Also sets autoLootDefault=1 so left-clicking a corpse triggers looting.
--- ============================================================================
+-- [ FASTER LOOTING ] ----------------------------------------------------------
+-- Suppresses the stock Blizzard loot window entirely by unregistering
+-- LOOT_OPENED/LOOT_CLOSED from LootFrame, then calling LootSlot() for
+-- every slot on LOOT_OPENED ourselves — the same technique used by Plumber.
+-- The window never appears; loot goes straight to your bags.
+-- Also sets autoLootDefault=1 so left-clicking a corpse triggers looting.
 local lootFrameMuted = false
 
 local function MuteLootFrame(mute)
@@ -340,9 +326,7 @@ local function ApplyFasterLooting()
     end
 end
 
--- ============================================================================
--- AUTO REPAIR on MERCHANT_SHOW
--- ============================================================================
+-- [ AUTO REPAIR ] -------------------------------------------------------------
 local function AutoRepair()
     if not cfg().autoRepair then return end
     if not CanMerchantRepair() then return end
@@ -369,29 +353,23 @@ local function AutoRepair()
         usedGuild and " (Guild funds)" or ""))
 end
 
--- ============================================================================
--- DECLINE DUEL
--- ============================================================================
+-- [ DECLINE DUEL ] ------------------------------------------------------------
 local function OnDuelRequested()
     if not cfg().declineDuel then return end
     DeclineDuel()
     StaticPopup_Hide("DUEL_REQUESTED")
 end
 
--- ============================================================================
--- DECLINE GUILD INVITE
--- ============================================================================
+-- [ DECLINE GUILD INVITE ] ----------------------------------------------------
 local function OnGuildInviteRequest()
     if not cfg().declineGuild then return end
     DeclineGuild()
     StaticPopup_Hide("GUILD_INVITE")
 end
 
--- ============================================================================
--- LOW DURABILITY WARNING
---   Fires on UPDATE_INVENTORY_DURABILITY.  Throttled to once per 60 s.
---   Shows a red on-screen text frame that fades out after 8 seconds.
--- ============================================================================
+-- [ LOW DURABILITY WARNING ] --------------------------------------------------
+-- Fires on UPDATE_INVENTORY_DURABILITY. Throttled to once per 60 s.
+-- Shows a red on-screen text frame that fades out after 8 seconds.
 local EQUIP_SLOTS = { 1,2,3,5,6,7,8,9,10,11,12,13,14,15,16,17 }
 local durWarnThrottle = 0
 local durFrame  -- on-screen warning frame, built lazily
@@ -420,10 +398,11 @@ local function GetOrMakeDurFrame()
     warnIcon:SetTexture("Interface\\DialogFrame\\UI-Dialog-Icon-AlertOther")
     f.warnIcon = warnIcon
 
-    local txt = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local txt = f:CreateFontString(nil, "OVERLAY", "SystemFont_Large")
     txt:SetPoint("LEFT", warnIcon, "RIGHT", 8, 0)
     txt:SetPoint("RIGHT", f, "RIGHT", -8, 0)
     txt:SetJustifyH("LEFT")
+    ns.Theme:ApplyHudFont(txt)
     f.txt = txt
 
     -- Restore saved position, falling back to sensible default
@@ -487,9 +466,7 @@ function QOL.GetDurabilityFrame()
     return GetOrMakeDurFrame()
 end
 
--- ============================================================================
--- M+ AFFIX REMINDER  – on-screen frame shown on login/reload
--- ============================================================================
+-- [ M+ AFFIX REMINDER ] -------------------------------------------------------
 
 -- Milestone key levels at which new affixes are added.
 -- In Midnight Season 1 the schedule is: all keys (base), +4, +7.
@@ -518,9 +495,8 @@ local function BuildAffixFrame()
     f:SetClampedToScreen(true)
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 100)
 
-    -- Background + border
+    -- Background
     ns.Theme:ApplyBg(f)
-    ns.Theme:ApplyBorder(f)
 
     -- Border stripe (left)
     local stripe = f:CreateTexture(nil, "BORDER")
@@ -537,7 +513,7 @@ local function BuildAffixFrame()
     hline:SetHeight(1); hline:SetPoint("BOTTOMLEFT"); hline:SetPoint("BOTTOMRIGHT")
     hline:SetColorTexture(AT.accent[1], AT.accent[2], AT.accent[3], 0.7)
 
-    local title = header:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local title = header:CreateFontString(nil, "OVERLAY", "SystemFont_Med1")
     title:SetPoint("LEFT", header, "LEFT", PAD, 0)
     title:SetText(ns.Theme.EscapeColor("accent") .. "M+|r Affixes This Week")
     title:SetTextColor(AT.text[1], AT.text[2], AT.text[3], 1)
@@ -564,7 +540,7 @@ local function BuildAffixFrame()
     end
     RefreshStartupBtn()
 
-    local startupTip = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local startupTip = header:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     startupTip:SetPoint("RIGHT", startupBtn, "LEFT", -4, 0)
     startupTip:SetText("Show on login")
     startupTip:SetTextColor(AT.textDim[1], AT.textDim[2], AT.textDim[3], 1)
@@ -591,7 +567,7 @@ local function BuildAffixFrame()
         if not affixList or #affixList == 0 then
             self:SetSize(W, 32 + 40)
             body:SetHeight(40)
-            local nodata = body:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            local nodata = body:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
             nodata:SetPoint("CENTER", body, "CENTER", 0, 0)
             nodata:SetText("No affix data available yet.")
             nodata:SetTextColor(AT.textDim[1], AT.textDim[2], AT.textDim[3], 1)
@@ -609,7 +585,7 @@ local function BuildAffixFrame()
             if not name then break end
 
             -- Milestone label
-            local mileLbl = body:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            local mileLbl = body:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
             mileLbl:SetPoint("TOPLEFT", body, "TOPLEFT", PAD + ICON_SIZE + 8, y + 2)
             mileLbl:SetTextColor(AT.accent[1], AT.accent[2], AT.accent[3], 0.9)
             mileLbl:SetText(string.format("+%d and above", milestone))
@@ -634,13 +610,13 @@ local function BuildAffixFrame()
             end
 
             -- Affix name
-            local nameLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            local nameLbl = row:CreateFontString(nil, "OVERLAY", "SystemFont_Med1")
             nameLbl:SetPoint("TOPLEFT", icon, "TOPRIGHT", 8, -2)
             nameLbl:SetText(name)
             nameLbl:SetTextColor(AT.text[1], AT.text[2], AT.text[3], 1)
 
             -- Description (wrapped)
-            local descLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            local descLbl = row:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
             descLbl:SetPoint("TOPLEFT", nameLbl, "BOTTOMLEFT", 0, -2)
             descLbl:SetPoint("RIGHT", row, "RIGHT", -4, 0)
             descLbl:SetJustifyH("LEFT")
@@ -672,7 +648,7 @@ local function BuildAffixFrame()
         div:SetHeight(1)
         div:SetPoint("TOPLEFT",  body, "TOPLEFT",  PAD,  y)
         div:SetPoint("TOPRIGHT", body, "TOPRIGHT", -PAD, y)
-        div:SetColorTexture(AT.border[1], AT.border[2], AT.border[3], AT.border[4])
+        div:SetColorTexture(AT.textDim[1], AT.textDim[2], AT.textDim[3], 0.30)
         y = y - 10
 
         local totalH = math.abs(y) + PAD
@@ -690,12 +666,12 @@ local function ShowAffixFrame()
     end
 
     -- Always request fresh data from the server.
-    if C_MythicPlus and C_MythicPlus.RequestCurrentAffixes then
+    if C_MythicPlus.RequestCurrentAffixes then
         C_MythicPlus.RequestCurrentAffixes()
     end
 
     -- Populate from whatever is cached right now.
-    local affixList = C_MythicPlus and C_MythicPlus.GetCurrentAffixes and C_MythicPlus.GetCurrentAffixes()
+    local affixList = C_MythicPlus.GetCurrentAffixes and C_MythicPlus.GetCurrentAffixes()
     local hasData = affixList and #affixList > 0
     affixFrame:Populate(affixList)
 
@@ -712,7 +688,7 @@ end
 
 local function OnAffixUpdate()
     if not affixFrame then return end
-    local list = C_MythicPlus and C_MythicPlus.GetCurrentAffixes and C_MythicPlus.GetCurrentAffixes()
+    local list = C_MythicPlus.GetCurrentAffixes and C_MythicPlus.GetCurrentAffixes()
     -- Skip repopulate if data hasn't changed
     local sig = list and #list > 0 and table.concat((function() local t={} for _,a in ipairs(list) do t[#t+1]=a.id end return t end)(), ",") or ""
     if sig ~= "" and affixFrame._lastSig == sig then
@@ -734,7 +710,7 @@ local function MaybeShowAffixFrame()
 
     -- Data may not be ready immediately on login; request it and show
     -- once the MYTHIC_PLUS_CURRENT_AFFIX_UPDATE event fires
-    if C_MythicPlus and C_MythicPlus.RequestCurrentAffixes then
+    if C_MythicPlus.RequestCurrentAffixes then
         C_MythicPlus.RequestCurrentAffixes()
     end
     -- Small delay so the server response can arrive before we try to render
@@ -745,12 +721,10 @@ local function MaybeShowAffixFrame()
     end)
 end
 
--- ============================================================================
--- AUTO-SKIP CINEMATICS / CUTSCENES
---   Event-based: PLAY_MOVIE fires for pre-rendered movies, CINEMATIC_START
---   fires for in-world scripted cinematics.  Both events are reliable across
---   all WoW builds (unlike the old hook on MovieFrame:Play / CinematicFrame).
--- ============================================================================
+-- [ AUTO-SKIP CINEMATICS ] ----------------------------------------------------
+-- Event-based: PLAY_MOVIE fires for pre-rendered movies, CINEMATIC_START
+-- fires for in-world scripted cinematics. Both events are reliable across
+-- all WoW builds (unlike the old hook on MovieFrame:Play / CinematicFrame).
 local function OnPlayMovie()
     if not cfg().autoSkipCinematic then return end
     C_Timer.After(0.5, function()
@@ -775,11 +749,9 @@ local function OnCinematicStart()
     end)
 end
 
--- ============================================================================
--- AUTO-CONFIRM ITEM DELETION
---   DELETE_ITEM_CONFIRM fires when Blizzard shows the delete-confirmation
---   popup. We just hide the editbox and enable Button1 directly.
--- ============================================================================
+-- [ AUTO-CONFIRM ITEM DELETION ] ----------------------------------------------
+-- DELETE_ITEM_CONFIRM fires when Blizzard shows the delete-confirmation
+-- popup. We just hide the editbox and enable Button1 directly.
 local function OnDeleteItemConfirm()
     if not cfg().autoConfirmDelete then return end
     if StaticPopup1EditBox and StaticPopup1EditBox:IsShown() then
@@ -790,8 +762,11 @@ end
 
 
 
--- ============================================================================
+-- [ PET REMINDER ] ------------------------------------------------------------
 local PET_CLASSES = { HUNTER = true, WARLOCK = true }
+local LONE_WOLF_SPELL_ID    = 155228  -- Hunter MM passive: petless playstyle
+local GRIMOIRE_SACRIFICE_ID   = 108503  -- Warlock talent: sacrifice pet for buff
+local GRIMOIRE_SACRIFICE_BUFF = 196099  -- Aura granted after sacrificing
 local petFrame
 local petFadeTimer
 
@@ -814,8 +789,9 @@ local function GetOrMakePetFrame()
     local bg = f:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
     bg:SetColorTexture(0.1, 0.02, 0.02, 0.75)
-    local txt = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local txt = f:CreateFontString(nil, "OVERLAY", "SystemFont_Large")
     txt:SetPoint("CENTER"); txt:SetJustifyH("CENTER")
+    ns.Theme:ApplyHudFont(txt)
     f.txt = txt
     f:SetPoint(
         d.petPoint    or "CENTER",
@@ -854,38 +830,72 @@ local function ShowPetWarning(msg, persistent)
     end
 end
 
+-- Returns true when the Grimoire of Sacrifice buff is active on the player.
+local function HasSacrificeBuff()
+    local aura = C_UnitAuras.GetPlayerAuraBySpellID(GRIMOIRE_SACRIFICE_BUFF)
+    return aura ~= nil
+end
+
 local function CheckPetNow()
     local enabled = cfg().petReminder
     if not enabled then HidePetWarning() return end
     local _, classFile = UnitClass("player")
     if not PET_CLASSES[classFile] then return end
-    if InCombatLockdown() then return end
+    -- Lone Wolf hunters intentionally play petless — suppress all warnings.
+    if classFile == "HUNTER" and IsPlayerSpell(LONE_WOLF_SPELL_ID) then
+        HidePetWarning(); return
+    end
     if IsMounted() then HidePetWarning(); return end
     local petExists = UnitExists("pet")
     local petDead = petExists and UnitIsDead("pet")
-    local petPassive = petExists and not petDead and (GetPetActionInfo(2) == "PET_ACTION_PASSIVE")
+    local hasGoS = classFile == "WARLOCK" and IsPlayerSpell(GRIMOIRE_SACRIFICE_ID)
+    -- If the pet is alive and present, always clear the warning — even in combat.
+    -- (InCombatLockdown only blocks the passive check to avoid taint.)
+    if petExists and not petDead then
+        if InCombatLockdown() then
+            HidePetWarning()  -- clear "no pet" / "dead" banners; skip passive check in combat
+            return
+        end
+        -- GoS warlock with a live pet should sacrifice it.
+        if hasGoS then
+            ShowPetWarning("Sacrifice pet", true); return
+        end
+        local petPassive = (GetPetActionInfo(2) == "PET_ACTION_PASSIVE")
+        if petPassive then
+            ShowPetWarning("Pet is on Passive!", false) -- fades after 8 s
+        else
+            HidePetWarning()
+        end
+        return
+    end
+    -- Pet is missing or dead — don't show warnings in combat (can't summon anyway).
+    if InCombatLockdown() then return end
     if not petExists then
-        ShowPetWarning("No active pet!", true)   -- stays until a pet is summoned
+        if hasGoS then
+            -- Already sacrificed → silent; needs to summon + sacrifice → remind.
+            if HasSacrificeBuff() then HidePetWarning() else ShowPetWarning("Sacrifice pet", true) end
+        else
+            ShowPetWarning("No active pet!", true)
+        end
     elseif petDead then
         ShowPetWarning("Your pet is dead!", false) -- fades after 8 s
-    elseif petPassive then
-        ShowPetWarning("Pet is on Passive!", false) -- fades after 8 s
-    else
-        HidePetWarning()                           -- pet is alive and not passive, dismiss warning
     end
 end
 
 -- UNIT_PET fires before the game state fully updates; delay so
 -- UnitExists("pet") reflects the new state.  Also filters out
 -- party member pet changes (arg1 ~= "player").
-local function CheckPet(unit)
+local function CheckPet(unit, extraDelay)
     if unit and unit ~= "player" then return end
     C_Timer.After(0.5, CheckPetNow)
+    -- For dismount / mount-display changes the pet state can settle slowly;
+    -- schedule a second check so a sluggish update doesn't leave the banner up.
+    if extraDelay then
+        C_Timer.After(extraDelay, CheckPetNow)
+    end
 end
 
--- ============================================================================
--- EVENT DISPATCH
--- ============================================================================
+-- [ EVENT DISPATCH ] ----------------------------------------------------------
 local function OnEvent(self, event, arg1)
     if     event == "QUEST_DETAIL"               then OnQuestDetail()
     elseif event == "QUEST_PROGRESS"             then OnQuestProgress()
@@ -906,22 +916,29 @@ local function OnEvent(self, event, arg1)
     elseif event == "CINEMATIC_START"                   then OnCinematicStart()
     elseif event == "DELETE_ITEM_CONFIRM"                then OnDeleteItemConfirm()
     elseif event == "UNIT_PET"                          then CheckPet(arg1)
-    elseif event == "PLAYER_MOUNT_DISPLAY_CHANGED"       then CheckPet("player")
+    elseif event == "UNIT_AURA"                          then CheckPet(arg1)
+    elseif event == "PLAYER_MOUNT_DISPLAY_CHANGED"       then CheckPet("player", 2)
+    elseif event == "PLAYER_TALENT_UPDATE"               then CheckPet("player")
     elseif event == "PLAYER_ENTERING_WORLD"             then
         MaybeShowAffixFrame()
         CheckPet("player")
     end
 end
 
--- ============================================================================
--- PUBLIC API
--- ============================================================================
+-- [ PUBLIC API ] --------------------------------------------------------------
 
--- ============================================================================
--- AUTO-SLOT KEYSTONE
---   When ChallengesKeystoneFrame opens, find the keystone in bags and slot it.
--- ============================================================================
-local keystoneHooked = false
+-- [ AUTO-SLOT KEYSTONE ] -----------------------------------------------------
+-- When ChallengesKeystoneFrame opens, find the keystone in bags and slot it.
+local keystoneHooked  = false
+local startTimer      = nil  -- C_Timer handle for the auto-start countdown
+local START_COUNTDOWN = 3    -- seconds between keystone slot and auto-start
+
+local function CancelStartCountdown()
+    if startTimer then startTimer:Cancel(); startTimer = nil end
+    if ChallengesKeystoneFrame and ChallengesKeystoneFrame.StartButton then
+        ChallengesKeystoneFrame.StartButton:SetText(START_CHALLENGE)
+    end
+end
 
 local function SlotKeystone()
     if not cfg().autoSlotKeystone then return end
@@ -940,22 +957,53 @@ local function SlotKeystone()
     end
 end
 
+local function BeginAutoStart()
+    if not cfg().autoStartChallenge then return end
+    if not ChallengesKeystoneFrame then return end
+    local btn = ChallengesKeystoneFrame.StartButton
+    local remaining = START_COUNTDOWN
+    local function Tick()
+        if not cfg().autoStartChallenge or not ChallengesKeystoneFrame:IsShown() then
+            CancelStartCountdown()
+            return
+        end
+        if remaining <= 0 then
+            startTimer = nil
+            if btn then btn:SetText(START_CHALLENGE) end
+            C_ChallengeMode.StartChallengeMode()
+            ChallengesKeystoneFrame:Hide()
+            return
+        end
+        if btn then btn:SetText("Starting in " .. remaining .. "...") end
+        remaining = remaining - 1
+        startTimer = C_Timer.NewTimer(1, Tick)
+    end
+    Tick()
+end
+
 local function HookAutoSlotKeystone()
     if keystoneHooked then return end
     keystoneHooked = true
-    -- ChallengesKeystoneFrame is a load-on-demand frame; hook when it appears.
     local hookFrame = CreateFrame("Frame")
     hookFrame:RegisterEvent("ADDON_LOADED")
-    hookFrame:SetScript("OnEvent", function(_, _, name)
-        if name == "Blizzard_ChallengesUI" and ChallengesKeystoneFrame then
+    hookFrame:RegisterEvent("CHALLENGE_MODE_KEYSTONE_SLOTTED")
+    hookFrame:SetScript("OnEvent", function(_, event, name)
+        if event == "ADDON_LOADED" and name == "Blizzard_ChallengesUI" and ChallengesKeystoneFrame then
             ChallengesKeystoneFrame:HookScript("OnShow", SlotKeystone)
-            hookFrame:UnregisterAllEvents()
+            ChallengesKeystoneFrame:HookScript("OnHide", CancelStartCountdown)
+            -- OnKeystoneRemoved is a mixin method called when the keystone is dragged out;
+            -- no event fires for this, so we hook the method directly.
+            hooksecurefunc(ChallengesKeystoneFrame, "OnKeystoneRemoved", CancelStartCountdown)
+            hookFrame:UnregisterEvent("ADDON_LOADED")
+        elseif event == "CHALLENGE_MODE_KEYSTONE_SLOTTED" then
+            BeginAutoStart()
         end
     end)
-    -- If already loaded (e.g. reload while frame is open)
     if ChallengesKeystoneFrame then
         ChallengesKeystoneFrame:HookScript("OnShow", SlotKeystone)
-        hookFrame:UnregisterAllEvents()
+        ChallengesKeystoneFrame:HookScript("OnHide", CancelStartCountdown)
+        hooksecurefunc(ChallengesKeystoneFrame, "OnKeystoneRemoved", CancelStartCountdown)
+        hookFrame:UnregisterEvent("ADDON_LOADED")
     end
 end
 
@@ -1018,6 +1066,15 @@ function QOL.Refresh(addonObj)
     Reg("DELETE_ITEM_CONFIRM", d.autoConfirmDelete)
     Reg("UNIT_PET",         d.petReminder)
     Reg("PLAYER_MOUNT_DISPLAY_CHANGED", d.petReminder)
+    Reg("PLAYER_TALENT_UPDATE",         d.petReminder)
+    -- GoS warlocks need UNIT_AURA to react when the sacrifice buff drops.
+    -- Scoped to "player" via RegisterUnitEvent to avoid per-frame spam.
+    local _, classFile = UnitClass("player")
+    if d.petReminder and classFile == "WARLOCK" then
+        frame:RegisterUnitEvent("UNIT_AURA", "player")
+    else
+        frame:UnregisterEvent("UNIT_AURA")
+    end
 
     ApplyFasterLooting()
 end

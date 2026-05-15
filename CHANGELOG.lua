@@ -8,6 +8,42 @@ local ADDON_NAME, ns = ...
 -- ---------------------------------------------------------------------------
 ns.Changelog = {
     {
+        version = "1.2.0",
+        date    = "2026-05-15",
+        changes = {
+            "|cff44ccffRedesign|r  Visual overhaul — borders removed, unified SystemFont + OUTLINE treatment across all modules",
+            "|cff44ccffRedesign|r  Raid Toolbar — single panel background, atlas icons, fade-out toggle replaces collapse",
+            "|cff00cc66New|r  AuraReminder: clickable icons — left-click to cast buff or use consumable",
+            "|cff00cc66New|r  AuraReminder: glow effects (Blizzard/Pixel/Autocast/Pulse) via LibCustomGlow",
+            "|cff00cc66New|r  AuraReminder: duration threshold — remind when flask/food is about to expire",
+            "|cff00cc66New|r  AuraReminder: consumable preference dropdowns (flask & food per content type)",
+            "|cff00cc66New|r  AuraReminder: party buff range check, text labels, combat-aware display, open-world mode",
+            "|cff00cc66New|r  Pet Reminder: Lone Wolf suppression, Grimoire of Sacrifice detection",
+        },
+    },
+    {
+        version = "1.1.4",
+        date    = "2026-05-10",
+        changes = {
+            "|cff2dc9b8Fix|r  LibKeystone: SendAddonMessage blocked inside instances — stops \"You aren't in a party\" spam (WoW 12.0 restriction)",
+            "|cff2dc9b8Fix|r  Teleport: keystone requests skipped inside instances — prevents system error spam in delves and M+",
+            "|cff2dc9b8Fix|r  M+ Timer: completion chat message discarded when group disbands before zone-out",
+            "|cff2dc9b8Fix|r  M+ Timer: no longer crashes on scenario criteria events outside M+ (elapsedBase nil guard)",
+            "|cff2dc9b8Fix|r  Game UI Scale: chosen scale now persists across reloads (saved in addon profile)",
+        },
+    },
+    {
+        version = "1.1.3",
+        date    = "2026-04-23",
+        changes = {
+            "|cff2dc9b8Fix|r  Teleport: panel now correctly hidden inside Delves (scenario instance type was not excluded)",
+            "|cff2dc9b8Fix|r  Teleport: cooldown swipe removed — replaced with a centered countdown text shown on every button while a CD is active",
+            "|cff2dc9b8Fix|r  M+ Timer: Blizzard objective/timer suppression no longer bleeds into Delves — Show hooks now guard on IsChallengeModeActive()",
+            "|cff2dc9b8Fix|r  Pet Reminder: warning now clears correctly when pet returns during combat (InCombatLockdown no longer blocks HidePetWarning)",
+            "|cff2dc9b8Fix|r  Pet Reminder: warning clears faster after dismounting — second check scheduled 2 s after mount state changes",
+        },
+    },
+    {
         version = "1.1.2",
         date    = "2026-04-18",
         changes = {

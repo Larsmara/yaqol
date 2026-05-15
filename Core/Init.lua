@@ -7,6 +7,10 @@ _G.yaqol = yaqol
 
 function yaqol:OnInitialize()
     self.db = LibStub("AceDB-3.0"):New("yaqolDB", ns.Defaults, true)
+
+    -- Migrate: remove stale theme key from existing SavedVariables
+    if self.db.global.theme then self.db.global.theme = nil end
+
     ns.Theme.Init()
     self.db.RegisterCallback(self, "OnProfileChanged", "OnProfileChanged")
     self.db.RegisterCallback(self, "OnProfileCopied", "OnProfileChanged")
@@ -14,11 +18,36 @@ function yaqol:OnInitialize()
 
     -- Migrate: ensure spell list sub-tables exist for profiles created before they were added
     local r = self.db.profile.reminder
-    for _, key in ipairs({"flasks","food","augmentRunes","weaponBuffs","custom","classBuffs","partyBuffs"}) do
+    for _, key in ipairs({"classBuffs","partyBuffs"}) do
         if not r[key] then r[key] = {} end
     end
     if r.enableClassBuffs == nil then r.enableClassBuffs = true end
     if r.enablePartyBuffs == nil then r.enablePartyBuffs = true end
+    if r.showInCombat == nil then r.showInCombat = true end
+
+    -- Migrate: Phase 4 duration thresholds, range check, and consumable preferences
+    if r.showUnderDurationDungeon == nil then r.showUnderDurationDungeon = 20 end
+    if r.showUnderDurationRaid == nil then r.showUnderDurationRaid = 10 end
+    if r.partyBuffRangeCheck == nil then r.partyBuffRangeCheck = true end
+    if r.flaskRaid == nil then r.flaskRaid = "auto" end
+    if r.flaskDungeon == nil then r.flaskDungeon = "auto" end
+    if r.foodRaid == nil then r.foodRaid = "auto" end
+    if r.foodDungeon == nil then r.foodDungeon = "auto" end
+    -- Remove obsolete preference keys from old profiles
+    r.preferredFlask = nil
+    r.preferredFood = nil
+    r.preferredWeaponEnchant = nil
+
+    -- Migrate: Phase 5 display settings
+    if r.showNonInstanced == nil then r.showNonInstanced = false end
+    if r.showText == nil then r.showText = false end
+    if r.textSize == nil then r.textSize = 10 end
+    if r.textColor == nil then r.textColor = { r = 1, g = 1, b = 1 } end
+    if r.glowType == nil then r.glowType = "BLIZZARD" end
+    if r.glowColor == nil then r.glowColor = { r = 1, g = 0.8, b = 0, a = 1 } end
+    if r.iconSpacing == nil then r.iconSpacing = 4 end
+    if r.opacity == nil then r.opacity = 0.7 end
+    if r.frameStrata == nil then r.frameStrata = "HIGH" end
 
     -- Migrate: new QOL settings added in v1.0.5
     local q = self.db.profile.qol
@@ -37,28 +66,15 @@ function yaqol:OnInitialize()
     if not self.db.profile.mythicTimer then
         self.db.profile.mythicTimer = CopyTable(ns.Defaults.profile.mythicTimer)
     end
+    local mt = self.db.profile.mythicTimer
+    if mt.showBackdrop  == nil then mt.showBackdrop  = false end
+    if mt.showKillTimes == nil then mt.showKillTimes = false end
+    if mt.fontScale     == nil then mt.fontScale     = 1.0   end
     -- Migrate: old profiles had enabledDungeon=false by mistake; default is now true
     if r.enabledDungeon == nil or r.enabledDungeon == false then
         -- Only reset if it was never explicitly set to false by the user.
         -- Since old default was false, we can't distinguish — just upgrade to true.
         r.enabledDungeon = true
-    end
-
-    -- Migrate: if profile still has old TWW flask IDs (< Midnight S1), reset to new defaults
-    local twwFlaskIDs = { [431932]=true,[431934]=true,[431935]=true,[431936]=true,[431933]=true,
-                          [432021]=true,[432022]=true,[432023]=true,[432024]=true,[432025]=true }
-    if r.flasks and r.flasks[1] and twwFlaskIDs[r.flasks[1].spellID] then
-        r.flasks = CopyTable(ns.Defaults.profile.reminder.flasks)
-    end
-    -- Migrate: reset old TWW augment rune ID (441392) to new Midnight rune IDs
-    if r.augmentRunes and r.augmentRunes[1] and r.augmentRunes[1].spellID == 441392 then
-        r.augmentRunes = CopyTable(ns.Defaults.profile.reminder.augmentRunes)
-    end
-    -- Migrate: reset old individual food spell IDs to new generic Well Fed IDs
-    local oldFoodIDs = { [431780]=true,[431781]=true,[431782]=true,[431783]=true,
-                         [431784]=true,[431785]=true,[431786]=true }
-    if r.food and r.food[1] and oldFoodIDs[r.food[1].spellID] then
-        r.food = CopyTable(ns.Defaults.profile.reminder.food)
     end
 
     -- Migrate: ensure combatRess defaults exist for old profiles
@@ -93,12 +109,39 @@ function yaqol:OnInitialize()
         self.db.profile.mouseTracker = CopyTable(ns.Defaults.profile.mouseTracker)
     end
 
+    -- Migrate: ensure groupFilter defaults exist for old profiles
+    if not self.db.profile.groupFilter then
+        self.db.profile.groupFilter = CopyTable(ns.Defaults.profile.groupFilter)
+    end
+    local gf = self.db.profile.groupFilter
+    if gf.enabled             == nil then gf.enabled             = true  end
+    if gf.needMyClass         == nil then gf.needMyClass         = false end
+    if gf.hasTank             == nil then gf.hasTank             = false end
+    if gf.hasHealer           == nil then gf.hasHealer           = false end
+    if gf.difficultyNormal    == nil then gf.difficultyNormal    = false end
+    if gf.difficultyHeroic    == nil then gf.difficultyHeroic    = false end
+    if gf.difficultyMythic    == nil then gf.difficultyMythic    = false end
+    if gf.difficultyMythicPlus == nil then gf.difficultyMythicPlus = false end
+    if gf.playstyle1          == nil then gf.playstyle1          = false end
+    if gf.playstyle2          == nil then gf.playstyle2          = false end
+    if gf.playstyle3          == nil then gf.playstyle3          = false end
+    if gf.playstyle4          == nil then gf.playstyle4          = false end
+    if gf.minRating           == nil then gf.minRating           = 0    end
+
     ns.Config.Build(self)
     self:RegisterChatCommand("yaqol", "OnSlashCommand")
     self:RegisterChatCommand("yq", "OnSlashCommand")
 end
 
 function yaqol:OnEnable()
+    -- Re-apply saved Game UI Scale (CVars may not persist across reload/crash)
+    local savedScale = self.db.profile.gameUIScale
+    if savedScale then
+        SetCVar("useUiScale", "1")
+        SetCVar("uiScale", string.format("%.4f", savedScale))
+        UIParent:SetScale(savedScale)
+    end
+
     ns.MinimapButton.Init(self)
     ns.Teleport.Init(self)
     ns.AuraReminder.Init(self)
@@ -112,6 +155,7 @@ function yaqol:OnEnable()
     ns.VaultTracker.Init(self)
     ns.RunHistory.Init(self)
     ns.MouseTracker.Init(self)
+    ns.GroupFilter.Init(self)
 end
 
 function yaqol:OnProfileChanged()
@@ -128,6 +172,7 @@ function yaqol:OnProfileChanged()
     ns.VaultTracker.Refresh(self)
     ns.RunHistory.Refresh(self)
     ns.MouseTracker.Refresh(self)
+    ns.GroupFilter.Refresh(self)
 end
 
 function yaqol:OnSlashCommand(input)

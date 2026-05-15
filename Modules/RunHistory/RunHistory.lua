@@ -24,11 +24,11 @@ local COL = {
 }
 
 -- Upgrade colours
-local COL_PLUS3  = { 0.2,  0.85, 0.35 }  -- green
-local COL_PLUS2  = { 0.3,  0.75, 0.95 }  -- blue
-local COL_PLUS1  = { 0.9,  0.82, 0.1  }  -- yellow
-local COL_TIMED  = { 0.7,  0.7,  0.7  }  -- grey  (0-upgrade but timed)
-local COL_DEPLETE = { 0.9, 0.25, 0.25 }  -- red
+local COL_PLUS3  = { r = 0.2,  g = 0.85, b = 0.35 }  -- green
+local COL_PLUS2  = { r = 0.3,  g = 0.75, b = 0.95 }  -- blue
+local COL_PLUS1  = { r = 0.9,  g = 0.82, b = 0.1  }  -- yellow
+local COL_TIMED  = { r = 0.7,  g = 0.7,  b = 0.7  }  -- grey  (0-upgrade but timed)
+local COL_DEPLETE = { r = 0.9, g = 0.25, b = 0.25 }  -- red
 
 -- [ STATE ] -------------------------------------------------------------------
 local panel         -- main frame
@@ -39,6 +39,22 @@ local currentCharKey  -- "Realm-Name" string for the logged-in character
 local filterWeek    = "all"   -- "week" | "season" | "all"
 local filterDungeon = "all"   -- dungeon name string or "all"
 local filterMinKey  = 0       -- minimum key level
+
+-- Group snapshot taken at CHALLENGE_MODE_START, used by RecordCurrentRun.
+-- GetChallengeCompletionInfo().members is unreliable (may return fewer members
+-- than actually ran the key), so we capture the full party when the key begins.
+local partySnapshot = nil
+
+-- Player ilvl captured at CHALLENGE_MODE_START
+local snapshotIlvl = nil
+
+-- C_DamageMeter constants
+local DM_SESSION_OVERALL = 0   -- DamageMeterSessionType.Overall
+local DM_TYPE_DAMAGE     = 0   -- DamageMeterType.DamageDone
+local DM_TYPE_HEALING    = 2   -- DamageMeterType.HealingDone
+
+-- Forward declaration — defined after RecordCurrentRun
+local PendingDamageMeterPatch
 
 -- [ HELPERS ] -----------------------------------------------------------------
 local function db()
@@ -103,6 +119,14 @@ local function FmtDate(ts)
     return date("%b %d", ts)
 end
 
+-- Large number → compact string (e.g. 1234567 → "1.23M", 45600 → "45.6K")
+local function FmtNumber(n)
+    if not n or n == 0 then return "0" end
+    if n >= 1e6 then return string.format("%.2fM", n / 1e6) end
+    if n >= 1e3 then return string.format("%.1fK", n / 1e3) end
+    return tostring(math.floor(n))
+end
+
 -- Returns the Unix timestamp of the most recent weekly reset (Tuesday 09:00 UTC).
 local function WeekResetTime()
     local now = time()
@@ -146,27 +170,20 @@ local function RecordCurrentRun()
         deaths = C_ChallengeMode.GetDeathCount() or 0
     end
 
-    -- Group members (from completion info; falls back to live group)
+    -- Group members: prefer the snapshot captured at CHALLENGE_MODE_START.
+    -- GetChallengeCompletionInfo().members is unreliable — it may contain fewer
+    -- members than actually ran the key, so we never use it.
     local members = {}
-    if info.members and #info.members >= 1 then
-        for _, m in ipairs(info.members) do
-            if m.name then
-                local _, class = m.memberGUID and GetPlayerInfoByGUID(m.memberGUID) or nil
-                members[#members + 1] = {
-                    name  = m.name,
-                    class = class or "UNKNOWN",
-                    role  = "NONE",
-                }
-            end
-        end
+    if partySnapshot and #partySnapshot > 0 then
+        members = partySnapshot
     else
-        -- fallback: read live group
+        -- Fallback: read live group (should still be intact at completion time).
         local function AddMember(unit)
-            local uName = UnitName(unit)
+            local uName, uRealm = UnitName(unit)
             if not uName then return end
             local _, class = UnitClass(unit)
             local role = UnitGroupRolesAssigned(unit) or "NONE"
-            members[#members + 1] = { name = uName, class = class or "UNKNOWN", role = role }
+            members[#members + 1] = { name = uName, realm = uRealm or "", class = class or "UNKNOWN", role = role }
         end
         AddMember("player")
         if IsInGroup() then
@@ -176,6 +193,14 @@ local function RecordCurrentRun()
 
     -- Current season
     local season = (C_MythicPlus.GetCurrentSeason and C_MythicPlus.GetCurrentSeason()) or 0
+
+    -- Strip GUIDs before persisting (they change between sessions)
+    -- Keep a GUID→index map for the deferred damage meter patch.
+    local guidMap = {}
+    for i, m in ipairs(members) do
+        if m.guid then guidMap[m.guid] = i end
+        m.guid = nil
+    end
 
     local run = {
         mapID     = mapID,
@@ -189,10 +214,92 @@ local function RecordCurrentRun()
         members   = members,
         date      = time(),
         season    = season,
+        totalDamage  = 0,
+        totalHealing = 0,
+        ilvl         = snapshotIlvl,
     }
 
     local runs = GetRuns()
     table.insert(runs, 1, run)  -- newest first
+
+    -- Damage meter values are SecretWhenInCombat and the player is typically
+    -- still in combat when CHALLENGE_MODE_COMPLETED fires. Defer the read
+    -- until combat drops (PLAYER_REGEN_ENABLED), then patch the saved run.
+    PendingDamageMeterPatch(run, guidMap)
+end
+
+-- Reads C_DamageMeter data and writes it into the given run record.
+-- Returns true if data was successfully read.
+local function ReadDamageMeter(run, guidMap)
+    if not C_DamageMeter or not C_DamageMeter.GetCombatSessionFromType then return false end
+
+    local function SafeNum(val)
+        if val == nil then return nil end
+        if issecretvalue(val) then return nil end
+        return val
+    end
+
+    local function SafeStr(val)
+        if val == nil then return nil end
+        if issecretvalue(val) then return nil end
+        return val
+    end
+
+    -- Damage
+    local dmgSession = C_DamageMeter.GetCombatSessionFromType(DM_SESSION_OVERALL, DM_TYPE_DAMAGE)
+    if dmgSession then
+        local total = SafeNum(dmgSession.totalAmount)
+        if total then run.totalDamage = total end
+        if dmgSession.combatSources then
+            for _, src in ipairs(dmgSession.combatSources) do
+                local guid = SafeStr(src.sourceGUID)
+                local amt  = SafeNum(src.totalAmount)
+                if guid and amt then
+                    local idx = guidMap[guid]
+                    if idx and run.members[idx] then run.members[idx].damage = amt end
+                end
+            end
+        end
+    end
+
+    -- Healing
+    local healSession = C_DamageMeter.GetCombatSessionFromType(DM_SESSION_OVERALL, DM_TYPE_HEALING)
+    if healSession then
+        local total = SafeNum(healSession.totalAmount)
+        if total then run.totalHealing = total end
+        if healSession.combatSources then
+            for _, src in ipairs(healSession.combatSources) do
+                local guid = SafeStr(src.sourceGUID)
+                local amt  = SafeNum(src.totalAmount)
+                if guid and amt then
+                    local idx = guidMap[guid]
+                    if idx and run.members[idx] then run.members[idx].healing = amt end
+                end
+            end
+        end
+    end
+
+    return (run.totalDamage or 0) > 0 or (run.totalHealing or 0) > 0
+end
+
+-- Schedule deferred damage meter read: try immediately, fall back to PLAYER_REGEN_ENABLED.
+local pendingPatchFrame
+PendingDamageMeterPatch = function(run, guidMap)
+    -- Try immediately (player might already be out of combat)
+    if not InCombatLockdown() then
+        local ok, err = pcall(ReadDamageMeter, run, guidMap)
+        if ok then return end
+    end
+
+    -- Defer until combat ends
+    if not pendingPatchFrame then
+        pendingPatchFrame = CreateFrame("Frame")
+    end
+    pendingPatchFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+    pendingPatchFrame:SetScript("OnEvent", function(self)
+        self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+        pcall(ReadDamageMeter, run, guidMap)
+    end)
 end
 
 -- [ FILTERING ] ---------------------------------------------------------------
@@ -225,11 +332,11 @@ local statsLbl
 -- Build a single column header label
 local function ColHeader(parent, text, x, w, yOff)
     local T = ns.Theme
-    local lbl = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local lbl = parent:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     lbl:SetPoint("TOPLEFT", parent, "TOPLEFT", x, yOff)
     lbl:SetWidth(w)
     lbl:SetJustifyH("LEFT")
-    lbl:SetTextColor(T.textHeader[1], T.textHeader[2], T.textHeader[3])
+    lbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3])
     lbl:SetText(text)
     return lbl
 end
@@ -257,14 +364,14 @@ local function RebuildRows(charKey)
         local rowBg = rowF:CreateTexture(nil, "BACKGROUND")
         rowBg:SetAllPoints()
         if i % 2 == 0 then
-            rowBg:SetColorTexture(T.bg[1] + 0.03, T.bg[2] + 0.03, T.bg[3] + 0.03, 0.6)
+            rowBg:SetColorTexture(T.bgRow[1], T.bgRow[2], T.bgRow[3], T.bgRow[4])
         else
             rowBg:SetColorTexture(T.bg[1], T.bg[2], T.bg[3], 0.4)
         end
 
         local x = 4
         local function AddCell(text, w, r2, g2, b2)
-            local f2 = rowF:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            local f2 = rowF:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
             f2:SetPoint("LEFT", rowF, "LEFT", x, 0)
             f2:SetWidth(w - 4)
             f2:SetJustifyH("LEFT")
@@ -279,14 +386,14 @@ local function RebuildRows(charKey)
         AddCell("+" .. (r.level or "?"), COL.key,     T.accent[1], T.accent[2], T.accent[3])
         AddCell(FmtTime(r.elapsed),      COL.time)
         -- Inline colour codes handled by SetText
-        local deltaF = rowF:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local deltaF = rowF:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
         deltaF:SetPoint("LEFT", rowF, "LEFT", x, 0)
         deltaF:SetWidth(COL.delta - 4)
         deltaF:SetJustifyH("LEFT")
         deltaF:SetText(FmtDelta(r.elapsed, r.timeLimit))
         x = x + COL.delta
 
-        AddCell(upg,                     COL.upgrade,  col[1], col[2], col[3])
+        AddCell(upg,                     COL.upgrade,  col.r, col.g, col.b)
         AddCell(tostring(r.deaths or 0), COL.deaths)
         AddCell(FmtDate(r.date),         COL.date,    T.textDim[1], T.textDim[2], T.textDim[3])
 
@@ -294,19 +401,30 @@ local function RebuildRows(charKey)
         rowF:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:AddLine(r.dungeon .. " +" .. r.level, 1, 1, 1)
+            if r.ilvl then
+                GameTooltip:AddLine("iLvl: " .. r.ilvl, T.textDim[1], T.textDim[2], T.textDim[3])
+            end
             if r.members and #r.members > 0 then
                 GameTooltip:AddLine(" ")
-                GameTooltip:AddLine("Group:", T.textHeader[1], T.textHeader[2], T.textHeader[3])
+                GameTooltip:AddLine("Group:", T.textDim[1], T.textDim[2], T.textDim[3])
                 for _, m in ipairs(r.members) do
                     local classColour = RAID_CLASS_COLORS and RAID_CLASS_COLORS[m.class]
                     local r2, g2, b2 = 1, 1, 1
                     if classColour then r2, g2, b2 = classColour.r, classColour.g, classColour.b end
-                    GameTooltip:AddLine("  " .. m.name, r2, g2, b2)
+                    local suffix = ""
+                    if m.damage and m.damage > 0 then suffix = suffix .. "  D:" .. FmtNumber(m.damage) end
+                    if m.healing and m.healing > 0 then suffix = suffix .. "  H:" .. FmtNumber(m.healing) end
+                    GameTooltip:AddLine("  " .. m.name .. (m.realm and m.realm ~= "" and "-" .. m.realm or "") .. suffix, r2, g2, b2)
                 end
+            end
+            if (r.totalDamage and r.totalDamage > 0) or (r.totalHealing and r.totalHealing > 0) then
+                GameTooltip:AddLine(" ")
+                GameTooltip:AddDoubleLine("Total Damage", FmtNumber(r.totalDamage or 0), T.textDim[1], T.textDim[2], T.textDim[3], 1, 1, 1)
+                GameTooltip:AddDoubleLine("Total Healing", FmtNumber(r.totalHealing or 0), T.textDim[1], T.textDim[2], T.textDim[3], 1, 1, 1)
             end
             if r.affixIDs and #r.affixIDs > 0 then
                 GameTooltip:AddLine(" ")
-                GameTooltip:AddLine("Affixes:", T.textHeader[1], T.textHeader[2], T.textHeader[3])
+                GameTooltip:AddLine("Affixes:", T.textDim[1], T.textDim[2], T.textDim[3])
                 for _, id in ipairs(r.affixIDs) do
                     local affixName = C_ChallengeMode.GetAffixInfo(id)
                     if affixName then
@@ -388,7 +506,6 @@ local function BuildPanel()
     f:SetClampedToScreen(true)
     f:Hide()
     T:ApplyBg(f)
-    T:ApplyBorder(f)
 
     -- [ HEADER ] --------------------------------------------------------------
     local header = CreateFrame("Frame", nil, f)
@@ -396,7 +513,7 @@ local function BuildPanel()
     header:SetPoint("TOPLEFT", f, "TOPLEFT", 0, 0)
     header:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
 
-    local title = header:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local title = header:CreateFontString(nil, "OVERLAY", "SystemFont_Med1")
     title:SetPoint("LEFT", header, "LEFT", 12, 0)
     title:SetTextColor(T.accent[1], T.accent[2], T.accent[3])
     title:SetText("RUN HISTORY")
@@ -412,27 +529,23 @@ local function BuildPanel()
     charDropBtn:SetSize(160, 20)
     charDropBtn:SetPoint("RIGHT", closeBtn, "LEFT", -8, 0)
     T:StyleButton(charDropBtn, 160, 20)
-    local charLbl = charDropBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local charLbl = charDropBtn:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     charLbl:SetPoint("LEFT", charDropBtn, "LEFT", 6, 0)
     charLbl:SetWidth(130)
     charLbl:SetJustifyH("LEFT")
     charLbl:SetText(selectedChar)
     charDropBtn:SetScript("OnClick", function(self)
         local keys = GetCharKeys()
-        local menu = {}
-        for _, k in ipairs(keys) do
-            local kRef = k
-            menu[#menu+1] = {
-                text    = kRef,
-                notCheckable = true,
-                func = function()
+        MenuUtil.CreateContextMenu(self, function(_, rootDescription)
+            for _, k in ipairs(keys) do
+                local kRef = k
+                rootDescription:CreateButton(kRef, function()
                     selectedChar = kRef
                     charLbl:SetText(kRef)
                     RebuildRows(kRef)
-                end,
-            }
-        end
-        EasyMenu(menu, CreateFrame("Frame", "yaqolCharMenuAnchor", UIParent), "cursor", 0, 0, "MENU")
+                end)
+            end
+        end)
     end)
 
     -- Divider under header
@@ -440,7 +553,7 @@ local function BuildPanel()
     hDiv:SetHeight(1)
     hDiv:SetPoint("TOPLEFT", f, "TOPLEFT", 8, -HEADER_H)
     hDiv:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -HEADER_H)
-    hDiv:SetColorTexture(T.border[1], T.border[2], T.border[3], T.border[4])
+    hDiv:SetColorTexture(T.textDim[1], T.textDim[2], T.textDim[3], 0.15)
 
     -- [ FILTER ROW ] ----------------------------------------------------------
     local filterY = -(HEADER_H + 6)
@@ -452,7 +565,7 @@ local function BuildPanel()
     timeBtn:SetSize(100, 20)
     timeBtn:SetPoint("TOPLEFT", f, "TOPLEFT", 8, filterY)
     T:StyleButton(timeBtn, 100, 20)
-    local timeLbl = timeBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local timeLbl = timeBtn:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     timeLbl:SetPoint("CENTER"); timeLbl:SetText(timeLabels[filterWeek])
     timeBtn:SetScript("OnClick", function()
         local cur = filterWeek
@@ -471,31 +584,29 @@ local function BuildPanel()
     dungeonBtn:SetSize(160, 20)
     dungeonBtn:SetPoint("LEFT", timeBtn, "RIGHT", 6, 0)
     T:StyleButton(dungeonBtn, 160, 20)
-    local dungLbl = dungeonBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local dungLbl = dungeonBtn:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     dungLbl:SetPoint("LEFT", dungeonBtn, "LEFT", 6, 0)
     dungLbl:SetWidth(140)
     dungLbl:SetJustifyH("LEFT")
     dungLbl:SetText("All Dungeons")
     dungeonBtn:SetScript("OnClick", function(self)
         local names = GetDungeonNames(selectedChar)
-        local menu = {}
-        for _, n in ipairs(names) do
-            local nRef = n
-            menu[#menu+1] = {
-                text = (nRef == "all") and "All Dungeons" or nRef,
-                notCheckable = true,
-                func = function()
-                    filterDungeon = nRef
-                    dungLbl:SetText((nRef == "all") and "All Dungeons" or nRef)
-                    RebuildRows(selectedChar)
-                end,
-            }
-        end
-        EasyMenu(menu, CreateFrame("Frame", "yaqolDungMenuAnchor", UIParent), "cursor", 0, 0, "MENU")
+        MenuUtil.CreateContextMenu(self, function(_, rootDescription)
+            for _, n in ipairs(names) do
+                local nRef = n
+                rootDescription:CreateButton(
+                    (nRef == "all") and "All Dungeons" or nRef,
+                    function()
+                        filterDungeon = nRef
+                        dungLbl:SetText((nRef == "all") and "All Dungeons" or nRef)
+                        RebuildRows(selectedChar)
+                    end)
+            end
+        end)
     end)
 
     -- Min key level input
-    local keyLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local keyLabel = f:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     keyLabel:SetPoint("LEFT", dungeonBtn, "RIGHT", 8, 0)
     keyLabel:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3])
     keyLabel:SetText("Key ≥")
@@ -506,7 +617,7 @@ local function BuildPanel()
     keyEB:SetAutoFocus(false)
     keyEB:SetNumeric(true)
     keyEB:SetMaxLetters(3)
-    keyEB:SetFontObject("GameFontNormalSmall")
+    keyEB:SetFontObject("SystemFont_Small")
     keyEB:SetTextColor(T.text[1], T.text[2], T.text[3])
     keyEB:SetTextInsets(4, 4, 0, 0)
     local keyBg = keyEB:CreateTexture(nil, "BACKGROUND")
@@ -514,7 +625,7 @@ local function BuildPanel()
     keyBg:SetColorTexture(T.bgInput[1], T.bgInput[2], T.bgInput[3], T.bgInput[4])
     local keyBorder = keyEB:CreateTexture(nil, "BORDER")
     keyBorder:SetHeight(1); keyBorder:SetPoint("BOTTOM")
-    keyBorder:SetColorTexture(T.border[1], T.border[2], T.border[3], T.border[4])
+    keyBorder:SetColorTexture(T.textDim[1], T.textDim[2], T.textDim[3], 0.15)
     keyEB:SetScript("OnEnterPressed", function(self)
         filterMinKey = tonumber(self:GetText()) or 0
         self:ClearFocus()
@@ -527,7 +638,7 @@ local function BuildPanel()
     clearBtn:SetSize(80, 20)
     clearBtn:SetPoint("LEFT", keyEB, "RIGHT", 6, 0)
     T:StyleButton(clearBtn, 80, 20)
-    local clearLbl = clearBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local clearLbl = clearBtn:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     clearLbl:SetPoint("CENTER"); clearLbl:SetText("Clear Filters")
     clearBtn:SetScript("OnClick", function()
         filterWeek = "all"; filterDungeon = "all"; filterMinKey = 0
@@ -557,7 +668,7 @@ local function BuildPanel()
     cDiv:SetHeight(1)
     cDiv:SetPoint("TOPLEFT",  f, "TOPLEFT",  8, colY - 18)
     cDiv:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, colY - 18)
-    cDiv:SetColorTexture(T.border[1], T.border[2], T.border[3], T.border[4])
+    cDiv:SetColorTexture(T.textDim[1], T.textDim[2], T.textDim[3], 0.15)
 
     -- [ SCROLL FRAME ] --------------------------------------------------------
     local scrollTop = HEADER_H + FILTER_H + 22
@@ -593,7 +704,7 @@ local function BuildPanel()
     statsBar:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  8,  4)
     statsBar:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -8, 4)
 
-    statsLbl = statsBar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    statsLbl = statsBar:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     statsLbl:SetPoint("LEFT", statsBar, "LEFT", 4, 0)
     statsLbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3])
     statsLbl:SetText("No runs recorded yet.")
@@ -607,10 +718,32 @@ function RunHistory.Init(addon)
     currentCharKey = nil  -- resolved lazily after PLAYER_LOGIN
 
     local watcher = CreateFrame("Frame")
+    watcher:RegisterEvent("CHALLENGE_MODE_START")
     watcher:RegisterEvent("CHALLENGE_MODE_COMPLETED")
     watcher:SetScript("OnEvent", function(_, event)
-        if event == "CHALLENGE_MODE_COMPLETED" then
+        if event == "CHALLENGE_MODE_START" then
+            -- Snapshot the full party now, before the key might cause anyone to
+            -- leave. This is what RecordCurrentRun uses for the members table.
+            partySnapshot = {}
+            local function Snap(unit)
+                local uName, uRealm = UnitName(unit)
+                if not uName then return end
+                local _, class = UnitClass(unit)
+                local role = UnitGroupRolesAssigned(unit) or "NONE"
+                local guid = UnitGUID(unit)
+                partySnapshot[#partySnapshot + 1] = { name = uName, realm = uRealm or "", class = class or "UNKNOWN", role = role, guid = guid }
+            end
+            Snap("player")
+            if IsInGroup() then
+                for i = 1, GetNumSubgroupMembers() do Snap("party" .. i) end
+            end
+            -- Capture player ilvl (GetAverageItemLevel returns overall, equipped, pvp)
+            local _, equipped = GetAverageItemLevel()
+            snapshotIlvl = equipped and math.floor(equipped) or nil
+        elseif event == "CHALLENGE_MODE_COMPLETED" then
             RecordCurrentRun()
+            partySnapshot = nil  -- clear for next run
+            snapshotIlvl = nil
             -- Refresh panel if open
             if panel and panel:IsShown() then
                 RebuildRows(CharKey())

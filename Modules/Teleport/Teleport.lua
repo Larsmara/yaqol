@@ -34,7 +34,6 @@ local challengeMapToDungeon = {
 -- map list and name-matching against DUNGEONS[i].searchKey.
 -- Safe to call multiple times; only updates entries we can confirm.
 local function BuildChallengeMapLookup()
-    if not (C_ChallengeMode and C_ChallengeMode.GetMapTable) then return end
     local maps = C_ChallengeMode.GetMapTable()
     if not maps then return end
     for _, mapID in ipairs(maps) do
@@ -60,8 +59,8 @@ local HEADER_H = 26  -- header strip containing title + controls
 local FRAME_W = BTN_W + PANEL_PAD * 2
 
 local DISABLED_ALPHA = 0.3
-local LEARNED_COLOR = { 0.9, 0.9, 0.9 }
-local UNKNOWN_COLOR = { 0.5, 0.5, 0.5 }
+local LEARNED_COLOR = { r = 0.9, g = 0.9, b = 0.9 }
+local UNKNOWN_COLOR = { r = 0.5, g = 0.5, b = 0.5 }
 local T = ns.Theme  -- populated by Theme.Init() before BuildPanel runs
 
 -- [ KEYSTONE DATA VIA LIBKEYSTONE ] -----------------------------------------
@@ -94,6 +93,10 @@ end
 
 local function RequestPartyKeystones()
     if LibKeystone then
+        -- 12.0.0: SendAddonMessage is blocked inside instances; skip request
+        -- to avoid "You aren't in a party" system error spam.
+        local _, iType = GetInstanceInfo()
+        if iType and iType ~= "none" then return end
         LibKeystone.Request("PARTY")
     end
 end
@@ -112,7 +115,7 @@ local function CollectPartyKeystones()
         local r, g, b = 1, 0.82, 0.1  -- fallback gold (used when unit token is unknown)
         if unit then
             local _, classFile = UnitClass(unit)
-            if classFile and C_ClassColor and C_ClassColor.GetClassColor then
+            if classFile then
                 local c = C_ClassColor.GetClassColor(classFile)
                 if c then r, g, b = c.r, c.g, c.b end
             end
@@ -153,9 +156,9 @@ local function CollectPartyKeystones()
 
     -- Always supplement with direct C_MythicPlus read for own key.
     -- This covers: LibKeystone not loaded, pName nil at lib load, or data not yet in cache.
-    if C_MythicPlus then
-        local mapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID and C_MythicPlus.GetOwnedKeystoneChallengeMapID()
-        local level = C_MythicPlus.GetOwnedKeystoneLevel and C_MythicPlus.GetOwnedKeystoneLevel()
+    do
+        local mapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID()
+        local level = C_MythicPlus.GetOwnedKeystoneLevel()
         if mapID and mapID > 0 and level and level > 0 then
             local name = UnitName("player") or "player"
             if not ownKeyHandled then
@@ -194,7 +197,7 @@ local function CheckVisibility()
     end
 
     local inInstance, instanceType = IsInInstance()
-    if inInstance and (instanceType == "party" or instanceType == "raid" or instanceType == "pvp" or instanceType == "arena") then
+    if inInstance and (instanceType == "party" or instanceType == "raid" or instanceType == "pvp" or instanceType == "arena" or instanceType == "scenario") then
         panel:Hide()
         return
     end
@@ -226,24 +229,15 @@ local function MakePanel()
     f:SetFrameStrata("MEDIUM")
     f.restingAlpha = 0.8
 
-    ns.Theme:ApplyBg(f)
-    ns.Theme:ApplyBorderCompact(f)
-
     -- Header strip
     local header = CreateFrame("Frame", nil, f)
     header:SetSize(FRAME_W, HEADER_H)
     header:SetPoint("TOPLEFT")
-    local hbg = header:CreateTexture(nil, "BACKGROUND")
-    hbg:SetAllPoints()
-    hbg:SetColorTexture(T.accent[1]*0.08, T.accent[2]*0.08, T.accent[3]*0.08, 1)
-    local hdiv = header:CreateTexture(nil, "OVERLAY")
-    hdiv:SetHeight(1)
-    hdiv:SetPoint("BOTTOMLEFT"); hdiv:SetPoint("BOTTOMRIGHT")
-    hdiv:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.45)
-    local titleLbl = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local titleLbl = header:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     titleLbl:SetPoint("LEFT", header, "LEFT", PANEL_PAD, 0)
     titleLbl:SetText("DUNGEONS")
     titleLbl:SetTextColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
+    ns.Theme:ApplyHudFont(titleLbl)
 
     -- Close button (inside header) — uses WoW minimize button texture (always renders)
     local closeBtn = CreateFrame("Button", nil, header)
@@ -276,8 +270,8 @@ local function MakePanel()
     local rHl = refreshBtn:CreateTexture(nil, "HIGHLIGHT")
     rHl:SetAllPoints(); rHl:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.20)
     local rIcon = refreshBtn:CreateTexture(nil, "OVERLAY")
-    rIcon:SetPoint("CENTER"); rIcon:SetSize(12, 12)
-    rIcon:SetTexture("Interface\\Buttons\\UI-RefreshButton")
+    rIcon:SetPoint("CENTER"); rIcon:SetSize(14, 14)
+    rIcon:SetAtlas("UI-RefreshButton", false)
     rIcon:SetVertexColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
     refreshBtn:SetScript("OnEnter", function()
         f:SetAlpha(1)
@@ -317,8 +311,27 @@ local function MakePanel()
             end
             return
         end
-        -- Normal click: don't wipe the cache (keep what we have visible while waiting
-        -- for updated responses). Just re-request and refresh after delay.
+        -- Always rebuild the mapID lookup before refreshing — it may have been
+        -- populated before M+ data was ready (MYTHIC_PLUS_CURRENT_AFFIX_UPDATE).
+        BuildChallengeMapLookup()
+        -- Visual feedback: spin the icon 180° for 0.4 s using an animation group.
+        rIcon:SetVertexColor(T.accent[1], T.accent[2], T.accent[3], 1)
+        C_Timer.After(0.6, function()
+            rIcon:SetVertexColor(T.textDim[1], T.textDim[2], T.textDim[3], 1)
+        end)
+        -- Force-seed own keystone from C_MythicPlus directly (bypasses LibKeystone).
+        -- This ensures the pill shows even if LibKeystone never fired for this session.
+        do
+            local mapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID()
+            local level = C_MythicPlus.GetOwnedKeystoneLevel()
+            if type(mapID) == "number" and mapID > 0 and type(level) == "number" and level > 0 then
+                local shortName = (UnitName("player") or ""):match("^([^%-]+)") or ""
+                if shortName ~= "" then
+                    partyKeyCache[shortName] = { mapID = mapID, level = level }
+                end
+            end
+        end
+        -- Immediate repaint, then request from party with retries.
         RefreshButtons()
         RequestPartyKeystones()
         C_Timer.After(4, RefreshButtons)
@@ -350,19 +363,6 @@ local function MakeButton(parent, dungeon, idx)
     btn:SetAttribute("type", "spell")
     btn:SetAttribute("spell", dungeon.spellID)
 
-    -- 1px neutral border using OVERLAY sublayer 7 so they render above
-    -- InsecureActionButtonTemplate's own overlay textures.
-    local function MakeEdge()
-        local t = btn:CreateTexture(nil, "OVERLAY", nil, 7)
-        t:SetColorTexture(T.border[1], T.border[2], T.border[3], 0.6)
-        return t
-    end
-    local edgeT = MakeEdge(); edgeT:SetPoint("TOPLEFT",btn,"TOPLEFT",0,0);      edgeT:SetPoint("TOPRIGHT",btn,"TOPRIGHT",0,0);    edgeT:SetHeight(1)
-    local edgeB = MakeEdge(); edgeB:SetPoint("BOTTOMLEFT",btn,"BOTTOMLEFT",0,0); edgeB:SetPoint("BOTTOMRIGHT",btn,"BOTTOMRIGHT",0,0); edgeB:SetHeight(1)
-    local edgeL = MakeEdge(); edgeL:SetPoint("TOPLEFT",btn,"TOPLEFT",0,0);      edgeL:SetPoint("BOTTOMLEFT",btn,"BOTTOMLEFT",0,0);  edgeL:SetWidth(1)
-    local edgeR = MakeEdge(); edgeR:SetPoint("TOPRIGHT",btn,"TOPRIGHT",0,0);    edgeR:SetPoint("BOTTOMRIGHT",btn,"BOTTOMRIGHT",0,0); edgeR:SetWidth(1)
-    btn.edgeT, btn.edgeB, btn.edgeL, btn.edgeR = edgeT, edgeB, edgeL, edgeR
-
     local bg = btn:CreateTexture(nil, "BORDER")
     bg:SetPoint("TOPLEFT", btn, "TOPLEFT", 1, -1)
     bg:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -1, 1)
@@ -376,14 +376,29 @@ local function MakeButton(parent, dungeon, idx)
     icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
     btn.icon = icon
 
+    -- Cooldown frame (used only for timing; all visuals are suppressed)
+    local cdFrame = CreateFrame("Cooldown", nil, btn, "CooldownFrameTemplate")
+    cdFrame:SetAllPoints(btn)
+    cdFrame:SetDrawEdge(false)
+    cdFrame:SetDrawSwipe(false)
+    cdFrame:SetHideCountdownNumbers(true)
+    btn.cdFrame = cdFrame
+
+    -- Cooldown text overlay — shown on all buttons while a CD is active
+    local cdText = btn:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
+    cdText:SetPoint("CENTER", btn, "CENTER")
+    ns.Theme:ApplyHudFont(cdText)
+    cdText:SetTextColor(1, 0.82, 0.1, 1)
+    cdText:Hide()
+    btn.cdText = cdText
+
     -- Label
-    local label = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    label:SetShadowColor(0, 0, 0, 1)
-    label:SetShadowOffset(1, -1)
+    local label = btn:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
     label:SetPoint("LEFT", icon, "RIGHT", 6, 0)
     label:SetPoint("RIGHT", btn, "RIGHT", -4, 0)
     label:SetJustifyH("LEFT")
     label:SetText(dungeon.name)
+    ns.Theme:ApplyHudFont(label)
     btn.label = label
 
     -- Left accent bar: class color of primary keystone owner; hidden when no keys.
@@ -412,10 +427,9 @@ local function MakeButton(parent, dungeon, idx)
         pillBar:SetWidth(2)
         pillBar:SetPoint("TOPLEFT",    pill, "TOPLEFT",    0, 0)
         pillBar:SetPoint("BOTTOMLEFT", pill, "BOTTOMLEFT", 0, 0)
-        local pillText = pill:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local pillText = pill:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
         pillText:SetPoint("CENTER", pill, "CENTER", 1, 0)
-        pillText:SetShadowColor(0, 0, 0, 1)
-        pillText:SetShadowOffset(1, -1)
+        ns.Theme:ApplyHudFont(pillText)
         btn.pills[p] = { frame = pill, bg = pillBg, bar = pillBar, text = pillText }
     end
 
@@ -437,6 +451,60 @@ local function MakeButton(parent, dungeon, idx)
 
     btn.spellID = dungeon.spellID
     return btn
+end
+
+-- [ COOLDOWN ] ----------------------------------------------------------------
+-- All teleport spells share a cooldown category; reading one gives the global
+-- timer. We prefer a learned spell so the data is meaningful, but fall back to
+-- the first entry if none are known yet.
+local function UpdateCooldowns()
+    if not buttons then return end
+    local cdInfo
+    for _, btn in ipairs(buttons) do
+        if btn.learned then
+            cdInfo = C_Spell.GetSpellCooldown(btn.spellID)
+            break
+        end
+    end
+    if not cdInfo then
+        cdInfo = C_Spell.GetSpellCooldown(buttons[1] and buttons[1].spellID or DUNGEONS[1].spellID)
+    end
+
+    -- Calculate remaining time (ignore GCDs ≤ 1.5 s)
+    local remaining = 0
+    if cdInfo and cdInfo.startTime and cdInfo.startTime > 0 and cdInfo.duration > 1.5 then
+        remaining = (cdInfo.startTime + cdInfo.duration) - GetTime()
+        if remaining < 0 then remaining = 0 end
+    end
+
+    local cdStr
+    if remaining > 0 then
+        local mins = math.floor(remaining / 60)
+        local secs = math.floor(remaining % 60)
+        if mins > 0 then
+            cdStr = string.format("%d:%02d", mins, secs)
+        else
+            cdStr = string.format("%ds", secs)
+        end
+    end
+
+    for _, btn in ipairs(buttons) do
+        if btn.cdFrame then
+            if cdInfo then
+                btn.cdFrame:SetCooldown(cdInfo.startTime, cdInfo.duration)
+            else
+                btn.cdFrame:Clear()
+            end
+        end
+        if btn.cdText then
+            if cdStr then
+                btn.cdText:SetText(cdStr)
+                btn.cdText:Show()
+            else
+                btn.cdText:Hide()
+            end
+        end
+    end
 end
 
 -- [ REFRESH LOGIC ] -----------------------------------------------------------
@@ -464,13 +532,13 @@ local function RefreshButtons()
         
         if learned then
             btn:Enable()
-            btn.label:SetTextColor(LEARNED_COLOR[1], LEARNED_COLOR[2], LEARNED_COLOR[3])
+            btn.label:SetTextColor(LEARNED_COLOR.r, LEARNED_COLOR.g, LEARNED_COLOR.b)
         else
             btn:Disable()
-            btn.label:SetTextColor(UNKNOWN_COLOR[1], UNKNOWN_COLOR[2], UNKNOWN_COLOR[3])
+            btn.label:SetTextColor(UNKNOWN_COLOR.r, UNKNOWN_COLOR.g, UNKNOWN_COLOR.b)
         end
         
-        -- ── Keystone border + badge ──────────────────────────────────────────
+        -- [ KEYSTONE BORDER + BADGE ] -----------------------------------------
         local owners = partyKeys[i]  -- array of { r,g,b,level,name,unit } or nil
 
         -- Show if: spell learned, OR showUnknown is on, OR a party member has this key
@@ -529,6 +597,7 @@ local function RefreshButtons()
     -- Dynamically shrink the main panel if spells are hidden
     local dynamicH = HEADER_H + (visibleCount > 0 and (visibleCount * (BTN_H + BTN_PAD)) + PANEL_PAD * 2 - BTN_PAD or PANEL_PAD * 2)
     panel:SetHeight(dynamicH)
+    UpdateCooldowns()
 end
 
 -- [ PUBLIC API ] --------------------------------------------------------------
@@ -606,9 +675,14 @@ function Teleport.Init(addon)
     watcher:RegisterEvent("CHALLENGE_MODE_COMPLETED")
     watcher:RegisterEvent("BAG_UPDATE_DELAYED")
     watcher:RegisterEvent("MYTHIC_PLUS_CURRENT_AFFIX_UPDATE")
+    watcher:RegisterEvent("SPELL_UPDATE_COOLDOWN")
+    watcher:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
     watcher:SetScript("OnEvent", function(self, event, ...)
         if event == "SPELLS_CHANGED" then
             RefreshButtons()
+
+        elseif event == "SPELL_UPDATE_COOLDOWN" or event == "UNIT_SPELLCAST_SUCCEEDED" then
+            UpdateCooldowns()
 
         elseif event == "CHALLENGE_MODE_KEYSTONE_SLOTTED" then
             -- Key slotted — we're about to start; grab latest party keys.

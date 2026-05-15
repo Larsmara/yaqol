@@ -11,11 +11,12 @@ local TIME_BAR_H      = 16
 local FORCES_BAR_H    = 12
 local FRAME_W         = 320
 local FRAME_W_WIDE    = 400   -- when showKillTimes is enabled
-local FRAME_H         = 90    -- base height (before boss rows)
+local FRAME_H         = 102   -- base height (before boss rows)
 local BOSS_LINE_H     = 18    -- height per vertical boss entry
-local HDR_Y           = -16   -- center of header content row
-local TIME_BAR_Y      = -36   -- top of time progress bar
-local BOSS_LIST_Y     = -58   -- top of first boss entry (below time bar)
+local HDR_Y           = -16   -- center of header content row (level + deaths)
+local AFFIX_Y         = -32   -- center of affix names row (below header)
+local TIME_BAR_Y      = -48   -- top of time progress bar
+local BOSS_LIST_Y     = -70   -- top of first boss entry (below time bar)
 local BORDER_COLOR    = { r = 0.133, g = 0.133, b = 0.133 }  -- #222222
 local T = ns.Theme  -- populated by Theme.Init() before GetOrMakeFrame runs
 
@@ -193,9 +194,9 @@ local function GetOrMakeFrame()
     TagBaseSize(deathText)
     f.deathText = deathText
 
-    -- Affix names — right-aligned text in the header row.
-    local affixText = f:CreateFontString(nil, "OVERLAY", "SystemFont_Med1")
-    affixText:SetPoint("RIGHT", f, "TOPRIGHT", -8, HDR_Y)
+    -- Affix names — own row below the header, right-aligned.
+    local affixText = f:CreateFontString(nil, "OVERLAY", "SystemFont_Small")
+    affixText:SetPoint("RIGHT", f, "TOPRIGHT", -8, AFFIX_Y)
     affixText:SetJustifyH("RIGHT")
     affixText:SetTextColor(0.65, 0.65, 0.65, 1)
     ns.Theme:ApplyHudFont(affixText)
@@ -406,6 +407,7 @@ local function UpdateDisplay()
     local forcesBarH = math.ceil(FORCES_BAR_H * scale)
     local bossLineH = math.ceil(BOSS_LINE_H * scale)
     local hdrY      = math.floor(HDR_Y * scale)
+    local affixY    = math.floor(AFFIX_Y * scale)
     local timeBarY  = math.floor(TIME_BAR_Y * scale)
     local bossListY = timeBarY - timeBarH - math.ceil(6 * scale)
 
@@ -413,7 +415,7 @@ local function UpdateDisplay()
     f.levelText:ClearAllPoints()
     f.levelText:SetPoint("LEFT", f, "TOPLEFT", 10, hdrY)
     f.affixText:ClearAllPoints()
-    f.affixText:SetPoint("RIGHT", f, "TOPRIGHT", -8, hdrY)
+    f.affixText:SetPoint("RIGHT", f, "TOPRIGHT", -8, affixY)
 
     -- Reposition and resize time bar
     f.timeBarBg:ClearAllPoints()

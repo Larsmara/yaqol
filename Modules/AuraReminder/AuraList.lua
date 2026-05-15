@@ -98,7 +98,10 @@ local function PlayerHasAura(spellID)
             if InCombatLockdown() and _preCombatCacheValid then
                 return _preCombatCache[spellID] == true
             end
-            return false
+            -- OOC: GetPlayerAuraBySpellID returned a non-nil aura, so the buff
+            -- IS present even though the spellId field is tainted.  Trust the
+            -- existence of the return value rather than the unreadable field.
+            return true
         end
         -- Check expiry — guard the expirationTime field too
         if IsSecret(aura.expirationTime) then return true end  -- secret expiry = treat as permanent

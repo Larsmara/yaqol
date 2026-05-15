@@ -43,6 +43,9 @@ ns.Defaults = {
         mythicTimer = {
             enabled       = true,
             hideBlizzard  = true,   -- hide default Blizzard M+ block in objective tracker
+            showBackdrop  = false,  -- optional semi-transparent backdrop + 1px border
+            showKillTimes = false,  -- show per-boss kill timestamps in the boss row
+            fontScale     = 1.0,    -- font size multiplier (0.7–1.5)
             point = "CENTER", relPoint = "CENTER", x = 300, y = 200,
             -- Completion message
             completionMsg        = false,
@@ -100,7 +103,7 @@ ns.Defaults = {
         -- Raid Tools bar
         raidTools = {
             enabled   = true,
-            minimized = false,
+            fadeOut    = false,   -- when true, bar ghosts to low alpha and fades in on hover
             point    = "CENTER", relPoint = "CENTER", x = 0, y = 200,
         },
 
@@ -188,7 +191,6 @@ ns.Defaults = {
         },
     },
     global = {
-        theme = "mellow",  -- "mellow" | "blizzard"
         runHistoryByChar = {},  -- ["Realm-Name"] = { runs[] }
         historyPanelPos  = { point = "CENTER", relPoint = "CENTER", x = 0, y = 0 },
     },
